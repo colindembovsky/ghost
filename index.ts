@@ -1,6 +1,15 @@
 import converter from '@tryghost/html-to-mobiledoc';
 import parser from 'xml2json';
 import fs from 'fs';
+import { createParserPlugins } from './plugins';
+import { JSDOM } from 'jsdom';
+
+const plugins = createParserPlugins({
+    createDocument(html) {
+        let doc = (new JSDOM(html)).window.document;
+        return doc;
+    }
+});
 
 const tags = [
     { id: 1, name: "Build", slug: "build", description: "Posts about build" },
@@ -45,10 +54,8 @@ function getPost(path: string) {
     const postObj = JSON.parse(postString);
     const post = postObj.post;
     
-    const mobileDocContent = converter.toMobiledoc(post.content);
+    const mobileDocContent = converter.toMobiledoc(post.content, { plugins });
     const body = JSON.stringify(mobileDocContent);
-
-    console.log(post);
 
     return {
         post: {
@@ -68,8 +75,11 @@ let posts = <any[]>[];
 let postTags = <any[]>[];
 // TODO: loop through XML files in 'exported' folder
 const postData = getPost("exported/build-fails-path-limit-exceeded.xml");
+//const postData2 = getPost("exported/azure-pipeline-parameters.xml");
 postTags.push(postData.postTags);
 posts.push(postData.post);
+// postTags.push(postData2.postTags);
+// posts.push(postData2.post);
 
 const gdpost = {
     db: [

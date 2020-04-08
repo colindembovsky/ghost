@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>12e92756-f244-471c-ada5-81b6f17889bc</id>
+  <title>Azure Pipeline Parameters</title>
+  <slug>azure-pipeline-parameters</slug>
+  <shortUrl>https://colinsalmcorner.com/post/azure-pipeline-parameters</shortUrl>
+  <author></author>
+  <pubDate>2020-02-26 23:35:44</pubDate>
+  <lastModified>2020-02-26 23:35:44</lastModified>
+  <content>&lt;p&gt;In a &lt;a href="https://colinsalmcorner.com/post/azure-pipeline-variables"&gt;previous post&lt;/a&gt;, I did a deep dive into Azure Pipeline variables. That post turned out to be longer than I anticipated, so I left off the topic of parameters until this post.&lt;/p&gt;&lt;h2&gt;Type: Any&lt;/h2&gt;&lt;p&gt;If we look at the YML schema for variables and parameters, we’ll see this definition:&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;variables: { string: string }
+
+parameters: { string: any }
+&lt;/pre&gt;&lt;p&gt;Parameters are essentially the same as variables, with the following important differences:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Parameters are dereferenced using “${{}}” notation&lt;/li&gt;&lt;li&gt;Parameters can be complex objects&lt;/li&gt;&lt;li&gt;Parameters are expanded at queue time, not at run time&lt;/li&gt;&lt;li&gt;Parameters can only be used in templates (you cannot pass parameters to a pipeline, only variables)&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Parameters allow us to do interesting things that we cannot do with variables, like if statements and loops. Before we dive in to some examples, let’s consider &lt;em&gt;variable dereferencing&lt;/em&gt;.&lt;/p&gt;&lt;h2&gt;Variable Dereferencing&lt;/h2&gt;&lt;p&gt;The &lt;a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/variables?view=azure-devops&amp;amp;tabs=yaml%2Cbatch#understand-variable-syntax"&gt;official documentation&lt;/a&gt; specifies three methods of dereferencing variables: macros, template expressions and runtime expressions:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Macros: this is the “$(var)” style of dereferencing&lt;/li&gt;&lt;li&gt;Template parameters use the syntax “${{ parameter.name }}”&lt;/li&gt;&lt;li&gt;Runtime expressions, which have the format “$[variables.var]”&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;In practice, the main thing to bear in mind &lt;em&gt;is when the value is injected&lt;/em&gt;. “$()” variables are expanded at runtime, while “${{}}” parameters are expanded at &lt;em&gt;compile&lt;/em&gt; time. Knowing this rule can save you some headaches.&lt;p&gt;The other notable difference is left vs right side: variables can only expand on the right side, while parameters can expand on left or right side. For example:&lt;pre class="brush: javascript;"&gt;# valid syntax
+key: $(value)
+key: $[variables.value]
+${{ parameters.key }} : ${{ parameters.value }}
+
+# invalid syntax
+$(key): value
+$[variables.key]: value
+&lt;/pre&gt;&lt;p&gt;Here's a real-life example from a &lt;a href="http://pipelinehttps://github.com/10thmagnitude/TailwindTraders-Backend/blob/master/Pipeline/azure-pipeline.yaml"&gt;TailWind Traders&lt;/a&gt; I created. In this case, the repo contains several microservices that are deployed as Kubernetes services using Helm charts. Even though the code for each microservice is different, the &lt;em&gt;deployment&lt;/em&gt; for each is identical, except for the path to the Helm chart and the image repository.&lt;/p&gt;
+&lt;p&gt;Thinking about this scenario, I wanted a template for deployment steps that I could parameterize. Rather than copy the entire template, I used a “for” expression to iterate over a map of complex properties. For each service deployment, I wanted:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;
+serviceName: The path to the service Helm chart&lt;/li&gt;&lt;li&gt;serviceShortName: Required because the deployment requires two steps: “bake” the manifest, and then “deploy” the baked manifest. The “deploy” task references the output of the “bake” step, so I needed a name that wouldn't collide as I expanded it multiple times in the “for” loop&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Here's a snippet of the template steps:&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;# templates/step-deploy-container-service.yml
+parameters:
+  serviceName: ''  # product-api
+  serviceShortName: '' # productapi
+  environment: dev
+  imageRepo: ''  # product.api
+  ...
+  services: []
+
+steps:
+- ${{ each s in parameters.services }}:
+  - ${{ if eq(s.skip, 'false') }}:
+    - task: KubernetesManifest@0
+      displayName: Bake ${{ s.serviceName }} manifest
+      name: bake_${{ s.serviceShortName }}
+      inputs:
+        action: bake
+        renderType: helm2
+        releaseName: ${{ s.serviceName }}-${{ parameters.environment }}
+        ...
+    - task: KubernetesManifest@0
+      displayName: Deploy ${{ s.serviceName }} to k8s
+      inputs:
+        manifests: $(bake_${{ s.serviceShortName }}.manifestsBundle)
+        imagePullSecrets: $(imagePullSecret)
+&lt;/pre&gt;&lt;p&gt;Here's a snippet of the pipeline that references the template:&lt;pre class="brush: javascript;"&gt;...
+  - template: templates/step-deploy-container-service.yml
+    parameters:
+      acrName: $(acrName)
+      environment: dev
+      ingressHost: $(IngressHost)
+      tag: $(tag)
+      autoscale: $(autoscale)
+      services:
+      - serviceName: 'products-api'
+        serviceShortName: productsapi
+        imageRepo: 'product.api'
+        skip: false
+      - serviceName: 'coupons-api'
+        serviceShortName: couponsapi
+        imageRepo: 'coupon.api'
+        skip: false
+      ...
+      - serviceName: 'rewards-registration-api'
+        serviceShortName: rewardsregistrationapi
+        imageRepo: 'rewards.registration.api'
+        skip: true
+&lt;/pre&gt;&lt;p&gt;
+In this case, “services” could not have been a variable since variables can only have “string” values. Hence I had to make it a parameter.&lt;/p&gt;&lt;h2&gt;Parameters and Expressions&lt;/h2&gt;&lt;p&gt;There are a number of expressions that allow us to create more complex scenarios, especially in conjunction with parameters. The example above uses both the “each” and the “if” expressions, along with the boolean function “eq”. Expressions can be used to loop over steps or ignore steps (as an equivalent of setting the “condition” property to “false”). Let's look at an example in a bit more detail. Imagine you have this template:&lt;br&gt;
+&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;# templates/steps.yml
+parameters:
+  services: []
+
+steps:
+- ${{ each s in parameters.services }}:
+  - ${{ if eq(s.skip, 'false') }}:
+    - script: echo 'Deploying ${{ s.name }}'
+&lt;/pre&gt;&lt;p&gt;Then if you specify the following pipeline:&lt;pre class="brush: javascript;"&gt;jobs:
+- job: deploy
+  - steps: templates/steps.yml
+    parameters:
+      services:
+      - name: foo
+        skip: false
+      - name: bar
+        skip: true
+      - name: baz
+        skip: false
+&lt;/pre&gt;&lt;p&gt;&lt;br&gt;
+you should get the following output from the steps:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;Deploying foo&lt;br&gt;
+Deploying baz&lt;/font&gt;&lt;br&gt;
+&lt;/p&gt;&lt;p&gt;Parameters can also be used to inject steps. Imagine you have a set of steps that you want to repeat with different parameters - except that in some cases, a slightly different middle step needs to be executed. You can create a template that has a parameter called “middleSteps” where you can pass in the middle step(s) as a parameter!&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;# templates/steps.yml
+parameters:
+  environment: ''
+  middleSteps: []
+
+steps:
+- script: echo 'Prestep'
+- ${{ parameters.middleSteps }}
+- script: echo 'Post-step'
+
+# pipelineA
+jobs:
+- job: A
+  - steps: templates/steps.yml
+    parameters:
+      middleSteps:
+      - script: echo 'middle A step 1'
+      - script: echo 'middle A step 2'
+
+# pipelineB
+jobs:
+- job: B
+  - steps: templates/steps.yml
+    parameters:
+      middleSteps:
+      - script: echo 'This is job B middle step 1'
+      - task: ...  # some other task
+      - task: ...  # some other task
+&lt;/pre&gt;&lt;p&gt;For a real world example of this, see this &lt;a href="https://github.com/10thmagnitude/MLOpsDemo/blob/master/templates/job-train-model.yml"&gt;template file&lt;/a&gt;. This is a demo where I have two scenarios for machine learning: a manual training process and an AutoML training process. The pre-training and post-training steps are the same, but the training steps are different: the template reflects this scenario by allowing me to pass in different “TrainingSteps” for each scenario.&lt;/p&gt;&lt;h2&gt;Extends Templates&lt;/h2&gt;&lt;p&gt;Passing steps as parameters allows us to create what Azure DevOps calls “&lt;a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/security/templates?view=azure-devops#use-extends-templates"&gt;extends templates&lt;/a&gt;”. These provide rails around what portions of a pipeline can be customized, allowing template authors to inject (or remove) steps. The following example from the documentation demonstrates this:&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;# template.yml
+parameters:
+- name: usersteps
+  type: stepList
+  default: []
+steps:
+- ${{ each step in parameters.usersteps }}:
+  - ${{ each pair in step }}:
+    ${{ if ne(pair.key, 'script') }}:
+      ${{ pair.key }}: ${{ pair.value }}
+
+# azure-pipelines.yml
+extends:
+  template: template.yml
+  parameters:
+    usersteps:
+    - task: MyTask@1
+    - script: echo This step will be stripped out and not run!
+    - task: MyOtherTask@2
+&lt;/pre&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Parameters allow us to pass and manipulate complex objects, which we are unable to do using variables. They can be combined with expressions to create complex control flow. Finally, parameters allow us to control how a template is customized using extends templates. &lt;/p&gt;&lt;p&gt;Happy parameterizing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments></comments>
+  <viewCount>0</viewCount>
+</post>
