@@ -1,15 +1,23 @@
 import converter from '@tryghost/html-to-mobiledoc';
 import parser from 'xml2json';
 import fs from 'fs';
-import { createParserPlugins } from './plugins';
+import { createParserPlugins } from '@tryghost/kg-parser-plugins';
+import { fontToHtmlCard, preCodeToCardCustom } from './customPlugins';
 import { JSDOM } from 'jsdom';
 
-const plugins = createParserPlugins({
+const defaultPlugins = createParserPlugins({
     createDocument(html) {
         let doc = (new JSDOM(html)).window.document;
         return doc;
     }
 });
+
+let plugins = <any[]>[];
+defaultPlugins.forEach(p => {
+    if (p.name !== "preCodeToCard") plugins.push(p);
+});
+plugins.push(preCodeToCardCustom);
+plugins.push(fontToHtmlCard);
 
 const tags = [
     { id: 1, name: "Build", slug: "build", description: "Posts about build" },
@@ -75,11 +83,11 @@ let posts = <any[]>[];
 let postTags = <any[]>[];
 // TODO: loop through XML files in 'exported' folder
 const postData = getPost("exported/build-fails-path-limit-exceeded.xml");
-//const postData2 = getPost("exported/azure-pipeline-parameters.xml");
+const postData2 = getPost("exported/azure-pipeline-parameters.xml");
 postTags.push(postData.postTags);
 posts.push(postData.post);
-// postTags.push(postData2.postTags);
-// posts.push(postData2.post);
+postTags.push(postData2.postTags);
+posts.push(postData2.post);
 
 const gdpost = {
     db: [
