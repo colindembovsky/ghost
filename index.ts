@@ -2,7 +2,7 @@ import converter from '@tryghost/html-to-mobiledoc';
 import parser from 'xml2json';
 import fs from 'fs';
 import { createParserPlugins } from '@tryghost/kg-parser-plugins';
-import { fontToHtmlCard, preCodeToCardCustom } from './customPlugins';
+import { fontToHtmlCard, preCodeToCardCustom, imgToCardCustom } from './customPlugins';
 import { JSDOM } from 'jsdom';
 
 const defaultPlugins = createParserPlugins({
@@ -14,10 +14,16 @@ const defaultPlugins = createParserPlugins({
 
 let plugins = <any[]>[];
 defaultPlugins.forEach(p => {
-    if (p.name !== "preCodeToCard") plugins.push(p);
+    if (
+        p.name !== "preCodeToCard" &&
+        p.name !== "imgToCard"
+    ) {
+        plugins.push(p);
+    }
 });
 plugins.push(preCodeToCardCustom);
 plugins.push(fontToHtmlCard);
+plugins.push(imgToCardCustom);
 
 const tags = [
     { id: 1, name: "Build", slug: "build", description: "Posts about build" },
@@ -81,13 +87,22 @@ function getPost(path: string) {
 
 let posts = <any[]>[];
 let postTags = <any[]>[];
-// TODO: loop through XML files in 'exported' folder
-const postData = getPost("exported/build-fails-path-limit-exceeded.xml");
-const postData2 = getPost("exported/azure-pipeline-parameters.xml");
-postTags.push(postData.postTags);
-posts.push(postData.post);
-postTags.push(postData2.postTags);
-posts.push(postData2.post);
+
+var files = fs.readdirSync("exported");
+files.forEach(f => {
+    const postData = getPost("exported/" + f);
+    console.log("Imported " + postData.post.title);
+    postTags.push(postData.postTags);
+    posts.push(postData.post);
+});
+
+// // TODO: loop through XML files in 'exported' folder
+// const postData = getPost("exported/build-fails-path-limit-exceeded.xml");
+// const postData2 = getPost("exported/azure-pipeline-parameters.xml");
+// postTags.push(postData.postTags);
+// posts.push(postData.post);
+// postTags.push(postData2.postTags);
+// posts.push(postData2.post);
 
 const gdpost = {
     db: [
@@ -98,7 +113,7 @@ const gdpost = {
             },
             data: {
                 posts,
-                posts_tags: postData.postTags,
+                posts_tags: postTags,
                 tags,
             }
         }   
