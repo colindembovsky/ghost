@@ -1,4 +1,9 @@
 [{
+    "from": "^\/posts\/files\/(.+)",
+    "to": "/content/images/files/$1",
+    "permanent": true
+},
+{
     "from": "^\/post\/(.+)",
     "to": "/$1",
     "permanent": true
