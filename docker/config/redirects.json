@@ -1,0 +1,7 @@
+[
+    {
+        "from": "^\/post\/(.+)",
+        "to": "/$1",
+        "permanent": true
+    }
+]
