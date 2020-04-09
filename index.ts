@@ -25,7 +25,7 @@ plugins.push(preCodeToCardCustom);
 plugins.push(fontToHtmlCard);
 plugins.push(imgToCardCustom);
 
-const tags = [
+const ALLTAGS = [
     { id: 1, name: "Build", slug: "build", description: "Posts about build" },
     { id: 2, name: "Testing", slug: "testing", description: "Posts about Testing" },
     { id: 3, name: "Source Control", slug: "sourcecontrol", description: "Posts about Source Control" },
@@ -45,12 +45,12 @@ const tags = [
 
 function getTags(post) {
     let cats = <any[]>[];
-    cats.push(post.categories.category); // TODO: push more categories if this is an array
+    cats.push(...post.categories.category);
 
     const tags = cats.map(c => {
         const lookupTagName = c.toLowerCase().replace(" ", "");
         if (lookupTagName === "teambuild") return 1;
-        const lookupTag = tags.filter(t => t.name === lookupTag);
+        const lookupTag = ALLTAGS.filter(t => t.name === lookupTagName);
         if (lookupTag) return lookupTagName.id;
         return 15;
     });
@@ -114,10 +114,13 @@ const gdpost = {
             data: {
                 posts,
                 posts_tags: postTags,
-                tags,
+                ALLTAGS,
             }
         }   
     ]
 }
 
-fs.writeFileSync("import.json", JSON.stringify(gdpost));
+// hack the urls for images
+const pattern = /http(s?):\/\/colinsalmcorner.com\/posts\/files\//gi;
+let importContent = JSON.stringify(gdpost).replace(pattern, "https://colinsalmcorner.azureedge.net/ghostcontent/images/files/");
+fs.writeFileSync("import.json", importContent);
