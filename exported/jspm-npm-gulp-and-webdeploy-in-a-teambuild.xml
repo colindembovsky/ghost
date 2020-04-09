@@ -102,7 +102,9 @@ $x = cmd /c "rd $srcDir\src\MyWebProject\node_modules /s /q" 2&amp;gt;&amp;amp;1
 &lt;p&gt;Any build/deploy automation can be tricky to set up initially – especially if you’ve got as many moving parts as we have in our solution. However, the effort pays off, since you’ll be executing the build/deploy cycle many hundreds of times over the lifetime of an agile project – each time you can deploy from a single button-press is a win!&lt;/p&gt;
 &lt;p&gt;Happy packaging!&lt;/p&gt;</content>
   <ispublished>true</ispublished>
-  <categories></categories>
+  <categories>
+    <category>development</category>
+  </categories>
   <comments>
     <comment isAdmin="false" isApproved="true" id="3a2b692b-3961-4fc0-a257-cd0c6968279c">
       <author>Steve Cadwallader</author>
