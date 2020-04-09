@@ -1,0 +1,514 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>65a85990-3924-4088-8866-9860cf8045b1</id>
+  <title>Using WebDeploy in vNext Releases</title>
+  <slug>using-webdeploy-in-vnext-releases</slug>
+  <shortUrl>http://bit.ly/1nIQOiB</shortUrl>
+  <author></author>
+  <pubDate>2014-10-27 08:43:21</pubDate>
+  <lastModified>2016-03-31 17:34:49</lastModified>
+  <content>&lt;p&gt;A few months ago Release Management (RM) Update 3 preview was released. One of the big features in that release was the ability to &lt;a href="http://blogs.msdn.com/b/visualstudioalm/archive/2014/07/07/how-to-setup-environments-for-agent-less-deployments-in-release-management-release-management-2013-with-update-3-rc.aspx" target="_blank"&gt;deploy without agents using PowerShell DSC&lt;/a&gt;. Once I saw this feature, I started a journey to see how far I could take deployments using this amazing technology. I had to learn how DSC worked, and from there I had to figure out how to use DSC with RM! The ride was a bit rocky at first, but I feel comfortable with what I am able to do using RM with PowerShell DSC.&lt;/p&gt; &lt;h2&gt;Readying Environments for Deployment&lt;/h2&gt; &lt;p&gt;In my mind there were two distinct steps that I wanted to be able to manage using RM/DSC:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Configure an environment (set of machines) to make them ready to run my application  &lt;li&gt;Deploy my application to these servers&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;The RM/DSC posts I’ve blogged so far deal with readying the environment:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;&lt;a href="http://colinsalmcorner.com/post/using-powershell-dsc-in-release-management-the-hidden-manual" target="_blank"&gt;Using PowerShell DSC in Release Management: The Hidden Manual&lt;/a&gt;  &lt;li&gt;&lt;a href="http://colinsalmcorner.com/post/more-dsc-release-management-goodness-readying-a-webserver-for-deployment" target="_blank"&gt;More DSC Release Management Goodness: Readying a Webserver for Deployment&lt;/a&gt;  &lt;li&gt;&lt;a href="http://colinsalmcorner.com/post/install-and-configure-sql-server-using-powershell-dsc" target="_blank"&gt;Install and Configure SQL Server using PowerShell DSC&lt;/a&gt; &lt;li&gt;&lt;a href="http://colinsalmcorner.com/post/new-vnext-config-variable-options-in-rm-update-4-rc" target="_blank"&gt;New vNext Config Variable Options in RM Update 4 RC&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;So we’re now at a point where we can ensure that the machines that we want to deploy our application to are ready for our application – in the case of a SQL server SQL is installed and configured correctly. In the case of a webserver, IIS is installed and configured, additional runtimes are present (like MVC) and Webdeploy is installed and ports opened so that I can deploy using Webdeploy. So how then do I deploy my application?&lt;/p&gt; &lt;h2&gt;Good Packages&lt;/h2&gt; &lt;p&gt;Good deployment always beings with good packages. To get a good package, you’ll need an &lt;a href="http://colinsalmcorner.com/post/automated-buildswhy-theyre-absolutely-essential-(part-1)" target="_blank"&gt;automated build&lt;/a&gt; that ties into source control (and hopefully work items) and performs automated unit testing with coverage. This gives you some metrics as to the quality of your builds. The next critical piece that you’ll need is to make sure that you can manage multiple configurations – after all, you’ll be wanting to deploy the same package to Production that you deployed and testing in UAT, so the package shouldn’t have configuration hard-coded in. In my agent-based &lt;a href="http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way" target="_blank"&gt;Webdeploy/RM post&lt;/a&gt;, I show how you can create a team build that puts placeholders into the SetParameters.xml file, so that you can put in environment-specific values when you deploy. The package I created for that deployment process can be used for deployment via DSC as well – just showing that if you create a good package during build, you have more release options available to you.&lt;/p&gt; &lt;p&gt;Besides the package, you’ll want to source control your DSC scripts. This way you can track changes that you make to your scripts over time. Also, having the scripts “travel” with your binaries means you only have to look in one location to find both deployment packages (or binaries) and the scripts you need to deploy them. Here’s how I organized my website and scripts in TF Version Control:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/6ae1308a-fe3e-4a9f-90ab-373adc8088f9.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b5ea780d-7a2d-4000-bc0a-6a20c0e0e33b.png" width="199" height="100"&gt;&lt;/a&gt;The actual solution (with my websites, libraries and database schema project) is in the FabrikamFiber.CallCenter folder. I have some 3rd party libraries that are checked into the lib folder. The build folder has some utilities for running the build (like the xunit test adapter). And you can also see the DscScripts folder where I keep the scripts for deploying this application.&lt;/p&gt; &lt;p&gt;By default on a team build, only compiled output is placed into the drop folder – you don’t typically get any source code. I haven’t included the scripts in my solution or projects, so I used a post-build script to copy the scripts from the source folder to the bin folder during the build – the build then copies everything in the bin folder to the drop folder. You could use this technique if you wanted to share scripts with multiple solutions – in that case you’d have the scripts in a higher level folder in SC. Here’s the script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$srcPath = $env:TF_BUILD_SOURCESDIRECTORY,
+  [string]$binPath = $env:TF_BUILD_BINARIESDIRECTORY,
+  [string]$pathToCopy
+)
+
+try
+{
+    $sourcePath = "$srcPath\$pathToCopy"
+    $targetPath = "$binPath\$pathToCopy"
+
+    if (-not(Test-Path($targetPath))) {
+        mkdir $targetPath
+    }
+
+    xcopy /y /e $sourcePath $targetPath
+
+    Write-Host "Done!"
+}
+catch {
+    Write-Host $_
+    exit 1
+}
+&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Lines 2-3: you can use the $env parameters that get set when team build executes a custom script. Here I am using the sources and binaries directory settings.&lt;/li&gt;
+&lt;li&gt;Line 4: the subfolder to copy from the $srcPath to the $binPath.&lt;/li&gt;
+&lt;li&gt;Line 12-14: ensure that the target path exists.&lt;/li&gt;
+&lt;li&gt;Line 16: xcopy the files to the target folder.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Calling the script with $pathToCopy set to DscScripts will result in my DSC scripts being copied to the drop folder along with my build binaries. Using the TFVC 2013 default template, here’s what my advanced build parameters look like:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/394bb737-3143-4f8e-a417-415513160dcd.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/48ac1d7f-c1eb-4fec-8302-b123c8c50bed.png" width="644" height="99"&gt;&lt;/a&gt;&amp;nbsp;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The MSBuild arguments build a Webdeploy package for me. The profile (specified when you right-click the project and select “Publish”) also inserts RM placeholders into environment specific settings (like connection strings, for example). I don’t hard-code the values since this same package can be deployed to multiple environments. Later we’ll see how the actual values replace the tokens at deploy time.&lt;/li&gt;
+&lt;li&gt;The post-build script is the script above, and I pass “-pathToCopy DscScripts” to the script in order to copy the scripts to the bin (and ultimately the drop) folder.&lt;/li&gt;
+&lt;li&gt;I also use a pre-build script to version my assemblies so that I can match the &lt;a href="http://colinsalmcorner.com/post/matching-binary-version-to-build-number-version-in-tfs-2013-builds" target="_blank"&gt;binary file versions with the build&lt;/a&gt;.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s what my build output folders look like:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/63d1eacf-5a3d-449a-a373-ada38cc3789c.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/158e72c7-51d9-472f-b29b-6d29cbbe9fa6.png" width="644" height="350"&gt;&lt;/a&gt; There are 3 “bits” that I really care about here:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The DscScripts folder has all the scripts I need to deploy this application.&lt;/li&gt;
+&lt;li&gt;The FabrikamFiber.Schema.dacpac is the binary of my database schema project.&lt;/li&gt;
+&lt;li&gt;The _PublishedWebsites folder contains 2 folders: the “xcopyable” site (which I ignore) and the FabrikamFiber.Web_package folder which is shown on the right in the figure above, containing the cmd file to execute WebDeploy, the SetParameters.xml file for configuration and the zip file containing the compiled site.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s what my SetParameters file looks like:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;?xml version="1.0" encoding="utf-8"?&amp;gt;
+&amp;lt;parameters&amp;gt;
+  &amp;lt;setParameter name="IIS Web Application Name" value="__SiteName__" /&amp;gt;
+  &amp;lt;setParameter name="FabrikamFiber-Express-Web.config Connection String" value="__FabFiberExpressConStr__" /&amp;gt;
+&amp;lt;/parameters&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Note the “__” (double underscore) pre- and post-fix, making SiteName and FabFiberExpressConStr parameters that I can use in both agent-based and agent-less deployments.&lt;/p&gt;
+&lt;p&gt;Now that all the binaries and scripts are together, we can look at how to do the deployment.&lt;/p&gt;
+&lt;h2&gt;Deploying a DacPac&lt;/h2&gt;
+&lt;p&gt;To deploy the database component of my application, I want to use the DacPac (the compiled output of my &lt;a href="http://msdn.microsoft.com/en-us/data/tools.aspx" target="_blank"&gt;SSDT&lt;/a&gt; project). The DacPac is a “compiled model” of how I want the database to look. To deploy a DacPac, you invoke sqlpackage.exe (installed with SQL Server Tools when you install and configure SQL Server). SqlPackage then reverse engineers the target database (the database you’re deploying the model to) into another model, does a compare and produces a diff script. You can also make SqlPackage run the script (which will make the target database look exactly like the DacPac model you compiled your project into).&lt;/p&gt;
+&lt;p&gt;To do this inside a DSC script, I implement a “Script” resource. The Script resource has 3 parts: a Get-Script, a Set-Script and a Test-Script. The Get-Script is executed when you run DSC in interrogative mode – it won’t change the state of the target node at all. The Test-Script is used to determine if any action must be taken – if it return $true, then no action is taken (the target is already in the desired state). If the Test-Script returns $false, then the target node is not in the desired state and the Set-Script is invoked. The Set-Script is executed in order to bring the target node into the desired state.&lt;/p&gt;
+&lt;h3&gt;A Note on Script Resource Parameters&lt;/h3&gt;
+&lt;p&gt;A caveat here though: the Script resource can be a bit confusing in terms of parameters. The DSC script actually has 2 “phases” – first, the PowerShell script is “compiled” into a &lt;a href="http://technet.microsoft.com/en-us/library/cc180827.aspx" target="_blank"&gt;mof file&lt;/a&gt;. This file is then pushed to the target server and executed during the “deploy” phase. The parameters that you use in the configuration script are available on the RM server at “compile” time, while parameters in the Script resources are only available on the target node during “deploy” time. That means that you can’t pass a parameter from the config file “into” the Script resource – all parameters in the Script resource need to be hard-coded or calculated on the target node at execution time.&lt;/p&gt;
+&lt;p&gt;For example, let’s look at this example script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration Test
+{
+    params (
+        [string]$logLocation
+    )
+
+    Node myNode
+    {
+        Log LogLocation
+        {
+            Message = "The log location is [$logLocation]"
+        }
+
+        Script DoSomething
+        {
+            Get-Script { @{ "DoSomething" = "Yes" } }
+            Test-Script { $false }
+            Set-Script
+            {
+                Write-Host "Log location is [$logLocation]"
+                $localParam = "Hello there"
+                Write-Host "LocalParam is [$localParam]"
+            }
+        }
+    }
+}&lt;/pre&gt;
+&lt;p&gt;Here the intent is to have a parameter called $logLocation that we pass into the config script. When you see this script, it seems to make perfect sense – however, while the log will show the message “The log location is [c:\temp]”, for example (line 11), when the Set-Script of the Script resource runs on the target node, you’ll see the message “Log location is []” (Line 20). Why? Because the $logLocation parameter does not exist when this script is run &lt;em&gt;at deploy time on the target node&lt;/em&gt;. The parameter is available to the Log resource (or other resources like File) but won’t be to the Script resource. You will be able to create other parameters “at deploy time” (like $localParam on Line 21). This is frustrating, but kind of understandable. The Script resource script blocks are not evaluated for parameters. I found a &lt;a href="https://social.technet.microsoft.com/Forums/en-US/2eb97d67-f1fb-4857-8840-de9c4cb9cae0/dsc-configuration-data-for-script-resources?forum=winserverpowershell" target="_blank"&gt;string manipulation hack&lt;/a&gt; that allows you to fudge config parameters into the script blocks, but decided against using it.&lt;/p&gt;
+&lt;h3&gt;ConfigData&lt;/h3&gt;
+&lt;p&gt;Before we look at the DSC script used to deploy the database, I need to show you my configData script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;#@{
+$configData = @{
+    AllNodes = @(
+        @{
+            NodeName = "*"
+            PSDscAllowPlainTextPassword = $true
+         },
+
+        @{
+            NodeName = "fabfiberserver"
+            Role = "WebServer"
+         },
+
+        @{
+            NodeName = "fabfiberdb"
+            Role = "SqlServer"
+         }
+    );
+}
+
+# Note: different 1st line for RM or command line
+# use $configData = @{ for RM
+# use @{ for running from command line
+&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 1: When running from the command line, you just specify a hash-table. DSC requires this hash-table to be put into a variable. I have both in the script (though I default to the format RM requires) just so that I can test the script outside of RM. 
+&lt;li&gt;Line 3: AllNodes is a hash-table of all the nodes I want to affect with my configuration scripts. 
+&lt;li&gt;Lines 5/6 – common properties for all nodes (the name is “*” so DSC applies these properties to all nodes).
+&lt;li&gt;Line 10/11 and 15/16: I specify the nodes I have as well as a Role property. This is so that I can deploy the same configuration to multiple servers that have the same role (like a web farm for example).
+&lt;li&gt;You can specify other parameters, each with another value for each server.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s the DSC script I use to deploy a DacPac to a target server:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration FabFibWeb_Db
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $PackagePath
+    )
+
+    Node fabfiberdb #$AllNodes.where{ $_.NodeName -ne "*" -and $_.Role.Contains("SqlServer") }.NodeName
+    {
+        Log DeployAppLog
+        {
+            Message = "Starting SqlServer node configuration. PackagePath = $PackagePath"
+        }
+
+        #
+        # Update the application database
+        #
+        File CopyDBSchema
+        {
+            Ensure = "Present"
+            SourcePath = "$PackagePath\FabrikamFiber.Schema.dacpac"
+            DestinationPath = "c:\temp\dbFiles\FabrikamFiber.Schema.dacpac"
+            Type = "File"
+        }
+
+        Script DeployDacPac
+        {
+            GetScript = { @{ Name = "DeployDacPac" } }
+            TestScript = { $false }
+            SetScript =
+            {
+                $cmd = "&amp;amp; 'C:\Program Files (x86)\Microsoft SQL Server\110\DAC\bin\sqlpackage.exe' /a:Publish /sf:c:\temp\dbFiles\FabrikamFiber.Schema.dacpac /tcs:'server=localhost; initial catalog=FabrikamFiber-Express'"
+                Invoke-Expression $cmd | Write-Verbose
+            }
+            DependsOn = "[File]CopyDBSchema"
+        }
+
+        Script CreateLabUser
+        {
+            GetScript = { @{ Name = "CreateLabUser" } }
+            TestScript = { $false }
+            SetScript = 
+            {
+                $sql = @"
+                    USE [master]
+                    GO
+
+                    IF (NOT EXISTS(SELECT name from master..syslogins WHERE name = 'Lab'))
+                    BEGIN
+                        CREATE LOGIN [lab] WITH PASSWORD=N'P2ssw0rd', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+    
+                        BEGIN
+                            USE [FabrikamFiberExpress]
+                        END
+
+                        CREATE USER [lab] FOR LOGIN [lab]
+                        ALTER ROLE [db_owner] ADD MEMBER [lab]
+                    END
+"@
+                
+                $cmdPath = "c:\temp\dbFiles\createLogin.sql"
+                sc -Path $cmdPath -Value ($sql -replace '\n', "`r`n")
+                
+                &amp;amp; "C:\Program Files\Microsoft SQL Server\110\Tools\Binn\sqlcmd.exe" -S localhost -U sa -P P2ssw0rd -i $cmdPath
+            }
+        }
+    }
+}
+
+# command for RM
+FabFibWeb_Db -ConfigurationData $configData -PackagePath $applicationPath
+
+# test from command line
+#FabFibWeb -ConfigurationData configData.psd1 -PackagePath "\\rmserver\builddrops\__ReleaseSite\__ReleaseSite_1.0.0.3"
+#Start-DscConfiguration -Path .\FabFibWeb -Verbose -Wait
+&lt;/pre&gt;
+&lt;p&gt;Let’s take a look at what is going on:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 7: I need a parameter to tell me where the DacPac is – this will be my build drops folder.
+&lt;li&gt;Line 10: I specify the node I want to bring into the desired state. I wanted to apply this config to all nodes that have the role “SqlServer” and this worked from the command line – for some reason I couldn’t get it to work with RM, so I hardcode the node-name here. I think this is particular to my environment, since this should work.
+&lt;li&gt;Lines 12-15: Log a message.
+&lt;li&gt;Lines 20-26: Use the File resource to copy the DacPac from a subfolder in the $PackagePath to a known folder on the local machine. I did this because I couldn’t pass the drop-folder path in to the Script resource – so I copied using the File Resource to a known location and can just “hard code” that location in my Script resources.
+&lt;li&gt;Line 28: This is the start of the script Resource for invoking sqlpackage.exe.
+&lt;li&gt;Line 30: Just return the name of the resource.
+&lt;li&gt;Line 31: Always return false – meaning that the Set-Script will always be run. You could have some check here if you didn’t want the script to execute for some specific condition. 
+&lt;li&gt;Lines 32-36: This is the script that actually does the work – I create the command and then Invoke it, piping output to the verbose log for logging. I use “/a:Publish” to tell SqlPackage to execute the incremental changes on the database, using the DacPac as the source file (/sf) and targeting the database specified in the target connection string (/tcs).
+&lt;li&gt;Line 37: Invoking the DacPac is dependent on the DacPac being present, so I express the dependency.
+&lt;li&gt;The final resource in this script is also a Script resource – the Get- and Test-Scripts are self-explanatory. The Set-Script takes the SQL string I have in the script, writes it to a file (using sc – Set-Content) and then executes the file using sqlcmd.exe. This is specific to my environment, but shows that you can execute arbitrary SQL against a server fairly easily using the Script resource.
+&lt;li&gt;Line 73: When using DSC with RM, you need to compile the configuration (do this by invoking the Configuration) into mof files. Don’t call Start-DscConfiguration (which pushes the mof files to the target nodes for running the configuration) since RM will do this step. You can see how I use $applicationPath – this is the path that you specify when you create the vNext component (relative to a drop folder) – we’ll see later how to set this up. RM sets this parameter when before it calls the script. Also, you need to specify the parameter that contains the configuration hash-table. In my case this is $configData, which you’ll see at the top of the configData script above. RM “executes” this script so the parameter is in memory by the time the DSC script is executed.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;When working with DSC, you have to think about idempotency. In other words, the script must produce the same result every time you run it – no matter what the starting state is. Since deploying a DacPac to a database is already idempotent, I don’t have too much to worry about in this case, so that’s why the Test-Script for the DeployDacPac Script resource always returns false.&lt;/p&gt;
+&lt;h2&gt;Deploying a Website using WebDeploy&lt;/h2&gt;
+&lt;p&gt;You could be publishing your website out of Visual Studio. But don’t – seriously, &lt;a href="http://colinsalmcorner.com/post/automated-buildswhy-theyre-absolutely-essential-(part-1)" target="_blank"&gt;don’t EVER do this&lt;/a&gt;. So you’re smart: you’ve got an automated build to compile your website. Well done! Now you could be deploying this site using xcopy. Don’t – primarily because managing configuration is hard to do using this method, and you usually end up deploying all sorts of files that you don’t actually require (like web.debug.config etc.). You should be using &lt;a href="http://www.hanselman.com/blog/WebDeploymentMadeAwesomeIfYoureUsingXCopyYoureDoingItWrong.aspx" target="_blank"&gt;WebDeploy&lt;/a&gt;!&lt;/p&gt;
+&lt;p&gt;I’ve got a post about &lt;a href="http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way" target="_blank"&gt;how to use WebDeploy with agent-based templates&lt;/a&gt;. What follows is how to deploy sites using WebDeploy in vNext templates (using PowerShell DSC). In a &lt;a href="http://colinsalmcorner.com/post/more-dsc-release-management-goodness-readying-a-webserver-for-deployment" target="_blank"&gt;previous post&lt;/a&gt; I show how you can use DSC to ready a webserver for your application. Now we can look at what we need to do to actually deploy a site using WebDeploy. Here’s the script I use:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration FabFibWeb_Site
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $PackagePath
+    )
+
+    Node fabfiberserver #$AllNodes.where{ $_.NodeName -ne "*" -and $_.Role.Contains("WebServer") }.NodeName
+    {
+        Log WebServerLog
+        {
+            Message = "Starting WebServer node configuration. PackagePath = $PackagePath"
+        }
+
+        #
+        # Deploy a website using WebDeploy
+        #
+        File CopyWebDeployFiles
+        {
+            Ensure = "Present"         
+            SourcePath = "$PackagePath\_PublishedWebsites\FabrikamFiber.Web_Package"
+            DestinationPath = "c:\temp\Site"
+            Recurse = $true
+            Force = $true
+            Type = "Directory"
+        }
+
+        Script SetConStringDeployParam
+        {
+            GetScript = { @{ Name = "SetDeployParams" } }
+            TestScript = { $false }
+            SetScript = {
+                $paramFilePath = "c:\temp\Site\FabrikamFiber.Web.SetParameters.xml"
+
+                $paramsToReplace = @{
+                    "__FabFiberExpressConStr__" = "data source=fabfiberdb;database=FabrikamFiber-Express;User Id=lab;Password=P2ssw0rd"
+                    "__SiteName__" = "Default Web Site\FabrikamFiber"
+                }
+
+                $content = gc $paramFilePath
+                $paramsToReplace.GetEnumerator() | % {
+                    $content = $content.Replace($_.Key, $_.Value)
+                }
+                sc -Path $paramFilePath -Value $content
+            }
+            DependsOn = "[File]CopyWebDeployFiles"
+        }
+        
+        Script DeploySite
+        {
+            GetScript = { @{ Name = "DeploySite" } }
+            TestScript = { $false }
+            SetScript = {
+                &amp;amp; "c:\temp\Site\FabrikamFiber.Web.deploy.cmd" /Y
+            }
+            DependsOn = "[Script]SetConStringDeployParam"
+        }
+
+        #
+        # Ensure App Insights cloud monitoring for the site is enabled
+        #
+        Script AppInsightsCloudMonitoring
+        {
+            DependsOn = "[Script]DeploySite"
+            GetScript = 
+            {
+                @{
+                    WebApplication = 'Default Web Site/FabrikamFiber';
+                }
+            }
+            TestScript =
+            {
+                $false
+            }
+            SetScript =
+            {
+                # import module - requires change to PSModulePath for this session
+                $mod = Get-Module -Name Microsoft.MonitoringAgent.PowerShell
+                if ($mod -eq $null)
+                {
+                    $env:PSModulePath = $env:PSModulePath + ";C:\Program Files\Microsoft Monitoring Agent\Agent\PowerShell\"
+                    Import-Module Microsoft.MonitoringAgent.PowerShell -DisableNameChecking
+                }
+        
+                Write-Verbose "Starting cloud monitoring on FabFiber site"
+                Start-WebApplicationMonitoring -Cloud -Name 'Default Web Site/FabrikamFiber'
+            }
+        }
+    }
+}
+
+# command for RM
+FabFibWeb_Site -ConfigurationData $configData -PackagePath $applicationPath
+
+# test from command line
+#FabFibWeb -ConfigurationData configData.psd1 -PackagePath "\\rmserver\builddrops\__ReleaseSite\__ReleaseSite_1.0.0.3"
+#Start-DscConfiguration -Path .\FabFibWeb -Verbose -Wait
+&lt;/pre&gt;
+&lt;p&gt;You’ll see some similarities to the database DSC script – getting nodes by role (“WebServer” this time instead of “SqlServer”), Log resources to log messages and the “compilation” command which passes in the $configData and $applicationPath.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lines 20-28: I copy the entire FabrikamFiber.Web_package folder (containing the cmd, SetParameters and zip file) to a temp folder on the node.&lt;/li&gt;
+&lt;li&gt;Line 30: I use a Script Resource to do config replacement.&lt;/li&gt;
+&lt;li&gt;Lines 32-33: Always execute the Set-Script, and return the name of the resource when interrogating the target system.&lt;/li&gt;
+&lt;li&gt;Lines 34-47: The “guts” of this script – replacing the tokens in the SetParameters file with real values and then invoking WebDeploy.&lt;/li&gt;
+&lt;li&gt;Line 35: Set a parameter to the known local location of the SetParameters file.&lt;/li&gt;
+&lt;li&gt;Lines 37-40: Create a hash-table of key/value pairs that will be replaced in the SetParameters file. I have 2: the site name and the database connection string. You can see the familiar __ pre- and post-fix for the placeholders names – I can use this same package in agent-based deployments if I want to.&lt;/li&gt;
+&lt;li&gt;Line 42: read in the contents of the SetParameters file.&lt;/li&gt;
+&lt;li&gt;Lines 43-45: Replace the token placeholders with the actual values from the hash-table.&lt;/li&gt;
+&lt;li&gt;Line 46: overwrite the SetParameters file – it now has actual values instead of just placeholder values.&lt;/li&gt;
+&lt;li&gt;Lines 51-59: I use another Script resource to execute the cmd file (invoking WebDeploy).&lt;/li&gt;
+&lt;li&gt;Lines 64-90: This is optional – I include it here as a reference of how to ensure that the site is being monitored using Application Insights once it’s deployed.&lt;/li&gt;&lt;/ul&gt;
+&lt;h2&gt;The Release&lt;/h2&gt;
+&lt;p&gt;In order to run vNext (a.k.a. agent-less a.k.a DSC) deployments, you need to import your target nodes. Since vNext servers are agent-less, you don’t need to install anything on the target node. You just need to make sure you can run remote PowerShell commands against the node and have the username/password for doing so. When adding a new server, just type in the name of the machine and specify the remote port, which is 5985 by default. This adds the server into RM as a “Standard” server. These servers always show their status as “Ready”, but this can be misleading since there is no agent. You can then compose your servers into “Standard Environments”. Next you’ll want to create a vNext Release Path (which specifies the environments you’re deploying to as well as who is responsible for approvals).&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/19e05d8e-b16c-41ac-ac41-e4dc6d5b2c4f.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/6bddda2e-8136-4ba1-8a15-03989bb30af9.png" width="644" height="221"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/db1b526e-b3f7-4bdc-8fa7-e195118e41cf.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/3422cd7a-b93d-4e8a-a0cf-cd28bb087d81.png" width="644" height="160"&gt;&lt;/a&gt; You can specify other &lt;a href="http://colinsalmcorner.com/post/new-vnext-config-variable-options-in-rm-update-4-rc" target="_blank"&gt;configuration variables and defaults in RM Update 4 RC&lt;/a&gt;. &lt;/p&gt;
+&lt;h3&gt;vNext Components&lt;/h3&gt;
+&lt;p&gt;In order to use the binaries and scripts we’ve created, we need to specify a vNext component in RM. Here’s how I specify the component:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/560818af-d355-4e20-a6bf-b34bb0848b5a.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/06d1a702-41cd-479d-9eec-300ecfb0ecbd.png" width="581" height="484"&gt;&lt;/a&gt; All this is really doing is setting the value of the $packagePath (which I set to the root of the drop folder here). Also note how I only need a single component even though I have several scripts to invoke (as we’ll see next).&lt;/p&gt;
+&lt;h3&gt;The vNext Template&lt;/h3&gt;
+&lt;p&gt;I create a new vNext template. I select a vNext release path. I right-click the “Components” node in the toolbox and add in the vNext component I just created. Since I am deploying to (at least) 2 machines, I drag a “Parallel” activity onto the design surface. On the left of the parallel, I want scripts for my SQL servers. On the right, I want scripts for my webservers. Since I’ve already installed SQL on my SQL server, I am not going to use that script – I’ll just deploy my database model. On the webserver, I want to run the prerequisites script (to make sure IIS, Webdeploy, MVC runtime and the MMA agent are all installed and correctly configured. Then I want to deploy my website using Webdeploy. So I drag on 3 “Deploy using PS/DSC” activities. I select the appropriate server and component from the “Server” and “Component” drop-downs respectively. I set the username/password for the identity that RM will use to remote onto the target nodes. Then I set the path to the scripts (relative to the root of the drop folder, which is the “Path to Package” in the component I sepcified (which becomes $applicationPath inside the DSC script). I also set the path to the PsConifgurationPath to my configData.psd1 script. Finally I set UseCredSSP and UseHTTPS both to false and SkipCaCheck to true (you can vary these according to your environment).&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d9dd1e64-6503-4033-ae69-8822fd4f9c45.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/31dbb82e-70e4-4738-a035-d9585801d034.png" width="644" height="279"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Now I can trigger the release (either through the build or manually). Here’s what a successful run looks like and a snippet of one of the logs:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/7011f11c-27f2-4808-865f-06388d205e29.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/4572c2dc-1135-4784-be02-c4be8eeec65c.png" width="644" height="279"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;h2&gt;To Agent or Not To Agent?&lt;/h2&gt;
+&lt;p&gt;Looking at the features and improvements to Release Management Update 3 and Update 4, it seems that the TFS product team are not really investing in agent-based deployments and templates any more. If you’re using agent-based deployments, it’s a good idea to start investing in DSC (or at the very least just plain ol’ PowerShell) so that you can use agent-less (vNext) deployments. As soon as I saw DSC capabilities in Update 3, I guessed this was the direction the product team would pursue, and Update 4 seems to confirm that guess. While there is a bit of a learning curve, this technology is very powerful and will ultimately lead to better deployments – which means better quality for your business and customers.&lt;/p&gt;
+&lt;p&gt;Happy deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="52c840b8-f38b-40c6-b925-0b554e2d52de">
+      <author>BigFan</author>
+      <email>smcfay@gmail.com</email>
+      <website></website>
+      <ip>205.143.205.198</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-27 13:48:48</date>
+      <content>First of all I want to say thanks for replying so quickly with this post on how to use DSC to deploy web applications. I like the use of the Script resource to accomplish what the Agent based components did, I have two questions for you though.&lt;br /&gt;&lt;br /&gt;1. It seems like you have to hardcode the values for the setparamters.xml file in the dsc configuration script. How would you accomplish deploying this application to different environments Dev&amp;gt;UAT&amp;gt;PROD? with the latest RM update can you parameterize these values in the RM component?&lt;br /&gt;&lt;br /&gt;2. I notice that you always use $false on your TestScript  of the Script resource. Is there any risk to these configurations running more than once? what if a systems DSC LCM had a ConfigurationMode set to ApplyAndAutoCorrect?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="1e8d028f-15a5-4a80-9476-3db0c2520603">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.228.50.132</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-27 17:20:00</date>
+      <content>Hi @BigFan&lt;br /&gt;&lt;br /&gt;1. The Script resource has some limitation - so while RM does allow you to pass in parameters (see the Custom Configuration section at the bottom of the &amp;quot;Deploy using PS/DSC&amp;quot; activity), you will have to use the Script resource &amp;quot;string hack&amp;quot; to substitute the parameter value. I did briefly look at implementing a custom WebDeploy Resource, but haven&amp;#39;t followed that through.&lt;br /&gt;&lt;br /&gt;2. I mention that both my dacpac and WebDeploy deployments are idempotent - that&amp;#39;s why I can (in this case) safely return $false for the Test-Scripts. Of course if you were doing something that wasn&amp;#39;t idempotent, you&amp;#39;d have to have more sophisticated logic in your Test-Script to see whether or not to run the Set-Script.&lt;br /&gt;&lt;br /&gt;Thanks for the great questions - I definitely want to spend more time solving 1 - if I come up with something, I&amp;#39;ll post it!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a25cf0ff-5f3e-4a52-98d1-412aa37a4434">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.48.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-30 10:14:03</date>
+      <content>Hi @BigFan&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve created a custom resource to improve configuration handling. Here&amp;#39;s the post: http://colinsalmcorner.com/post/real-config-handling-for-dsc-in-rm&lt;br /&gt;&lt;br /&gt;Let me know how it goes!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="002be371-8ed6-4de6-80a8-7f3ba25356ea">
+      <author>Sam</author>
+      <email>sam.smith@bain.com</email>
+      <website></website>
+      <ip>206.106.128.5</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36</userAgent>
+      <date>2015-01-14 16:38:28</date>
+      <content>I have a quick question about the DSC/vNext release management deployments. The docs say:&lt;br /&gt;&lt;br /&gt;&amp;quot;Environments without deployment agents are called vNext environments. You can only use these vNext environments with vNext Components, vNext Release Templates and vNext Release Paths to deploy without deployment agents.&amp;quot;&lt;br /&gt;&lt;br /&gt;Does this mean I can&amp;#39;t use this technology with an older project (for example, an older .net MVC4 website?). I&amp;#39;m trying to figure this out before I really dive into the docs.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="f382c683-4473-4ca2-95af-3f847742d049">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:7:57</date>
+      <content>Hi Sam&lt;br /&gt;&lt;br /&gt;vNext in Release Management refers to the Release Management components - agent-based or agentless. The agentless components are called &amp;quot;vNext&amp;quot;. This is just the deployment mechanism - you can use it to deploy whatever you want. So you&amp;#39;d be able to deploy MVC4/5/6 applications!&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="39beb244-ca72-4c72-a777-0aaea01ae79e">
+      <author>Arvind</author>
+      <email>arvindbraju@gmail.com</email>
+      <website></website>
+      <ip>27.34.250.179</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36</userAgent>
+      <date>2015-03-25 17:15:39</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Can we call the powershell scripts directly in the script resource in the DSC configuration?&lt;br /&gt;We are currently redesigning a deployment framework and would like to use some of the script which are already in place. So, just wondering if we could reuse then in DSC configurations.&lt;br /&gt;&lt;br /&gt;Thanks!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="3be73736-38b4-48d2-8d9a-a4c440562b4f">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.95.247</ip>
+      <userAgent>Mozilla/5.0 (Mobile; Windows Phone 8.1; Android 4.0; ARM; Trident/7.0; Touch; rv:11.0; IEMobile/11.0; NOKIA; Lumia 920) like iPhone OS 7_0_3 Mac OS X AppleWebKit/537 (KHTML, like Gecko) Mobile Safari/537</userAgent>
+      <date>2015-03-25 20:21:27</date>
+      <content>@Arvind - you could call a script from within a Script Resource - though Release Manager lets you call &amp;quot;plain PowerShell&amp;quot; directly too. In fact I would suffers that as a first attempt. Call the DSC script to get your environment into as close a state to desired as you can get - then invoke the &amp;quot;plain&amp;quot; script as another step in the workflow. That way you get to use DSC and reuse your existing scripts.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="53dc2fbb-1bb2-4e33-b7d6-14f60716b2a1">
+      <author>Arvind</author>
+      <email>arvindbraju@gmail.com</email>
+      <website></website>
+      <ip>121.243.26.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36</userAgent>
+      <date>2015-03-27 13:56:26</date>
+      <content>Thanks for the reply Colin!&lt;br /&gt;&lt;br /&gt;As suggested, i tried to run the powershell script from the script resource, but i get the error mentioned below.&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;PowerShell provider MSFT_ScriptResource  failed to execute Set-TargetResource functionality with error message: A command that prompts the user &lt;br /&gt;failed because the host program or the command type does not support user interaction. Try a host program that supports user interaction, such as &lt;br /&gt;the Windows PowerShell Console or Windows PowerShell ISE, and remove prompt-related commands from command types that do not support user &lt;br /&gt;interaction, such as Windows PowerShell workflows. &lt;br /&gt;      CategoryInfo          : InvalidOperation: (:) [], CimException&lt;br /&gt;      FullyQualifiedErrorId : ProviderOperationExecutionFailure&lt;br /&gt;      PSComputerName        : bld-app&lt;br /&gt;&lt;br /&gt;I tried few options to fix , but they didn&amp;#39;t work. It works well from the commandline though.&lt;br /&gt;&lt;br /&gt;Could you please help me figure out what is going wrong here?&lt;br /&gt;&lt;br /&gt;   Script installmsi&lt;br /&gt;{&lt;br /&gt;    TestScript = { $false }&lt;br /&gt;    GetScript = {&lt;br /&gt;        @{&lt;br /&gt;            Result = &amp;quot;installmsi&amp;quot;&lt;br /&gt;        }&lt;br /&gt;    }&lt;br /&gt;    SetScript = {&lt;br /&gt;        Write-Verbose &amp;quot;Install MSI&amp;quot;&lt;br /&gt;        write-host date&lt;br /&gt;       $cmd = &amp;quot;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="62427e1c-263c-40a0-842d-2827cb8ddbef">
+      <author>Arvind</author>
+      <email>arvindbraju@gmail.com</email>
+      <website></website>
+      <ip>121.243.26.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36</userAgent>
+      <date>2015-03-30 13:56:55</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;I was also trying the option of running the PS script directly in Release Manager, which you had mentioned, as i had issues running the PS scripts within the Script resource(mentioned in my previous post).&lt;br /&gt;But in the vNext Release template, i don&amp;#39;t get to see any tasks/actions which are listed in the Agent-based Release template.  So, in this case how do i run a PS script directly?&lt;br /&gt;&lt;br /&gt;Thanks!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e2c8109c-a362-410d-8908-f1712573d4b5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.229.33.11</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-09 20:33:53</date>
+      <content>Hi Arvind&lt;br /&gt;&lt;br /&gt;Some commands will work from the command line, but won&amp;#39;t work when executed remotely. One example (if I remember correctly) is Write-Host. It sees this as an &amp;quot;interactive&amp;quot; command and won&amp;#39;t allow it to be executed. Try to make sure that you don&amp;#39;t have any &amp;quot;interactive&amp;quot; commands in your script.&lt;br /&gt;&lt;br /&gt;As for your second comment, pretty much the only Task you can run is a PowerShell command. The same activity is used for both DSC script and &amp;quot;plain&amp;quot; PowerShell - the task is smart enough to figure out which type of script it is. So just add another activity and set the script path to your plain PowerShell script and it should run just like that.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="cf76c351-d96e-4d5e-b82b-7eb635441f9b">
+      <author>Curt Zarger</author>
+      <email>czarger@asmr.com</email>
+      <website></website>
+      <ip>63.68.128.2</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-27 18:28:59</date>
+      <content>Colin,&lt;br /&gt;&lt;br /&gt;Great post.  It&amp;#39;s really helping me get my head around all of this changing technology and architecture. ... On that note, I&amp;#39;m working to understand the strategic technologies to use as I&amp;#39;m building up a new release capability.&lt;br /&gt;I&amp;#39;ve been hearing that MSBuild, PublishProfiles and WebDeploy are not strategic, though at a recent VSLive event the clear strategic replacements were not able to be described yet due to Microsoft restrictions at that time.&lt;br /&gt;Can you give me your thoughts on the current and future build/deploy/release picture?&lt;br /&gt;thx&lt;br /&gt;Curt</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="4d1cc7f6-176d-42e7-82a5-986276bf5de8">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>196.23.22.4</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-30 11:44:21</date>
+      <content>Hi Curt&lt;br /&gt;&lt;br /&gt;Great to know that the post is being helpful.&lt;br /&gt;&lt;br /&gt;As to &amp;quot;strategic-ness&amp;quot;, I can&amp;#39;t imagine why anyone would say that MSBuild, PublishProfiles and WebDeploy are &amp;quot;not strategic&amp;quot;. Have you tried to publish to Azure lately? You may do it from a GUI, but the underlying technology is WebDeploy. I don&amp;#39;t think that is going to change any time soon, so if you&amp;#39;re investing in IIS (and/or) Azure Websites, then you want to stick with these technologies.&lt;br /&gt;&lt;br /&gt;The MSBuild tasks for Web Projects simply allow you to create WebDeploy packages out-the-box. I don&amp;#39;t think anyone should be customizing MSBuild tasks - especially not with the new Build Engine that was released at //build. Instead, build tasks can invoke the MSBuild tasks - and you can do customizations in pre- and post-build scripts in the build flow.&lt;br /&gt;&lt;br /&gt;As for PublishProfiles, they are also deeply used in deploying to IIS and Azure, even in VS 2015. No reason that they are going to disappear any time soon. By creating a PublishProfile that puts placeholders into the config file, which are later filled in with environment-specific values, you get a single build package that can be moved from environment to environment in your release pipeline, and that&amp;#39;s a good thing!&lt;br /&gt;&lt;br /&gt;I&amp;#39;d love to know the context of the VSLive event that you refer to - can you post the link to the recording?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="475f0d7e-302a-466e-95ff-9b56f1d4a20e">
+      <author>Ahmed</author>
+      <email>ahmed.arcan@gmail.com</email>
+      <website></website>
+      <ip>63.174.212.27</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36</userAgent>
+      <date>2015-06-09 20:3:27</date>
+      <content>Im using RM but divided many DSC steps in different files what i noticed it is like always trying to clean temp folder DTdownloads what happen  is i get wmiprvse process locking my files. Any idea how can i avoid that ?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="bbc823c0-9612-40f3-a87a-a29c264ecf41">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:28:58</date>
+      <content>@Ahmed - the only think I can think of is to make sure your tasks are sequential and not parallel.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ac45bfcf-a752-46ac-afc0-d0becdc77b08">
+      <author>Tony Castro</author>
+      <email>acurags@comcast.net</email>
+      <website></website>
+      <ip>206.209.225.80</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36</userAgent>
+      <date>2015-09-22 15:38:55</date>
+      <content>I use a mix of MSBuild, WebDeploy and Powershell for my vNext component builds/releases. This allowed me to layer Release Management on top of my existing WebDeploy configuration (DeclareParams, SetParams, etc) and also integrate it into TFS. This reduced my scripting complexity in Release Management considerably. The first part is to have a TFS Build definition that can build and package (Create a WebDeploy deployment archive) along with any SetParams files and supporting msbuild/powershell scripts. This allows you to build the code once and deploy it to the various environments/stages in the Release Path. By having the build definition create the deployment archive you end up with that archive (environment agnostic) in the drop location (as well as supporting files) where Release Management can pick it up. The Release template can then simply just contain a minimal set of parameters (eg. environment) that tell WebDeploy what SetParams file to use. The Deploy Powershell script simply passes minmal arguments to WebDeploy to do the work (via sync action). All environment settings still reside in a SetParams file (one per environment, eg. prod.SetParams.xml). The bonus is that the logs in Release Management will contain all of the output from WebDeploy. You&amp;#39;ll know exactly what files were updated.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="35c69018-f4dc-4ef3-b7a7-bdd4b2c6ae15">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.233.245</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36</userAgent>
+      <date>2015-10-23 07:49:38</date>
+      <content>Hi @Tony&lt;br /&gt;&lt;br /&gt;Sounds like you&amp;#39;ve got a good thing going! I personally prefer the builds/scripts to have tokens and let the deployment tool (RM or Octopus etc.) fill in the values. That way I can change values in the deployment tool rather than having to commit another code change.&lt;br /&gt;&lt;br /&gt;Let&amp;#39;s imagine that you have a db connection string in prod.SetParams.xml. If you change the connection string, you&amp;#39;d have to change the file, commit and do a new build. If the value is in the deployment tool, you just change the value in the deployment pipeline (you can do this in RM or Octopus deploy for example). In my mind, the build shouldn&amp;#39;t care about the values that you need for deployment. Different strokes for different folks I guess.&lt;br /&gt;&lt;br /&gt;As long as your process is working and is automated, you&amp;#39;ve solved the problem! The method doesn&amp;#39;t really matter that much!&lt;br /&gt;&lt;br /&gt;Thanks for the feedback. Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="675c7518-147e-460b-b2b4-25c9a44c22a6">
+      <author>Nicklas E</author>
+      <email>nicklas.engberg@trafikverket.se</email>
+      <website>http://trafikverket.se/</website>
+      <ip>192.176.230.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-02 13:58:06</date>
+      <content>Hi Colin, I really do appreciate your posts an it is a great resource for my work. I&amp;#39;m currently finishing a pattern for CI and Release Management with BizTalk installations. What I stumbled on is, as you, about the behaviour of the Script Resource. I&amp;#39;m really  in a need f&amp;#246;r injecting parameters from the configData into the script. I&amp;#39;m using BTDF (BizTalkDeploymentFramework) that is built on MSBuild Tasks. What i discovered is if you use here-strings and the $($packagePath) opener you can inject the parameter value into the script. A reminder is not to use the { } on SetScript, se below. If you are using local parameters in the here-string you have to escape them with a backtick `. This is just a tip and something for me to reciprocate to all insights about Release and DSC. &lt;br /&gt;&lt;br /&gt;	Script SetConStringDeployParam&lt;br /&gt;        {&lt;br /&gt;            GetScript = { @{ Name = &amp;quot;SetDeployParams&amp;quot; } }&lt;br /&gt;            TestScript = { $false }&lt;br /&gt;            SetScript = @&amp;quot;&lt;br /&gt;                `$paramFilePath = &amp;quot;$($PackagePath)\bin\Deploy\Trafikverket.Mpk.TimeTableService.SetParameters.xml&amp;quot;&lt;br /&gt; &lt;br /&gt;                `$paramsToReplace = @{                    &lt;br /&gt;                    &amp;quot;__siteName__&amp;quot; = &amp;quot;Default Web Site/Trafikverket.Mpk.TimeTableService&amp;quot;&lt;br /&gt;                }&lt;br /&gt; &lt;br /&gt;                `$content = gc `$paramFilePath&lt;br /&gt;                `$paramsToReplace.GetEnumerator() | % {&lt;br /&gt;                    `$content = `$content.Replace(`$_.Key, `$_.Value)&lt;br /&gt;                }&lt;br /&gt;                sc -Path `$paramFilePath -Value `$content&lt;br /&gt;&amp;quot;@&lt;br /&gt;  &lt;br /&gt;                #DependsOn = &amp;quot;[File]CopyWebDeployFiles&amp;quot;&lt;br /&gt;            }	&lt;br /&gt;&lt;br /&gt;Cheers!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2446eca2-66e2-4b29-b660-5ac7c5a8cdc5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:34:48</date>
+      <content>@Niklas - thanks, that looks interesting!</content>
+    </comment>
+  </comments>
+  <viewCount>8135</viewCount>
+</post>

@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>227c45a4-594d-4647-9a02-f470d43b25f7</id>
+  <title>Implement an Azure DevOps Release Gate to ServiceNow</title>
+  <slug>implement-an-azure-devops-release-gate-to-servicenow</slug>
+  <shortUrl>http://bit.ly/2PQE2hu</shortUrl>
+  <author></author>
+  <pubDate>2018-10-19 20:24:53</pubDate>
+  <lastModified>2019-03-14 14:33:09</lastModified>
+  <content>&lt;p&gt;I'm currently doing some work with a customer that is integrating between ServiceNow and Azure DevOps (the artist formerly known as VSTS). I quickly spun up a development ServiceNow instance to play around a bit. One of the use-cases I could foresee was a release gate that only allows a release to continue if a Change Request (CR) is in the Implement state. So I had to do some investigation: I know there are a few out-of-the-box Azure DevOps &lt;a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/release/approvals/gates?view=vsts" target="_blank"&gt;release gates&lt;/a&gt;, including a REST API call - but I knew that you could also create a custom gate. I decided to see if I could create the gate without expecting the release author having to know the REST API call to ServiceNow or how to parse the JSON response!&lt;/p&gt;&lt;p&gt;Follow along to see the whole process - or just grab the code in the &lt;a href="https://github.com/colindembovsky/cols-service-now-extensions" target="_blank"&gt;Github repo&lt;/a&gt;.&lt;/p&gt;&lt;h2&gt;Finding the ServiceNow REST API&lt;/h2&gt;&lt;p&gt;Part One of my quest was to figure out the REST API call to make to ServiceNow. The ServiceNow documentation is ok - perhaps if you understand ServiceNow concepts (and I don't have deep experience with them) then they're fine. But I quickly felt like I was getting lost in the weeds. Add to that many, many versions of the product - which all seem to have different APIs. After a couple hours I did discover that the ServiceNow instance has a REST API explorer - but I'm almost glad I didn't start there as you do need some knowledge of the product in order to really use the explorer effectively. For example, I was able to query the state of the CR if I had its internal sys_id, but I didn't expect the user to have that. I wanted to get the state of the CR by its number - and how to do that wasn't obvious from the REST API explorer.&lt;/p&gt;&lt;p&gt;Anyway, I was able to find the REST API to query the state of a Change Request: &lt;/p&gt;&lt;p&gt;&lt;font face="Courier New"&gt;https://&amp;lt;instance&amp;gt;.servicenow.com/api/now/table/change_request?sysparm_query=number=&amp;lt;number&amp;gt;&amp;amp;sysparm_fields=state&amp;amp;sysparm_display_value=true&lt;/font&gt;&lt;/p&gt;&lt;p&gt;A couple notes on the query strings:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;sysparm_query lets me specify that I want to query the change_request table for the expression "number=&amp;lt;number&amp;gt;", which lets me get the CR via its number instead of its sys_id&lt;/li&gt;&lt;li&gt;sysparm_fields lets me specify which fields I want returned - in this case, just the state field&lt;/li&gt;&lt;li&gt;sysparm_value=true expands the enums from ints to strings, so I get the "display value" of the state instead of the state ID&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;The next problem is authentication - turns out if you have a username and password for your ServiceNow instance, you can include a standard auth header using BasicAuth (this is over HTTPS, so that's ok). I tested this with curl and was able to get a response that looks something like this:&lt;/p&gt;&lt;p&gt;&lt;font face="Courier New"&gt;{"result":[{"state":"Implement"}]}&lt;/font&gt;&lt;h2&gt;Creating a Custom Release Gate Extension&lt;/h2&gt;&lt;p&gt;Now that I know the REST API call to ServiceNow, I turned to how to Part Two of my quest: create a custom Release Gate extension. Fortunately, I had Microsoft DevLabs' great &lt;a href="https://marketplace.visualstudio.com/items?itemName=ms-devlabs.vsts-developer-tools-build-tasks" target="_blank"&gt;Azure DevOps Extension extension&lt;/a&gt; as a reference (this was originally from &lt;a href="https://jessehouwing.net/" target="_blank"&gt;Jesse Houwing&lt;/a&gt;) - and I use this all the time to package and publish my own &lt;a href="https://bit.ly/cacbuildtasks" target="_blank"&gt;Azure DevOps Build and Release extension pack&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;It turns out that the release gate "task" itself is pretty simple, since the entire task is just a JSON file which specifies its UI and the expression to evaluate on the response packet. The full file is &lt;a href="https://github.com/colindembovsky/cols-service-now-extensions/blob/master/Tasks/SnowChangeRequestGate/task.json" target="_blank"&gt;here&lt;/a&gt; but let's examine the two most important parts of this task: the "inputs" element and the "execution" element. First the inputs:&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;"inputs": [
+  {
+    "name": "connectedServiceName",
+    "type": "connectedService:ServiceNow",
+    "label": "Service Now endpoint",
+    "required": true,
+    "helpMarkDown": "Service Now endpoint connection."
+  },
+  {
+    "name": "crNumber",
+    "type": "string",
+    "label": "Change Request number",
+    "defaultValue": "",
+    "required": true,
+    "helpMarkDown": "Change Request number to check."
+  },
+  {
+    "name": "validState",
+    "type": "string",
+    "label": "State",
+    "defaultValue": "Implement",
+    "helpMarkDown": "State that the CR should be in to pass the gate.",
+    "required": true
+  }
+]&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;connectedServiceName is of type "connectedService:ServiceNow". This is the endpoint used to call the REST API and should handle authentication.&lt;/li&gt;&lt;li&gt;crNumber is a string and is the CR number we're going to search on&lt;/li&gt;&lt;li&gt;validState is a string and is the state the CR should be in to pass the gate&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Given those inputs, we can look at the execute element:&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;"execution": {
+  "HttpRequest": {
+    "Execute": {
+      "EndpointId": "$(connectedServiceName)",
+      "EndpointUrl": "$(endpoint.url)/api/now/table/change_request?sysparm_query=number=$(crNumber)&amp;amp;sysparm_fields=state&amp;amp;sysparm_display_value=true",
+      "Method": "GET",
+      "Body": "",
+      "Headers": "{\"Content-Type\":\"application/json\"}",
+      "WaitForCompletion": "false",
+      "Expression": "eq(jsonpath('$.result[0].state')[0], '$(validState)')"
+    }
+  }
+}&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;The execution is an HttpRequest&lt;/li&gt;&lt;li&gt;Endpoint is set to the connectedService input&lt;/li&gt;&lt;li&gt;EndpointUrl is the full URL to use to hit the REST API&lt;/li&gt;&lt;li&gt;The REST method is a GET&lt;/li&gt;&lt;li&gt;The body is empty&lt;/li&gt;&lt;li&gt;We're adding a Content-Type header of "application/json" - notice that we don't need to specify auth headers since the Endpoint will take care of that for us&lt;/li&gt;&lt;li&gt;The expression to evaluate is checking that the state field of the first result is set to the value of the validState variable&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;And that's it! Let's take a look at the connected service endpoint, which is defined in the extension manifest (not in the task definition):&lt;/p&gt;&lt;pre class="brush: javascript;"&gt;{
+  "id": "colinsalmcorner-snow-endpoint-type",
+  "type": "ms.vss-endpoint.service-endpoint-type",
+  "targets": [
+    "ms.vss-endpoint.endpoint-types"
+  ],
+  "properties": {
+    "name": "ServiceNow",
+    "displayName": "Service Now",
+    "helpMarkDown": "Create an authenticated endpoint to a Service Now instance.",
+    "url": {
+      "displayName": "Service Now URL",
+         "description": "The Service Now instance Url, e.g. `https://instance.service-now.com`."
+    },
+    "authenticationSchemes": [
+    {
+      "type": "ms.vss-endpoint.endpoint-auth-scheme-basic",
+      "inputDescriptors": [
+        {
+          "id": "username",
+          "name": "Username",
+          "description": "Username",
+          "inputMode": "textbox",
+          "isConfidential": false,
+          "validation": {
+            "isRequired": true,
+            "dataType": "string",
+            "maxLength": 300
+          }
+        },
+        {
+          "id": "password",
+          "name": "Password",
+          "description": "Password for the user account.",
+          "inputMode": "passwordbox",
+          "isConfidential": true,
+          "validation": {
+            "isRequired": true,
+            "dataType": "string",
+            "maxLength": 300
+          }
+        }
+      ]
+    }
+  ]
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Lines 2-6: specify that this contribution is of type Service Endpoint&lt;/li&gt;&lt;li&gt;Line 8: name of the endpoint type - this is referenced by the gate in the endpoint input&lt;/li&gt;&lt;li&gt;Lines 9-10: description and help text&lt;/li&gt;&lt;li&gt;Line 11-14: specify a URL input for this endpoint&lt;/li&gt;&lt;li&gt;The rest: specify the authentication scheme for the endpoint&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;By default the &lt;font face="Courier New"&gt;ms.vss-endpoint.endpoint-auth-scheme-basic&lt;/font&gt; authentication scheme adds an Authorization header to any request made to the URL of the service endpoint. The value of the header is a base64 encoded munge of user:password. It's great that you don't have to mess with this yourself!&lt;/p&gt;&lt;h2&gt;Putting It All Together&lt;/h2&gt;&lt;p&gt;Now we have the service endpoint and the gate, we're ready to publish and install the extension! The readme.md in the repo has some detail on this if you want to try your own (or make changes to the code from mine), or you can just install the &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-snow-extensions" target="_blank"&gt;extension that I've published&lt;/a&gt; if you want to use the gate as-is. If you do publish it yourself, you'll need to change the publisher and the GUIDs before you publish.&lt;/p&gt;&lt;p&gt;For the release to work, you'll need to make the CR a variable. I did this by adding the variable and making it settable at queue time:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/772b0be7-080e-439d-95cb-72e002288330.png" target="_blank"&gt;&lt;img width="482" height="78" title="SNAGHTMLaca5f5b" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="SNAGHTMLaca5f5b" src="https://colinsalmcorner.com/posts/files/b2a33460-f6e7-448b-b85f-862ac2c19f86.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Now when I queue the release, I have to add the CR. Of course you could imagine a release being queued off from an automated process, and that can pass the CR as part of the body of the REST API call to queue the release. For now, I'm entering it manually:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/900b68e0-511c-46bf-81e4-9f52d23df052.png" target="_blank"&gt;&lt;img width="439" height="362" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="https://colinsalmcorner.com/posts/files/03fc601c-eebd-435d-a80f-5bb40ae20032.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;So how do we specify the gate? Edit the release and click on the pre- or post-approval icon for the environment and open the Gates section. Click the + to add a new gate and select the "Change Request Status" gate. We can then configure the endpoint, the CR number and the State we want to pass on:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/930b95a8-7435-4353-8e27-2b13152ac289.png" target="_blank"&gt;&lt;img width="446" height="418" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="https://colinsalmcorner.com/posts/files/ea57f2f3-432b-4cab-9a3f-462598289d4f.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;To create an endpoint, just click on "+ New" next to the Service Now endpoint drop-down - this will open a new tab to the Service Endpoints page where you can add a new ServiceNow endpoint.&lt;/p&gt;&lt;p&gt;Note how we set the Change Request number to the variable &lt;font face="Courier New"&gt;$(ChangeRequestNumber)&lt;/font&gt;. That way this field is dynamic.&lt;/p&gt;&lt;p&gt;Finally, set the "Evaluation options" to configure the frequency, timeout and other gate settings:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/dd675a14-0c80-47de-a015-96dcc14527c1.png" target="_blank"&gt;&lt;img width="426" height="304" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="https://colinsalmcorner.com/posts/files/e542cf32-4c7a-48fa-a0c8-e50b9d1edb9f.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Once the release runs, we can see the Gate invocations and results:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/0a3ba383-88c6-41fa-bf64-9c1a8b2b60f1.png" target="_blank"&gt;&lt;img width="435" height="140" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="https://colinsalmcorner.com/posts/files/673645cc-d97d-499e-a210-a8d815201d42.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Note that the Gate has to pass twice in a row before it's successful and moves the pipeline on.&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Creating release gates as extensions is not too hard once you have some of the bits in place. And it's a far better authoring experience than the out of the box REST API call - which leaves you trying to mess with auth headers and parsing JSON responses. If you want to get release authors to really fully utilize the power of gates, do them a solid and wrap the gate in an extension!&lt;/p&gt;&lt;p&gt;Happy gating!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="84741e45-499f-4520-9566-f550687b157b">
+      <author>Jesse Houwing</author>
+      <email>jesse.houwing@gmail.com</email>
+      <website>https://jessehouwing.net/vsts-release-create-complex-release-gate/</website>
+      <ip>37.17.208.21</ip>
+      <userAgent>Mozilla/5.0 (Linux; Android 9; Pixel 2 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.64 Mobile Safari/537.36</userAgent>
+      <date>2018-10-29 08:53:55</date>
+      <content>Did you en dip using the expression testing utility? That expression isn&amp;#39;t easy to &amp;#39;just figure out&amp;#39;.&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve blogged about it here:&lt;br /&gt;&lt;br /&gt;https://jessehouwing.net/vsts-release-create-complex-release-gate/</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="09e34c10-d7b5-4216-bbe2-3fc98286d85b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>73.92.4.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36</userAgent>
+      <date>2018-10-29 16:27:44</date>
+      <content>Thanks @jesse - I did look at the expression validator, but I don&amp;#39;t have TFS installed, so couldn&amp;#39;t run it.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="8fe6e7fc-efac-415d-8b01-ca9a0700bca6">
+      <author>Ngan Menegay</author>
+      <email>ngan.menegay@texascapitalbank.com</email>
+      <website></website>
+      <ip>63.98.103.65</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36</userAgent>
+      <date>2018-11-26 21:44:26</date>
+      <content>Hi Colin,&lt;br /&gt;I installed your extension successfully. However, your gate is not shown up for me to choose from when I try to add a gate. All I see are the out-of-the-box gates. Not sure what I&amp;#39;m missing?&lt;br /&gt;&lt;br /&gt;Screenshots:&lt;br /&gt;https://www.screencast.com/t/uh20und6&lt;br /&gt;https://www.screencast.com/t/u4GzeAkU&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;-ngan</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="5198f022-5d3e-4df8-b52d-0ca6a72dc0b2">
+      <author>Mike Malloy</author>
+      <email>mike.malloy@commscope.com</email>
+      <website></website>
+      <ip>198.135.207.105</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36</userAgent>
+      <date>2019-03-14 14:33:09</date>
+      <content>Thank you for this great extension!&lt;br /&gt;Do you have any suggestions on how I can dynamically pass the Change Request Number to the release pipeline?&lt;br /&gt;One idea I had was to always name my git branches the change request number, then maybe there is a way to get that name while in the release pipeline?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

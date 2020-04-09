@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>7a05b039-c6bc-41d5-9867-7e1deed48020</id>
+  <title>2012 Lab Management Standard Environment: Configuring UI Tests Agent Identity Problem</title>
+  <slug>2012-lab-management-standard-environment-configuring-ui-tests-agent-identity-problem</slug>
+  <shortUrl>http://bit.ly/1pQAnRF</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2012-07-12 14:58:00</pubDate>
+  <lastModified>2020-04-02 14:35:40</lastModified>
+  <content>&lt;p&gt;I am a huge fan of Lab Management. Being able to manage test rigs centrally (and, if you’re using Hyper-V, self-provisioning and self-servicing) is a huge productivity bonus.&lt;/p&gt; &lt;p&gt;I wanted to test out a Standard Environment (what used to be called Physical Environment in TFS 2010). I am using Brian Keller’s RC VM and another VM (WebTest) for my test machine, both of which are workgrouped (and not connected to any domain).&lt;/p&gt; &lt;p&gt;When configuring the environment, I came across a rather strange error. One of the wizard screens when you create a Standard Environment allows you to configure the environment for UI testing (meaning that the test agent in your rig will run in interactive mode). The dialog requests that you specify the username and password for the test agent. I assumed that this would require an account on the test machine, so I specified a local account (i.e. a WebTest account).&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-pD5HLC_xO4Y/T_7JwU6rnDI/AAAAAAAAAas/33oOZUb7460/s1600-h/image%25255B3%25255D.png"&gt;&lt;img style="background-image: none; border-bottom: 0px; border-left: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; margin-left: auto; border-top: 0px; margin-right: auto; border-right: 0px; padding-top: 0px" title="image" border="0" alt="image" src="http://lh5.ggpht.com/-ggttrGGYagY/T_7JyOfi9BI/AAAAAAAAAa0/-jYoOIkmSac/image_thumb%25255B1%25255D.png?imgmax=800" width="405" height="266"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Unfortunately, that failed verification with the following error:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-HpXy8l2aE9k/T_7JzVqxk-I/AAAAAAAAAa8/QQ3eBOwgTyE/s1600-h/image%25255B7%25255D.png"&gt;&lt;img style="background-image: none; border-bottom: 0px; border-left: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; margin-left: auto; border-top: 0px; margin-right: auto; border-right: 0px; padding-top: 0px" title="image" border="0" alt="image" src="http://lh3.ggpht.com/-1XfyWDeKwvc/T_7J014xXpI/AAAAAAAAAbA/1pBJyNGZIpo/image_thumb%25255B3%25255D.png?imgmax=800" width="545" height="184"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;&lt;font face="Courier New"&gt;Verify that the machines are accessible using the user name and password provided. The credentials provided for configuring the test agent to run as process are not valid. Provide valid credentials.&lt;/font&gt;&lt;/p&gt; &lt;p&gt;That didn’t make much sense to me, since I was providing credentials that I was absolutely positive worked on the test machine.&lt;/p&gt; &lt;p&gt;After trying various things and searching online, I realized that you need the account for the Test Agent to be a shadow account of the one on TFS (i.e. same name and password on both machines) when you’re on a workgroup. If both machines are on a domain, you just need to make sure the domain user for the Test Agent is an admin on the test machine. Oh, and if you’re going to use the build-deploy-test workflow, make sure that identity also has read-access onto your drops folder!&lt;/p&gt; &lt;p&gt;Happy testing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Lab Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="6e4c7037-586f-4746-9363-dfc0e32587c4">
+      <author>Ed Blankenship</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/07342495166543006230</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-07-12 15:48:12</date>
+      <content>Gosh Sorry about that!  What do you think we could do to make that error message better?  Should we attempt to detect that it's in a workgroup and provide a better error message if that's the case?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="2bacfa04-b698-44c3-9b6f-0b23159d997e">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-07-13 11:29:08</date>
+      <content>Thanks Ed - I think what needs to change is the description on the wizard page. Something like:&lt;br /&gt;Specify the account for the interactive build agent:&lt;br /&gt;Workgroups: this must be a shadow account (same username and password on the test machine and on TFS) of the form ".\username". The account must be an administrator on the test machine.&lt;br /&gt;Domains: the account must be an administrator on the test machine.</content>
+    </comment>
+  </comments>
+  <viewCount>1987</viewCount>
+</post>

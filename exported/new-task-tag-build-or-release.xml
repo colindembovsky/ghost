@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>b789df7e-8071-4fac-8587-57ce03b9811a</id>
+  <title>New Task: Tag Build or Release</title>
+  <slug>new-task-tag-build-or-release</slug>
+  <shortUrl>http://bit.ly/2oSdcw3</shortUrl>
+  <author></author>
+  <pubDate>2017-05-02 05:49:12</pubDate>
+  <lastModified>2018-07-03 14:48:06</lastModified>
+  <content>&lt;p&gt;I have a build/release task pack in the &lt;a href="http://bit.ly/cacbuildtasks"&gt;marketplace&lt;/a&gt;. I’ve just added a new task that allows you to add tags to builds or releases in the pipeline, inspired by my friend and fellow MVP Rene van Osnabrugge’s &lt;a href="https://roadtoalm.com/2016/07/08/controlling-build-quality-using-build-tags-and-vsts-release-management/"&gt;excellent post&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Here are a couple of use cases for this task:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;You want to trigger releases, but only for builds on a particular branch with a particular tag. This trigger only works if the build is tagged &lt;em&gt;during the build&lt;/em&gt;. So you could add a TagBuild task to your build that is only run &lt;a href="https://www.visualstudio.com/en-us/docs/build/concepts/process/conditions"&gt;conditionally&lt;/a&gt; (for example for buildreason = Pull Request). Then if the condition is met, the tag is set on the build and the release will trigger in turn, but only for builds that have the tag set.  &lt;ol&gt; &lt;li&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b28ab04a-96bd-4a61-90ed-392f62ff5417.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/d9084b02-a33d-4834-96aa-9e66e4e77264.png" width="304" height="129"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;You want to tag a build from a release once a release gets to a certain environment. For example, you can add a TagBuild task and tag the primary build once all the integration tests have passed in the integration environment. That way you can see which builds have passed integration tests simply by querying the tags.  &lt;ol&gt; &lt;li&gt;&lt;a href="http://colinsalmcorner.com/posts/files/1c80eeec-e5cd-46fa-b77a-c79adac0befa.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/5a844571-d88c-407d-a4bd-da2f1a956e52.png" width="304" height="118"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Of course you can use variables for the tags – so you could tag the build with the release(s) that have made it to prod by specifying $(Release.ReleaseNumber) as the tag value.&lt;/p&gt; &lt;p&gt;There are of course a ton of other use cases!&lt;/p&gt; &lt;h3&gt;Tag Types&lt;/h3&gt; &lt;p&gt;You can see the tag type matrix for the “tag type” (which can be set to Build or Release) in the &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/TagBuild"&gt;docs&lt;/a&gt;.&lt;/p&gt; &lt;h3&gt;Conclusion&lt;/h3&gt; &lt;p&gt;Let me know if you have issues or feedback. Otherwise, happy taggin’!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="bddcb516-e1c9-4017-94a5-1bf111bbec94">
+      <author>Rene van Osnabrugge</author>
+      <email>rvanosnabrugge@live.com</email>
+      <website>https://roadtoalm.com/</website>
+      <ip>62.112.250.251</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.81 Safari/537.36</userAgent>
+      <date>2017-05-02 12:49:33</date>
+      <content>Thanks for creating this task ! I was too lazy for that :-)!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="79d01f72-e913-4953-a461-4342c938183c">
+      <author>Samora</author>
+      <email>poswasm@gmail.com</email>
+      <website></website>
+      <ip>196.26.127.34</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2017-05-08 07:47:39</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Interesting article. Thought I should let u know that I check your site almost every week. Anyway, its Samora from the Real People days.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="4cd77edd-a0d9-4910-bdb0-b76598d66e01">
+      <author>Bruce Haley</author>
+      <email>v-brhale@microsoft.com</email>
+      <website></website>
+      <ip>131.107.159.42</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.91 Safari/537.36</userAgent>
+      <date>2017-10-18 23:20:58</date>
+      <content>Very nice! This overcomes the limitations of tagging via standard out. (Characters like &amp;quot;*&amp;quot;, etc. throw a security error.)&lt;br /&gt;&lt;br /&gt;Suggestion: How about the reverse: a task to get the tags from a build? (Would make using build tags a great way to pass values from a build to a release.)&lt;br /&gt;&lt;br /&gt;Thanks.&lt;br /&gt;--Bruce</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="510b4547-eb3c-4e2e-b1f6-740fe7135216">
+      <author>Stefan Kip</author>
+      <email>stefan.kip@infocaster.net</email>
+      <website></website>
+      <ip>95.97.199.234</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36</userAgent>
+      <date>2018-02-08 13:29:40</date>
+      <content>Really nice! Was looking for a way to add the branch name as tag to the build, so I can filter which builds get release to which environments!&lt;br /&gt;&lt;br /&gt;Thank you!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="f28b71d5-4f02-4cf5-ba44-4836d161f939">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:21:48</date>
+      <content>Thanks for all the comments folks - glad this task is useful!&lt;br /&gt;&lt;br /&gt;@Bruce - nice idea! I&amp;#39;ll put it into the backlog (TM) :-)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="58e8b062-68a5-45c2-a1c2-ebe8bb7443a0">
+      <author>Rui Marinho</author>
+      <email>me@ruimarinho.pt</email>
+      <website></website>
+      <ip>89.152.236.81</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299</userAgent>
+      <date>2018-03-09 12:50:22</date>
+      <content>yap the reverse tags would be awesome. lookign at doing this right now.&lt;br /&gt;&lt;br /&gt;So my BD tags a build something like `ios-uitest` based for example on GitHub , then on my RD i could have a task that gets the tags of that build id and set&amp;#39;s it on a variable, that way i can use a contains on a phase condition to run or not that phase..</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

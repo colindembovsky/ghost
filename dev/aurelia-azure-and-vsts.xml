@@ -1,0 +1,579 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>59a5b680-7651-440d-8286-901593717cc1</id>
+  <title>Aurelia, Azure and VSTS</title>
+  <slug>aurelia-azure-and-vsts</slug>
+  <shortUrl>http://bit.ly/2rJlqqh</shortUrl>
+  <author></author>
+  <pubDate>2017-06-09 17:05:22</pubDate>
+  <lastModified>2018-02-15 04:20:27</lastModified>
+  <content>&lt;p&gt;I am a huge fan of &lt;a href="http://aurelia.io/" target="_blank"&gt;Aurelia&lt;/a&gt; – and that was even when I was working with it in the beta days. I recently had to do some development to display &lt;a href="https://d3js.org/" target="_blank"&gt;d3&lt;/a&gt; graphs, and needed a simple SPA app. Of course I decided to use Aurelia. During development, I was again blown away by how well thought out Aurelia is – and using some new (to me) tooling, the experience was super. In this post I’ll walk through the tools that I used as well as the build/release pipeline that I set up to host the site in Azure.&lt;/p&gt; &lt;h2&gt;Tools&lt;/h2&gt; &lt;p&gt;Here are the tools that I used:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;&lt;a href="https://github.com/aurelia/cli" target="_blank"&gt;aurelia-cli&lt;/a&gt; to create the project, scaffold and install components, build and run locally  &lt;li&gt;&lt;a href="https://code.visualstudio.com/" target="_blank"&gt;VS Code&lt;/a&gt; for frontend editing, with a great &lt;a href="http://blog.aurelia.io/2016/10/11/introducing-the-aurelia-vs-code-plugin/" target="_blank"&gt;Aurelia extension&lt;/a&gt;  &lt;li&gt;&lt;a href="https://www.visualstudio.com/downloads/" target="_blank"&gt;Visual Studio 2017&lt;/a&gt; for coding/running the API  &lt;li&gt;&lt;a href="https://www.typescriptlang.org/" target="_blank"&gt;TypeScript&lt;/a&gt; for the Aurelia code&lt;li&gt;&lt;a href="https://karma-runner.github.io/1.0/index.html" target="_blank"&gt;Karma&lt;/a&gt; (with &lt;a href="http://phantomjs.org/" target="_blank"&gt;phantomJS&lt;/a&gt;) and Istanbul for frontend testing and coverage &lt;li&gt;.&lt;a href="https://www.microsoft.com/net/core#windowsvs2017" target="_blank"&gt;NET Core&lt;/a&gt; for the Aurelia host as well as for an API  &lt;li&gt;&lt;a href="https://azure.microsoft.com/en-us/services/app-service/" target="_blank"&gt;Azure App Services&lt;/a&gt; to host the web app  &lt;li&gt;&lt;a href="https://www.visualstudio.com/team-services/" target="_blank"&gt;VSTS&lt;/a&gt; for Git source control, build and release&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;The Demo App and the Challenges&lt;/h2&gt; &lt;p&gt;To walk through the development process, I’m going to create a stupid-simple app. This isn’t a coding walkthrough per se – I want to focus on how to use the tooling to support your development process. However, I’ll demonstrate the challenges as well as the solutions, hopefully showing you how quickly you can get going and do what you do best – code!&lt;/p&gt; &lt;p&gt;The demo app will be an Aurelia app with just a REST call to an API. While it is a simple app, I’ll walk through a number of important development concepts:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Creating a new project  &lt;li&gt;Configuring VS Code  &lt;li&gt;Installing components  &lt;li&gt;Building, bundling and running the app locally &lt;li&gt;Handling different configs for different environments  &lt;li&gt;Automated build, test and deployment of the app&lt;/li&gt;&lt;/ol&gt; &lt;h3&gt;Creating the DotNet Projects&lt;/h3&gt; &lt;p&gt;There are some prerequisites to getting started, so I installed all of these:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;nodejs  &lt;li&gt;npm  &lt;li&gt;dotnet core  &lt;li&gt;aurelia-cli  &lt;li&gt;VS Code  &lt;li&gt;VS 2017&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Once I had the prereqs installed, I created a new empty folder (actually I cloned an empty Git repo – if you don’t clone a repo, remember to git init). Since I wanted to peg the dotnet version, I created a new file called global.json:&lt;/p&gt; &lt;pre class="brush: javascript;"&gt;
+{
+  "sdk": {
+    "version": "1.0.4"
+  }
+}
+&lt;/pre&gt;
+I also created a .gitignore (helpful tip: if you open the folder in Visual Studio and use Team Explorer-&amp;gt;Settings-&amp;gt;Repository Settings, you can create a default .gitignore and .gitattributes file). 
+&lt;p&gt;Then I created a new dotnet webapi project to “host” the Aurelia app in a folder called frontend and another dotnet project to be the API in a folder called API:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/61a4dc74-b9ef-466e-839c-e8bef965e68e.png" target="_blank"&gt;&lt;img width="302" height="218" title="image" style="border-width: 0px; padding-top: 0px; padding-right: 0px; padding-left: 0px; margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/8ba06ff0-8452-4001-976f-c6de8fda1880.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The commands are:&lt;/p&gt;
+&lt;pre&gt;
+mkdir frontend
+cd frontend
+dotnet new webapi
+cd ..
+mkdir API
+cd API
+dotnet new webapi
+&lt;/pre&gt;
+&lt;p&gt;I then opened the API project in Visual Studio. Pressing save prompted me to create a solution file, which I did in the API folder. I also created an empty readme.txt file in the wwwroot folder (I’ll explain why when we get to the build) and changed the Launch URL in the project properties to “api/values”:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/1e7d032a-075e-4e00-a32d-7ee0b27dfcdc.png" target="_blank"&gt;&lt;img width="371" height="221" title="image" style="border-width: 0px; padding-top: 0px; padding-right: 0px; padding-left: 0px; margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/a47cfea4-6910-4eed-9de0-2f1d957b7db0.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;When I press F5 to debug, I see this:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/637a8409-48f7-484c-b183-aa6a0a39f59a.png"&gt;&lt;img width="299" height="105" title="image" style="border-width: 0px; padding-top: 0px; padding-right: 0px; padding-left: 0px; margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/8714a2ae-aeeb-4750-a9cb-3569af41e412.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;Creating the Aurelia Project&lt;/h3&gt;
+&lt;p&gt;I was now ready to create the Aurelia skeleton. The last time I used Aurelia, there was no such thing as the &lt;a href="https://github.com/aurelia/cli" target="_blank"&gt;aurelia-cli&lt;/a&gt; – so it was a little bumpy getting started. I found using the cli and the project structure it creates for building/bundling made development smooth as butter. So I cd’d back to the frontend folder and ran the aurelia-cli command to create the Aurelia project: &lt;font face="Courier New"&gt;au new --here&lt;/font&gt;. The “&lt;font face="Courier New"&gt;--here&lt;/font&gt;” is important because it tells the aurelia-cli to create the project in this directory without creating another subdirectory. A wizard then walked me through some choices: here are my responses:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Target platform: .NET Core 
+&lt;li&gt;Transpiler: TypeScript 
+&lt;li&gt;Template: With minimum minification 
+&lt;li&gt;CSS Processor: Less 
+&lt;li&gt;Unit testing: Yes 
+&lt;li&gt;Install dependencies: Yes&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;That created the Aurelia project for me and installed all of the nodejs packages that Aurelia requires. Once the install completed, I was able to run by typing “au run”:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/886c77ba-42fe-4bc1-b1e4-c2006b7ee226.png"&gt;&lt;img width="354" height="126" title="image" style="border-width: 0px; padding-top: 0px; padding-right: 0px; padding-left: 0px; margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/143629bb-f9f7-4c0e-ba77-251c16e29728.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Whoop! The skeleton is up, so it’s time to commit!&lt;/p&gt;&lt;p&gt;You can find the repo I used for this post &lt;a href="https://github.com/colindembovsky/AzureAureliaDemo" target="_blank"&gt;here&lt;/a&gt;. There are various branches – start is the the start of the project up until now – in other words, the absolute bare skeleton of the project.&lt;/p&gt;
+&lt;h3&gt;Configuring VS Code&lt;/h3&gt;
+&lt;p&gt;Now that I have a project structure, I can start coding. I’ve already got Visual Studio for the API project, which I could use for the frontend editing, but I really like doing nodejs development in VS Code. So I open up the frontend folder in VS Code.&lt;/p&gt;
+&lt;p&gt;I’ve also installed some VS Code extensions:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href="https://marketplace.visualstudio.com/items?itemName=emmanuelbeziat.vscode-great-icons" target="_blank"&gt;VSCode Great Icons&lt;/a&gt; – makes the icons in the file explorer purdy (don’t forget to configure your preferences after you install the extension!) 
+&lt;li&gt;
+&lt;div align="left"&gt;&lt;a href="https://marketplace.visualstudio.com/items?itemName=eg2.tslint" target="_blank"&gt;TSLint&lt;/a&gt; – lints my TypeScript as I code&lt;/div&gt;
+&lt;li&gt;&lt;a href="https://marketplace.visualstudio.com/items?itemName=AureliaEffect.aurelia" target="_blank"&gt;aurelia&lt;/a&gt; – palette commands and html intellisense&lt;/li&gt;&lt;/ol&gt;
+&lt;h4&gt;Configuring TSLint&lt;/h4&gt;
+&lt;p&gt;There is already an empty tslint.json file in the root of the frontend project. Once you’ve installed the VS Code TSLint extension, you’ll see lint warnings in the status bar: though you have to first configure which rules you want to run. I usually start by extending the tslint:latest rules. Edit the tslint.json file to look like this:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+{
+  "extends": ["tslint:latest"],
+  "rules": {
+    
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;Now you’ll see some warnings and green squigglies in the code:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/5e8d659a-4185-48d6-8b46-96fa9fdbc862.png"&gt;&lt;img width="309" height="285" title="image" style="border-width: 0px; padding-top: 0px; padding-right: 0px; padding-left: 0px; margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/a91465e3-2b40-4ba1-97c6-6180273b61f4.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I don’t care about the type of quotation marks (single or double) and I don’t care about alphabetically ordering my imports, so I override those rules:&lt;/p&gt;
+&lt;pre class="brush: javascript; highlight: [4,5,6,7,8,9];"&gt;
+{
+  "extends": ["tslint:latest"],
+  "rules": {
+    "ordered-imports": [
+      false
+    ],
+    "quotemark": [
+      false
+    ]
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;Of course you can put whatever ruleset you want into this file – but making a coding standard for your team that’s enforced by a tool rather than in a wiki or word doc is a great practice! A helpful tip is that if you edit the json file in VS Code you get intellisense for the rules – and you can see the name of the rule in the warnings window.&lt;/p&gt;
+&lt;h3&gt;Installing Components&lt;/h3&gt;
+&lt;p&gt;Now we can use the aurelia cli (au) to install components. For example, I want to do some REST calls, so I want to install the fetch-client:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;au install aurelia-fetch-client whatwg-fetch&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;This not only adds the package, but amends the aurelia.json manifest file (in the aurelia_project folder) so that the aurelia-fetch-client is bundled when the app is “compiled”. I also recommend installing whatwg-fetch which is a fetch polyfill. Let’s create a new class which is a wrapper for the fetch client:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import { autoinject } from 'aurelia-framework';
+import { HttpClient } from 'aurelia-fetch-client';
+
+const baseUrl = "http://localhost:1360/api";
+
+@autoinject
+export class ApiWrapper {
+    public message = 'Hello World!';
+    public values: string[];
+
+    constructor(public client: HttpClient) {
+		client.configure(config =&gt; {
+			config
+				.withBaseUrl(baseUrl)
+				.withDefaults({
+					headers: {
+						Accept: 'application/json',
+					},
+				});
+		});
+	}
+}
+&lt;/pre&gt;
+&lt;p&gt;Note that (for now) we’re hard-coding the baseUrl. We’ll address config shortly.&lt;/p&gt;
+&lt;p&gt;We can now import in the ApiWrapper (via injection) and call the values method:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import { autoinject } from 'aurelia-framework';
+import { ApiWrapper } from './api';
+
+@autoinject
+export class App {
+  public message = 'Hello World!';
+  public values: string[];
+
+  constructor(public api: ApiWrapper) {
+    this.initValues();
+  }
+
+  private async initValues() {
+    try {
+      this.values = await this.api.client.fetch("/values")
+        .then((res) =&gt; res.json());
+    } catch (ex) {
+      console.error(ex);
+    }
+  }
+}
+&lt;/pre&gt;
+
+&lt;p&gt;Here’s the updated html for the app.html page:&lt;/p&gt;
+&lt;pre class="brush: html;"&gt;
+&lt;template&gt;
+  &lt;h1&gt;${message}&lt;/h1&gt;
+  &lt;h3&gt;Values&lt;/h3&gt;
+  &lt;ul&gt;
+    &lt;li repeat.for="val of values"&gt;${val}&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/template&gt;
+&lt;/pre&gt;
+&lt;p&gt;Nothing too fancy – but shown here to be complete. I’m not going to make a full app here, since that’s not the goal of this post.
+&lt;p&gt;Finally, we need to enable CORS on the Web API (since it does not allow CORS by default). Add the Microsoft.AspNet.Cors package to the API project and then add the services.AddCors() and app.UseCors() lines (see this snippet):&lt;/p&gt;
+&lt;pre class="brush: csharp;"&gt;
+public void ConfigureServices(IServiceCollection services)
+{
+  // Add framework services.
+  services.AddMvc();
+	services.AddCors();
+}
+
+// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+{
+  loggerFactory.AddConsole(Configuration.GetSection("Logging"));
+  loggerFactory.AddDebug();
+
+  app.UseCors(p =&gt; p.AllowAnyOrigin().AllowAnyMethod());
+  app.UseMvc();
+}
+&lt;/pre&gt;
+&lt;p&gt;Now we can get this when we run the project (using “au run”): 
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/2d4e4be1-dd11-422d-990c-b33fe7969174.png" target="_blank"&gt;&lt;img width="270" height="165" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/5e26fa9e-fbff-4216-9280-37081283ae84.png" border="0"&gt;&lt;/a&gt;&lt;p&gt;If you’re following along in the &lt;a href="https://github.com/colindembovsky/AzureAureliaDemo" target="_blank"&gt;repo&lt;/a&gt; code, the changes are on the “Step1-AddFetch” branch.&lt;/p&gt;&lt;h3&gt;Running Locally&lt;/h3&gt;
+&lt;p&gt;Running locally is trivial. I end up with Visual Studio open and pressing F5 to run the backend API project – the frontend project is just as trivial. In VSCode, with the frontend folder open, just hit ctrl-shift-p to bring up the command palette and then type/select “au run --watch” to launch the frontend “build”. This transpiles the TypeScript to JavaScript, compiles Less (or SASS) to css, bundles and minifies all your html, compiled css and JavaScript into a single app-bundle.js in wwwroot\scripts. It also minifies and bundles Aurelia and its dependencies into vendor-bundle.js, using the settings from the aurelia.json file. It’s a lot of work, but Aurelia takes care of it all for you – just run “au run” to do all that stuff and launch a server. If you add the --watch parameter, the process watches your source files (html, Less, TypeScript) and automatically recompiles everything and refreshes the browser automagically using browsersync. It’s as smooth as butter!&lt;/p&gt;
+&lt;h2&gt;Config Management&lt;/h2&gt;
+&lt;h3&gt;Attempt 1 – Using environment.ts&lt;/h3&gt;&lt;p&gt;Let’s fix up the hard-coded base URL for the api class. Aurelia does have the concept of “environments” – you can see that by looking in the src\environment.ts file. You would be tempted to change the values of that file, but you’ll see that if you do, the contents get overwritten each time Aurelia compiles. Instead, open up the aurelia-project\environments folder, where you’ll see three environment files – dev, stage and prod.ts. To change environment, just enter “au run --env dev” to get the dev environment or “au run --env prod” to get the prod environment. (Unfortunately you can’t change the environment using VSCode command palette, so you have to run the run command from a console or from the VSCode terminal).&lt;/p&gt;&lt;p&gt;Let’s edit the environments to put the api base URL there instead of hard-coding it:
+&lt;pre class="brush: javascript; highlight: [2]"&gt;
+export default {
+  apiBaseUrl: "http://localhost:64705/api",
+  debug: true,
+  testing: true,
+};
+&lt;/pre&gt;
+&lt;p&gt;Of course we add the apiBaseUrl property to the stage and prod files too!&lt;/p&gt;&lt;p&gt;With that change, we can simply import the environment and use the value of the property in the api.ts file:&lt;/p&gt;
+&lt;pre class="brush: javascript; highlight: [2,13]"&gt;
+import { autoinject } from 'aurelia-framework';
+import { HttpClient } from 'aurelia-fetch-client';
+import environment from './environment';
+
+@autoinject
+export class ApiWrapper {
+    public message = 'Hello World!';
+    public values: string[];
+
+    constructor(public client: HttpClient) {
+        client.configure(config =&gt; {
+            config
+                .withBaseUrl(environment.apiBaseUrl)
+                .withDefaults({
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                });
+        });
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;The important changes are on line 2 (reading in the environment settings) and line 13 (using the value). Now we can run for different environments. If you’re following along in the &lt;a href="https://github.com/colindembovsky/AzureAureliaDemo" target="_blank"&gt;repo&lt;/a&gt; code, the changes are on the “Step2-EnvTsConfig” branch.&lt;/p&gt;&lt;h3&gt;Attempt 2 – Using a Json File&lt;/h3&gt;&lt;p&gt;There’s a problem with the above approach though – if we have secrets (like access tokens or keys) then we don’t want them checked into source control. Also, when we get to build/release, we want the same build to go to multiple environments – using environment.ts means we have to build once for each environment and then select the correct package for the corresponding environment – it’s nasty. Rather, we want to be able to configure the environment settings during a release. This puts secret information in the release tool instead of source control, which is much better, and allows a single build to be deployed to any number of environments.&lt;/p&gt;&lt;p&gt;Unfortunately, it’s not quite so simple (at first glance). The environment.ts file is bundled into app-bundle.js, so there’s no way to inject values at deploy time, unless you want to monkey with the bundle itself. It would be much better to take a leaf out of the .NET CORE playbook and set up a Json config file. Fortunately, there’s an Aurelia plugin that allows you to do just that! Conveniently, it’s called aurelia-configuration.&lt;/p&gt;&lt;p&gt;Run “au install aurelia-configuration” to install the module.&lt;/p&gt;&lt;p&gt;Now (by convention) the config module looks for a file called “config\config.json”. So in the src folder, add a new folder called config and add a new file into the config folder called config.json:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+{
+      "api": {
+            "baseUri": "http://localhost:12487/api"
+      }
+}
+&lt;/pre&gt;
+&lt;p&gt;We can then inject the AureliaConfiguration class into our classes and call the get() method to retrieve a variable value. Let’s change the api.ts file again:&lt;/p&gt;
+&lt;pre class="brush: javascript; highlight: [3,10,13];"&gt;
+import { autoinject } from 'aurelia-framework';
+import { HttpClient } from 'aurelia-fetch-client';
+import { AureliaConfiguration } from 'aurelia-configuration';
+
+@autoinject
+export class ApiWrapper {
+    public message = 'Hello World!';
+    public values: string[];
+
+    constructor(public client: HttpClient, private aureliaConfig: AureliaConfiguration) {
+        client.configure(config =&gt; {
+            config
+                .withBaseUrl(aureliaConfig.get("api.baseUri"))
+                .withDefaults({
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                });
+        });
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;Line 3 has us importing the type, line 10 has the constructor arg for the autoinjection and we get the value on line 13.&lt;/p&gt;&lt;p&gt;We also have to tell Aurelia to use the config plugin. Open main.ts and add the plugin code (line 8 below):&lt;/p&gt;
+&lt;pre class="brush: javascript; highlight=[8];"&gt;
+import {Aurelia} from 'aurelia-framework';
+import environment from './environment';
+
+export function configure(aurelia: Aurelia) {
+  aurelia.use
+    .standardConfiguration()
+    .feature('resources')
+    .plugin('aurelia-configuration');
+  ...
+&lt;/pre&gt;
+&lt;p&gt;There’s one more piece to this puzzle: the config.json file doesn’t get handled anywhere, so running the program won’t work. We need to tell the Aurelia bundler that it needs to add in the config.json file and publish it to the wwwroot folder. To do that, we can add in a copyFiles target onto the aurelia.json settings file:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+{
+  "name": "frontend",
+  "type": "project:application",
+  "platform": {
+    ...
+  },
+  ...
+  "build": {
+    "targets": [
+     ...
+    ],
+    "loader": {
+      ...
+    },
+    "options": {
+      ...
+    },
+    "bundles": [
+      ...
+    ],
+    "copyFiles": {
+      "src/config/*.json": "wwwroot/config"
+    }
+  }
+}
+&lt;/pre&gt;
+
+&lt;p&gt;At the bottom of the file, just after the build.bundles settings, we add the copyFiles target. The config.json file is now copied to the wwwroot/config folder when we build, ready to be read at run time! If you’re following along in the &lt;a href="https://github.com/colindembovsky/AzureAureliaDemo" target="_blank"&gt;repo&lt;/a&gt; code, the changes are on the “Step3-JsonConfig” branch.&lt;/p&gt;&lt;h2&gt;Testing&lt;/h2&gt;&lt;h3&gt;Authoring the Tests&lt;/h3&gt;&lt;p&gt;Of course the API project would require tests – but doing .NET testing is fairly simple and there’s a ton of guidance on how to do that. I was more interested in testing the frontend (Aurelia) code with coverage results.&lt;/p&gt;&lt;p&gt;When I created the frontend project, Aurelia created a test stub project. If you open the test folder, there’s a simple test spec in unit\app.spec.ts:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import {App} from '../../src/app';
+
+describe('the app', () =&gt; {
+  it('says hello', () =&gt; {
+    expect(new App().message).toBe('Hello World!');
+  });
+});
+&lt;/pre&gt;
+&lt;p&gt;We’ve changed the App class, so this code won’t compile correctly. Now we need to pass an ApiWrapper to the App constructor. And if we want to construct an ApiWrapper, we need an AureliaConfiguration instance as well as an HttpClient instance. We’re going to want to mock the API calls that the frontend makes, so let’s stub out a mock implementation of HttpClient. I add a new class in src\test\unit\utils\mock-fetch.ts:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import { HttpClient } from 'aurelia-fetch-client';
+
+export class HttpClientMock extends HttpClient {
+}
+&lt;/pre&gt;
+&lt;p&gt;We’ll flesh this class out shortly. For now, it’s enough to get an instance of HttpClient for the ApiWrapper constructor. What about the AureliaConfiguration instance? Fortunately, we can create (and even configure) one really easily:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+let aureliaConfig = new AureliaConfiguration();
+aureliaConfig.set("api.baseUri", "http://test");
+&lt;/pre&gt;
+&lt;p&gt;We add the “api.BaseUri” key since that’s the value that the ApiWrapper reads from the configuration object. We can now flesh out the remainder of our test:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import {App} from '../../src/app';
+import {ApiWrapper} from '../../src/api';
+import {HttpClientMock} from './utils/mock-fetch';
+import {AureliaConfiguration} from 'aurelia-configuration';
+
+describe('the app', () =&gt; {
+  it('says hello', async done =&gt; {
+    // arrange
+    let aureliaConfig = new AureliaConfiguration();
+    aureliaConfig.set("api.baseUri", "http://test");
+
+    const client = new HttpClientMock();
+    client.setup({
+      data: ["testValue1", "testValue2", "testValue3"],
+      headers: {
+        'Content-Type': "application/json",
+      },
+      url: "/values",
+    });
+    const api = new ApiWrapper(client, aureliaConfig);
+
+    // act
+    let sut: App;
+    try {
+      sut = new App(api);
+    } catch (e) {
+      console.error(e);
+    }
+
+    // assert
+    setTimeout(() =&gt; {
+      expect(sut.message).toBe('Hello World!');
+      expect(sut.values.length).toBe(3);
+      expect(sut.values).toContain("testValue1");
+      expect(sut.values).toContain("testValue2");
+      expect(sut.values).toContain("testValue3");
+      done();
+    }, 10);
+  });
+});
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Lines 13-19: configure the mock fetch response (we’ll see the rest of the mock HttpClient class shortly)&lt;/li&gt;&lt;li&gt;Line 20: instantiate a new ApiWrapper&lt;/li&gt;&lt;li&gt;Lines 23-28: call the App constructor&lt;/li&gt;&lt;li&gt;Lines 31-38: we wrap the asserts in a timeout since the App constructor calls an async method (perhaps there’s a better way to do this?)&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Let’s finish off the test code by looking at the mock-fetch class:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+import { HttpClient } from 'aurelia-fetch-client';
+export class HttpClientMock extends HttpClient {
+}
+
+export interface IMethodConfig {
+    url: string;
+    method?: string;
+    status?: number;
+    statusText?: string;
+    headers?: {};
+    data?: {};
+};
+
+export class HttpClientMock extends HttpClient {
+    private config: IMethodConfig[] = [];
+
+    public setup(config: IMethodConfig) {
+        this.config.push(config);
+    }
+
+    public async fetch(input: Request | string, init?: RequestInit) {
+        let url: string;
+        if (typeof input === "string") {
+            url = input;
+        } else {
+            url = input.url;
+        }
+
+        // find the matching setup method
+        let methodConfig: IMethodConfig;
+        methodConfig = this.config.find(c =&gt; c.url === url);
+        if (!methodConfig) {
+            console.error(`---MockFetch: No such method setup: ${url}`);
+            return Promise.reject(new Response(null,
+                {
+                    status: 404,
+                    statusText: `---MockFetch: No such method setup: ${url}`,
+                }));
+        }
+
+        // set up headers
+        let responseInit: ResponseInit = {
+            headers: methodConfig.headers || {},
+            status: methodConfig.status || 200,
+            statusText: methodConfig.statusText || "",
+        };
+
+        // get a unified request object
+        let request: Request;
+        if (Request.prototype.isPrototypeOf(input)) {
+            request = (&lt;Request&gt; input);
+        } else {
+            request = new Request(input, responseInit || {});
+        }
+
+        // create a response object
+        let response: Response;
+        const data = JSON.stringify(methodConfig.data);
+        response = new Response(data, responseInit);
+
+        // resolve or reject accordingly
+        return response.status &gt;= 200 &amp;&amp; response.status &lt; 300 ?
+            Promise.resolve(response) : Promise.reject(response);
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;I won’t go through the whole class, but essentially you configure a mapping of routes to responses so that when the mock object is called it can return predictable data.&lt;/p&gt;&lt;p&gt;With those changes in place, we can run the tests using “au test”. This launches Chrome and runs the test. The Aurelia project did the heavy lifting to configure paths for the test runner (Karma) so that the tests “just work”.&lt;/p&gt;&lt;h3&gt;Going Headless and Adding Reports and Coverage &lt;/h3&gt;&lt;p&gt;Now that we can run the tests in Chrome with results splashed to the console, we should consider how these tests would run in a build. Firstly, we want to produce a report file of some sort so that the build can save the results. We also want to add coverage. Finally, we want to run headless so that we can run this on an agent that doesn’t need access to a desktop to launch a browser!&lt;/p&gt;&lt;p&gt;We’ll need to add some development-time node packages to accomplish these changes:&lt;/p&gt;&lt;p&gt;yarn add karma-phantomjs-launcher karma-coverage karma-tfs gulp-replace --dev&lt;/p&gt;&lt;p&gt;With those package in place, we can change the karma.conf.js file to use phantomjs (a headless browser) instead of Chrome. We’re also going to add in the test result reporter, coverage reporter and a coverage remapper. The coverage will report coverage on the JavaScript files, but we would ideally want coverage on the TypeScript files – that’s what the coverage remapper will do for us.&lt;/p&gt;&lt;p&gt;Here’s the new karma.conf.js:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+'use strict';
+const path = require('path');
+const project = require('./aurelia_project/aurelia.json');
+const tsconfig = require('./tsconfig.json');
+
+let testSrc = [
+  { pattern: project.unitTestRunner.source, included: false },
+  'test/aurelia-karma.js'
+];
+
+let output = project.platform.output;
+let appSrc = project.build.bundles.map(x =&gt; path.join(output, x.name));
+let entryIndex = appSrc.indexOf(path.join(output, project.build.loader.configTarget));
+let entryBundle = appSrc.splice(entryIndex, 1)[0];
+let files = [entryBundle].concat(testSrc).concat(appSrc);
+
+module.exports = function(config) {
+  config.set({
+    basePath: '',
+    frameworks: [project.testFramework.id],
+    files: files,
+    exclude: [],
+    preprocessors: {
+      [project.unitTestRunner.source]: [project.transpiler.id],
+      'wwwroot/scripts/app-bundle.js': ['coverage']
+    },
+    typescriptPreprocessor: {
+      typescript: require('typescript'),
+      options: tsconfig.compilerOptions
+    },
+    reporters: ['progress', 'tfs', 'coverage', 'karma-remap-istanbul'],
+    port: 9876,
+    colors: true,
+    logLevel: config.LOG_INFO,
+    autoWatch: true,
+    browsers: ['PhantomJS'],
+    singleRun: false,
+    // client.args must be a array of string.
+    // Leave 'aurelia-root', project.paths.root in this order so we can find
+    // the root of the aurelia project.
+    client: {
+      args: ['aurelia-root', project.paths.root]
+    },
+
+    phantomjsLauncher: {
+      // Have phantomjs exit if a ResourceError is encountered (useful if karma exits without killing phantom)
+      exitOnResourceError: true
+    },
+
+    coverageReporter: {
+      dir: 'reports',
+      reporters: [
+        { type: 'json', subdir: 'coverage', file: 'coverage-final.json' },
+      ]
+    },
+
+    remapIstanbulReporter: {
+      src: 'reports/coverage/coverage-final.json',
+      reports: {
+        cobertura: 'reports/coverage/cobertura.xml',
+        html: 'reports/coverage/html'
+      }
+    }
+  });
+};
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 25: add a preprocessor to instrument the code that we’re going to execute&lt;/li&gt;&lt;li&gt;Line 31: we add reporters to produce results files (tfs), coverage and remapping&lt;/li&gt;&lt;li&gt;Lines 45-48: we configure a catch-all to close phantomjs if something fails&lt;/li&gt;&lt;li&gt;Lines 50-55: we configure the coverage to output a Json coverage file&lt;/li&gt;&lt;li&gt;Lines 57-63: we configure the remapper so that we get TypeScript coverage results&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;One gotcha I had that I couldn’t find a work-around for: the html files that are generated showing which lines of code were hit is generated with incorrect relative paths and the src folder (with detailed coverage) generated outside the html report folder. Eventually, I decided that a simple replace and file move was all I needed, so I modified the test.ts task in the aurelia-project\tasks folder:&lt;/p&gt;
+&lt;pre class="brush: javascript;"&gt;
+// hack to fix the relative paths in the generated mapped html report
+let fixPaths = done =&gt; {
+  let repRoot = path.join(__dirname, '../../reports/');
+  let repPaths = [
+    path.join(repRoot, 'src/**/*.html'),
+    path.join(repRoot, 'src/*.html'),
+  ];
+  return gulp.src(repPaths, { base: repRoot })
+        .pipe(replace(/(..\/..\/..\/)(\w)/gi, '../coverage/html/$2'))
+        .pipe(gulp.dest(path.join(repRoot)));
+};
+
+let unit;
+
+if (CLIOptions.hasFlag('watch')) {
+  unit = gulp.series(
+    build,
+    gulp.parallel(
+      watch(build, onChange),
+      karma,
+      fixPaths
+    )
+  );
+} else {
+  unit = gulp.series(
+    build,
+    karma,
+    fixPaths
+  );
+}
+&lt;/pre&gt;
+&lt;p&gt;I add new tasks called “updateIndex” and “copySrc” that fix up the paths for me. Perhaps there’s a config setting for the remapper that will render this obsolete, but this was the best I could come up with.&lt;/p&gt;&lt;p&gt;Now when you run “au test” you get a result file and coverage results for the TypeScript code all in the html folder with the correct paths. If you’re following along in the &lt;a href="https://github.com/colindembovsky/AzureAureliaDemo" target="_blank"&gt;repo&lt;/a&gt; code, these changes are on the master branch (this is the final state of the demo code).&lt;/p&gt;&lt;h2&gt;Automated Build and Test&lt;/h2&gt;
+&lt;p&gt;We now have all the pieces in place to do a build. The build is fairly straightforward once you work out how to invoke the Arelia cli. Starting with a .NET Core Web App template, here is the definition I ended up with:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/72b236bf-fd45-45b3-9070-3287303247e6.png" target="_blank"&gt;&lt;img width="305" height="306" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/0573ca73-9e3b-4e2e-98f0-448f5d9c50ae.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here are the task settings:&lt;/p&gt;&lt;ol&gt;&lt;li&gt;.NET Core Restore – use defaults&lt;/li&gt;&lt;li&gt;.NET Core Build&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Change “Arguments” to &lt;font face="Courier New"&gt;--configuration $(BuildConfiguration) --version-suffix $(Build.BuildNumber)&lt;/font&gt;&lt;/li&gt;&lt;li&gt;The extra bit added is the version-suffix arg which produces binaries with the same version as the build number&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;npm install&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Change “working folder” to &lt;font face="Courier New"&gt;frontend&lt;/font&gt; (this is the directory of the Aurelia project).\node_modules\aurelia-cli\bin\aurelia-cli.js test&lt;/li&gt;&lt;/ol&gt;&lt;ol&gt;&lt;!--StartFragment--&gt;
+&lt;/ol&gt;&lt;li&gt;Run command&lt;/li&gt;&lt;ol&gt;
+&lt;ol&gt;
+&lt;li&gt;Set “Tool” to node&lt;/li&gt;
+&lt;li&gt;Set “Arguments” to &lt;font face="Courier New"&gt;.\node_modules\aurelia-cli\bin\aurelia-cli.js test&lt;/font&gt;&lt;/li&gt;
+&lt;li&gt;Expand “Advanced” and set “Working folder” to &lt;font face="Courier New"&gt;frontend&lt;/font&gt;&lt;/li&gt;&lt;li&gt;&lt;font face="Calibri"&gt;This runs the tests and produces the test results and coverage results files&lt;/font&gt;&lt;/li&gt;&lt;/ol&gt;&lt;!--EndFragment--&gt;&lt;/ol&gt;&lt;li&gt;Run command&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Set “Tool” to node&lt;/li&gt;&lt;li&gt;Set “Arguments” to &lt;font face="Courier New"&gt;.\node_modules\aurelia-cli\bin\aurelia-cli.js build --env prod&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Expand “Advanced” and set “Working folder” to &lt;font face="Courier New"&gt;frontend&lt;/font&gt;&lt;/li&gt;&lt;li&gt;&lt;font face="Calibri"&gt;This does transpilation, minification and bundling so that we’re ready to deploy&lt;/font&gt;&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Publish Test Results&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Set “Test Result Format” to &lt;font face="Courier New"&gt;VSTest&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Set “Test results files” to &lt;font face="Courier New"&gt;frontend/testresults/TEST*.xml&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Set “Test run title” to &lt;font face="Courier New"&gt;Aurelia&lt;/font&gt;&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Publish code coverage Results&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Set “Code Coverage Tool” to &lt;font face="Courier New"&gt;Cobertura&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Set “Summary File” to &lt;font face="Courier New"&gt;$(Build.SourcesDirectory)/frontend/reports/coverage/cobertura.xml&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Set “Report Directory” to &lt;font face="Courier New"&gt;$(System.DefaultWorkingDirectory)/frontend/reports/coverage/html&lt;/font&gt;&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;.NET Core Publish&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Make sure “Publish Web Projects” is checked – this is why I added a dummy readme file into the wwwroot folder of the API app, otherwise it’s not published as a web project&lt;/li&gt;&lt;li&gt;Set “Arguments” to &lt;font face="Courier New"&gt;--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory) --version-suffix $(Build.BuildNumber)&lt;/font&gt;&lt;/li&gt;&lt;li&gt;Make sure “Zip Published Projects” is checked&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;On the Options Tab&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Set the build number format to 1.0.0$(rev:.r) to give the build number a 1.0.0.x format&lt;/li&gt;&lt;li&gt;Set the default agent queue to Hosted VS2017 (or you can select a private build agent with VS 2017 installed)&lt;/li&gt;&lt;/ol&gt;&lt;/ol&gt;&lt;p&gt;Now when I run the build, I get test and coverage results in the summary:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/9b01b4c6-bca4-4f1e-8fb9-2d4498b76231.png" target="_blank"&gt;&lt;img width="333" height="179" title="SNAGHTML323918f" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="SNAGHTML323918f" src="http://colinsalmcorner.com/posts/files/ac8a03f6-4c0b-489f-a757-e7fa56b35e3c.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The coverage files are there if you click the Code Coverage results tab, but there’s a problem with the css. &lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/54921ef4-6167-46e1-9de3-4277bda6fa3e.png" target="_blank"&gt;&lt;img width="319" height="163" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/ae799414-0963-480f-9fbb-5e64273d45d4.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The &amp;lt;link&amp;gt; elements are stripped out of the html pages when the iFrame for the coverage results shows – I’m working with the product team to find a workaround for this. If you download the results from the Summary page and unzip them, you get the correct rendering.&lt;/p&gt;&lt;p&gt;I can also see both web projects ready for deployment in the Artifacts tab:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/1fe95c7d-f588-4063-abda-479c87794755.png" target="_blank"&gt;&lt;img width="277" height="104" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/e91eff17-6284-4452-b096-c421006379b4.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;We’re ready for a release!&lt;/p&gt;&lt;h2&gt;The Release Definition&lt;/h2&gt;&lt;p&gt;I won’t put the whole release to Azure here – the key point to remember is the configuration. We’ve done the work to move the configuration into the config.json file for this very reason.&lt;/p&gt;&lt;p&gt;Once you’ve set up an Azure endpoint, you can add in an “Azure App Services Deploy” task. Select the subscription and app service and then change the “Package or folder” from “$(System.DefaultWorkingDirectory)/**/*.zip” to “$(System.DefaultWorkingDirectory)/drop/frontend.zip” (or API.zip) to deploy the corresponding site. To handle the configuration, you simply add “wwwroot/config/config.json” to the “JSON variable substitution”.&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/e1ee97d8-a7a6-4ecc-bb7c-4a16cf65dc6e.png" target="_blank"&gt;&lt;img width="330" height="109" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/0e80ad3c-4056-4ed3-87f7-ec8247095fa8.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Now we can define an environment variable for the substitution. Just add one with the full “JSON path” for the variable. In our case, we want “api.baseUri” to be the name and then put in whatever the corresponding environment value is:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/09a2c2e9-0ad1-459a-8832-963872835b86.png" target="_blank"&gt;&lt;img width="338" height="111" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/17a16497-36e7-4011-86d1-f1ea5718de6d.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;We can repeat this for other variables if we need more.&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;I really love the Aurelia framework – and with the solid Aurelia cli, development is a really good experience. Add to that simple build and release management to Azure using VSTS, and you can get a complete site skeleton with full CI/CD in half a day. And that means you’re delivering better software, faster – always a good thing!&lt;/p&gt;&lt;p&gt;Happy Aurelia-ing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+    <category>ALM</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="da6e193e-a981-4bb9-862f-8b9da7d0ba01">
+      <author>max</author>
+      <email>amodernronin@gmail.com</email>
+      <website></website>
+      <ip>95.102.221.83</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36</userAgent>
+      <date>2017-07-07 18:23:49</date>
+      <content>Hi, very cool article, just about what I was looking for, thanks a lot!&lt;br /&gt;&lt;br /&gt;Anyway, I&amp;#39;ve hit a hiccup:&lt;br /&gt;&lt;br /&gt;after the step with adding ApiWrapper and editing app.ts, I get a runtime error like this:&lt;br /&gt;&lt;br /&gt;deep-extend.ts:148 Unhandled rejection Error: Script error for &amp;quot;aurelia-fetch-client&amp;quot;, needed by: ApiWrapper&lt;br /&gt;http://requirejs.org/docs/errors.html#scripterror&lt;br /&gt;    at makeError (http://localhost:9000/scripts/vendor-bundle.js:3952:17)&lt;br /&gt;    at HTMLScriptElement.onScriptError (http://localhost:9000/scripts/vendor-bundle.js:5522:36)&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;Although I did the au install aurelia-fetch-client etc. Checking out aurelia.json, I got an entry for fetch there, too:&lt;br /&gt;&lt;br /&gt;          {&lt;br /&gt;            &amp;quot;name&amp;quot;: &amp;quot;aurelia-fetch-client&amp;quot;,&lt;br /&gt;            &amp;quot;main&amp;quot;: &amp;quot;aurelia-fetch-client&amp;quot;,&lt;br /&gt;            &amp;quot;path&amp;quot;: &amp;quot;../node_modules/aurelia-fetch-client/dist/amd&amp;quot;,&lt;br /&gt;            &amp;quot;resources&amp;quot;: []&lt;br /&gt;          },&lt;br /&gt;          &amp;quot;whatwg-fetch&amp;quot;&lt;br /&gt;&lt;br /&gt;Any ideas?&lt;br /&gt;thx,&lt;br /&gt;Max from Vienna/Bratislava</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="75ffbc22-a7a1-4bf6-96b8-1adffaed156b">
+      <author>MCornille</author>
+      <email>michiel@digicreate.be</email>
+      <website></website>
+      <ip>84.199.48.250</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36</userAgent>
+      <date>2017-12-13 09:36:45</date>
+      <content>So what do you do about the other stuff in environment.ts? Do you refactor  debug: false,&lt;br /&gt;  testing: false into aurelia-configuration&amp;#39;s  config json as well?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="fa168769-1f71-4fe6-b856-cb65eca5130f">
+      <author>Cristián Ormazábal</author>
+      <email>cristian@ormasoft.cl</email>
+      <website>http://www.ormasoft.cl/</website>
+      <ip>190.151.14.101</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/604.5.6 (KHTML, like Gecko) Version/11.0.3 Safari/604.5.6</userAgent>
+      <date>2018-02-07 13:14:16</date>
+      <content>Colin, well written article. Will use it as a base for a new project because we&amp;#39;ll go just like your configuration (aurelia-cli, VSTS). The only difference will be our use of esnext instead of ts.&lt;br /&gt;&lt;br /&gt;I&amp;#39;m sure your work will save a lot of effort, so many thanks.&lt;br /&gt;&lt;br /&gt;Cristi&amp;#225;n</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9e8b780f-a37c-4477-aeb9-949fc42ea6bf">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:17:29</date>
+      <content>Hi @Max (from Vienna)&lt;br /&gt;&lt;br /&gt;Can you check that the JavaScript is loading correctly (using Chrome debug tools or similar)? That looks like the app isn&amp;#39;t able to load the JS that contains the Aurelia modules.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b8d6a14f-6e7a-4c8c-90ed-690c44b95863">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:19:24</date>
+      <content>Hi @MCornille&lt;br /&gt;&lt;br /&gt;The choice of where to put parameter values is about compile time vs runtime. If you need a runtime setting, then put it in aurelia-config. If you just need a compile time value, use environment.ts.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="03302a1b-2438-431b-881b-916e152dbe60">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:20:25</date>
+      <content>Hi @Cristi&amp;#225;n Ormaz&amp;#225;bal&lt;br /&gt;&lt;br /&gt;Thanks for the feedback - glad to help! I haven&amp;#39;t had a look into ESNext too much - love TypeScript too much to care :-)</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

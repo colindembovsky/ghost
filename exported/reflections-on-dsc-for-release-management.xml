@@ -1,0 +1,229 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Reflections on DSC for Release Management</title>
+  <slug>reflections-on-dsc-for-release-management</slug>
+  <shortUrl>http://bit.ly/15k1Ymg</shortUrl>
+  <author></author>
+  <pubDate>2015-01-19 11:05:59</pubDate>
+  <lastModified>2015-07-21 11:58:29</lastModified>
+  <content>&lt;p&gt;A couple of months ago I did a series of posts (&lt;a href="http://colinsalmcorner.com/post/using-webdeploy-in-vnext-releases" target="_blank"&gt;this one&lt;/a&gt; has the summary of all my RM/DSC posts) about using PowerShell DSC in Release Management. I set out to see if I could create a DSC script that RM could invoke that would prep the environment and install the application. I managed to get it going, but never felt particularly good about the final solution – it always felt a little bit hacky. Not the entire solution per se – really just the &lt;em&gt;application&lt;/em&gt; bit.&lt;/p&gt; &lt;p&gt;The main reason for this was the fact that I need to hack the Script Resource in order to let me run commands on the target node with parameters. Initially I thought that the inability to do this natively in DSC was short-sighted from the architecture of DSC – but the more I thought about it, the more I realized that I was trying to shoehorn application installation into DSC.&lt;/p&gt; &lt;p&gt;DSC scripts should be declarative – my scripts were mostly declarative, but the application-specific parts of the script were very much imperative – and that started to smell.&lt;/p&gt; &lt;h2&gt;Idempotency&lt;/h2&gt; &lt;p&gt;I wrote about what I consider to be the most important mental shift when working with PowerShell DSC – idempotency. The scripts you create need to be idempotent – that is they need to end up in the same end state no matter what the starting state is. This works really well for the environment that an application needs to run in – but it doesn’t really work so well for the application itself.&lt;/p&gt; &lt;p&gt;My conclusion is simple: use DSC to specify the &lt;em&gt;environment&lt;/em&gt;, and use plain ol’ PowerShell to install your &lt;em&gt;application&lt;/em&gt;.&lt;/p&gt; &lt;p&gt;PowerShell DSC resources are split into 3 actions – Get, Test and Set. The Get method gets the state of the resource on the node. The Set method “makes it so” – it enforces the state the script specifies. The Test method checks to see if the target node’s state matches the state the script specifies. Let’s consider an example: the WindowsFeature resource. Consider the following excerpt:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;WindowsFeature WebServerRole
+{
+    Name = "Web-Server"
+    Ensure = "Present"
+}
+&lt;/pre&gt;
+&lt;p&gt;When executing, this resource will check the corresponding WindowsFeature (IIS) on the target node using the Test method. If IIS is present, no action is taken (the node state matches the desired state specified in the script). If it’s not installed, the Set method is invoked to install/enable the IIS. Of course if we simply wanted to query the state of the WindowsFeature, the Get method would tell us the state (installed or not) of IIS.&lt;/p&gt;
+&lt;p&gt;This Get-Test-Set paradigm works well for environments – however, it starts to break down when you try to apply it to an application. Consider a Web Application with a SQL Database backend. How to you test if the application is in a particular state? You could check the schema of the database as an indication of the state; you could check if the site exists as an indication of the web site state. Of course this may not be sufficient for checking the state of your application.&lt;/p&gt;
+&lt;p&gt;(On a side note, if you’re using WebDeploy to deploy your website and you’re using Database Projects, you don’t need to worry, since these mechanisms are idempotent).&lt;/p&gt;
+&lt;p&gt;The point is, you may be deploying an application that doesn’t use an idempotent mechanism. In either case, you’re better off not trying to shoehorn application installation into DSC. Also, Release Management lets you execute both DSC and “plain” PowerShell against target nodes – so use them both.&lt;/p&gt;
+&lt;h2&gt;WebServerPreReqs Script&lt;/h2&gt;
+&lt;p&gt;I also realized that I never published my “WebServerPreReqs” script. I use this script to prep a Web Server for my web application. There are four major sections to the script: Windows Features, runtimes, WebDeploy and MMC.&lt;/p&gt;
+&lt;p&gt;First, I ensure that Windows is in the state I need it to be – particularly IIS. I ensure that IIS is installed, as well as some other options like Windows authentication. Also, I ensure that the firewall allows WMI.&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Script AllowWMI 
+{
+    GetScript = { @{ Name = "AllowWMI" } }
+    TestScript = { $false }
+    SetScript = 
+    {
+        Set-NetFirewallRule -DisplayGroup "Windows Management Instrumentation (WMI)" -Enabled True
+    }
+}
+
+WindowsFeature WebServerRole
+{
+    Name = "Web-Server"
+    Ensure = "Present"
+}
+
+WindowsFeature WebMgmtConsole
+{
+    Name = "Web-Mgmt-Console"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebAspNet
+{
+    Name = "Web-Asp-Net"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebNetExt
+{
+    Name = "Web-Net-Ext"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebAspNet45
+{
+    Name = "Web-Asp-Net45"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebNetExt45
+{
+    Name = "Web-Net-Ext45"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebHttpRedirect
+{
+    Name = "Web-Http-Redirect"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebWinAuth
+{
+    Name = "Web-Windows-Auth"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+WindowsFeature WebScriptingTools
+{
+    Name = "Web-Scripting-Tools"
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+&lt;/pre&gt;
+&lt;p&gt;Next I install any runtimes my website requires – in this case, the MVC framework. You need to supply a network share somewhere for the installer – of course you could use a File resource as well, but you’d still need to have a source somewhere.&lt;/p&gt;&lt;pre class="brush: ps;"&gt;#
+# Install MVC4
+#
+Package MVC4
+{
+    Name = "Microsoft ASP.NET MVC 4 Runtime"
+    Path = "$AssetPath\AspNetMVC4Setup.exe"
+    Arguments = "/q"
+    ProductId = ""
+    Ensure = "Present"
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+&lt;/pre&gt;
+&lt;p&gt;I can’t advocate WebDeploy as a web deployment mechanism enough – if you’re not using it, you should be! However, in order to deploy an application remotely using WebDeploy, the WebDeploy agent needs to be running on the target node and the firewall port needs to be opened. No problem – easy to specify declaratively using DSC. I add the required arguments to get the installer to deploy and start the WebDeploy agent (see the Arguments setting in the Package WebDeploy resource). I also use a Script resource to Get-Test-Set the firewall rule for WebDeploy:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;#
+# Install webdeploy
+#
+Package WebDeploy
+{
+    Name = "Microsoft Web Deploy 3.5"
+    Path = "$AssetPath\WebDeploy_amd64_en-US.msi"
+    Arguments = "ADDLOCAL=MSDeployFeature,MSDeployAgentFeature"
+    ProductId = ""
+    Ensure = "Present"
+    Credential = $Credential
+    DependsOn = "[WindowsFeature]WebServerRole"
+}
+
+#
+# Enable webdeploy in the firewall
+#
+Script WebDeployFwRule
+{
+    GetScript = 
+    {
+        write-verbose "Checking WebDeploy Firewall exception status"
+        $Rule = Get-NetFirewallRule -DisplayName "WebDeploy_TCP_8172"
+        Return @{
+            Result = "DisplayName = $($Rule.DisplayName); Enabled = $($Rule.Enabled)"
+        }
+    }
+    SetScript =
+    {
+        write-verbose "Creating Firewall exception for WebDeploy"
+        New-NetFirewallRule -DisplayName "WebDeploy_TCP_8172" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8172
+    }
+    TestScript =
+    {
+        if (Get-NetFirewallRule -DisplayName "WebDeploy_TCP_8172" -ErrorAction SilentlyContinue) 
+        {
+            write-verbose "WebDeploy Firewall exception already exists"
+            $true
+        } 
+        else 
+        {
+            write-verbose "WebDeploy Firewall exception does not exist"
+            $false
+        }
+    }
+    DependsOn = "[Package]WebDeploy"
+}
+&lt;/pre&gt;
+&lt;p&gt;Finally, I wanted to make sure that MMC is installed so that I can monitor my application using Application Insights. This one was a little tricky since there isn’t an easy way to install the agent quietly – I have to unzip the installer and then invoke the MSI within. However, it’s still not that hard.&lt;/p&gt;&lt;pre class="brush: ps;"&gt;#
+# MMA
+# Since this comes in an exe that can't be run silently, first copy the exe to the node,
+# then unpack it. Then use the Package Resource with custom args to install it from the
+# unpacked msi.
+#
+File CopyMMAExe
+{
+    SourcePath = "$AssetPath\MMASetup-AMD64.exe"
+    DestinationPath = "c:\temp\MMASetup-AMD64.exe"
+    Force = $true
+    Type = "File"
+    Ensure = "Present"
+}
+
+Script UnpackMMAExe
+{
+    DependsOn ="[File]CopyMMAExe"
+    TestScript = { $false }
+    GetScript = {
+        @{
+            Result = "UnpackMMAExe"
+        }
+    }
+    SetScript = {
+        Write-Verbose "Unpacking MMA.exe"
+        $job = Start-Job { &amp;amp; "c:\temp\MMASetup-AMD64.exe" /t:c:\temp\MMA /c }
+        Wait-Job $job
+        Receive-Job $job
+    }
+}
+
+Package MMA
+{
+    Name = "Microsoft Monitoring Agent"
+    Path = "c:\temp\MMA\MOMAgent.msi"
+    Arguments = "ACTION=INSTALL ADDLOCAL=MOMAgent,ACSAgent,APMAgent,AdvisorAgent AcceptEndUserLicenseAgreement=1 /qn /l*v c:\temp\MMA\mmaInstall.log"
+    ProductId = ""
+    Ensure = "Present"
+    Dependson = "[Script]UnpackMMAExe"
+}
+&lt;/pre&gt;
+&lt;p&gt;After running this script against a Windows Server in any state, I can be sure that the server will run my application – no need to guess or hope.&lt;/p&gt;
+&lt;p&gt;You can download the entire script from &lt;a href="http://1drv.ms/1IXntHL" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Release Management&lt;/h2&gt;
+&lt;p&gt;Now releasing my application is fairly easy in Release Management – execute two vNext script tasks: the first runs WebServerPreReqs DSC against the target node; the second runs a plain PowerShell script that invokes WebDeploy for my application using the drop folder of my build as the source.&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;PowerShell DSC is meant to be declarative – any time you’re doing any imperative scripting, rip it out and put it into plain PowerShell. Typically this split is going to be along the line of &lt;em&gt;environment&lt;/em&gt; vs &lt;em&gt;application&lt;/em&gt;. Use DSC for environment and plain PowerShell scripts for application deployment.&lt;/p&gt;
+&lt;p&gt;Happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="e4b3cf94-1008-482b-826d-d6ef3896488e">
+      <author>Andres</author>
+      <email>andresvettori@gmail.com</email>
+      <website></website>
+      <ip>190.16.91.242</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.124 Safari/537.36</userAgent>
+      <date>2015-06-19 13:36:49</date>
+      <content>Hi! I have setup a Linux Srv in Azure with OMI/PSDCS and trying to deploy with VSO Release Management.&lt;br /&gt;I have created an Azure environment (I won&amp;#39;t allow mw to create a Standard Env) and solved all certificate issues so far.&lt;br /&gt;Now it&amp;#39;s failing because RM try to connect to the linux server using Negotiate Auth and (of course) the OMI service only supports Basic.&lt;br /&gt;&lt;br /&gt;How can I make RM to use Basic? Or OMI to support Negotiate/NTLM? &lt;br /&gt;Any post or document showing ANY working VSO RM deploying to Azure without using Chef?&lt;br /&gt;&lt;br /&gt;Andr&amp;#233;s.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2ae5ee82-4a31-4e23-a4f3-26b1cb190fd2">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:26:36</date>
+      <content>@Andr&amp;#233;s - hmm, tricky! I think I would look at putting PuTTy or something on your deployment box and executing a remote shell script.&lt;br /&gt;&lt;br /&gt;Fortunately, Build (and Release Management) vNext have a cross-platform agent, so you should be able to execute commands on *nix or Mac machines via the node-based xplat agent. This should make your life a lot easier, so watch out for that!</content>
+    </comment>
+  </comments>
+  <viewCount>5911</viewCount>
+  <id>eaf9eda4-c107-41c6-a3dc-3225b35ecd12</id>
+</post>

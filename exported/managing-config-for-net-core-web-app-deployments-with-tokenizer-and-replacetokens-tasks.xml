@@ -1,0 +1,195 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>53a1a627-983e-461c-8211-4dc12ba21745</id>
+  <title>Managing Config for .NET Core Web App Deployments with Tokenizer and ReplaceTokens Tasks</title>
+  <slug>managing-config-for-net-core-web-app-deployments-with-tokenizer-and-replacetokens-tasks</slug>
+  <shortUrl>http://bit.ly/2eDqxTe</shortUrl>
+  <author></author>
+  <pubDate>2016-10-26 03:20:20</pubDate>
+  <lastModified>2018-07-31 21:22:16</lastModified>
+  <content>&lt;p&gt;Last week I posted an &lt;a href="http://colinsalmcorner.com/post/end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management" target="_blank"&gt;end-to-end walkthrough&lt;/a&gt; about how to build and deploy web apps using Team Build and Release Management – including config management. The post certainly helps you if you’re on the .NET 4.x Framework – but what about deploying .NET Core apps?&lt;/p&gt; &lt;h2&gt;The Build Once Principle&lt;/h2&gt; &lt;p&gt;If you’ve ever read any of my blogs you’ll know I’m a proponent of the “build once” principle. That is, your build should be taking source code and (after testing and code analysis etc.) producing a &lt;em&gt;single package&lt;/em&gt; that can be deployed to multiple environments. The biggest challenge with a “build once” approach is that it’s non-trivial to manage configuration. If you’re building a single package, how do you deploy it to multiple environments when the configuration is different on those environments? I present a solution in my walkthrough – use a publish profile and a parameters.xml file to tokenize the configuration file during build. Then replace the tokens with environment values at deploy time. I show you how to do that starting with the required source changes, how the build works and finally how to craft your release definition for token replacements and deployment.&lt;/p&gt; &lt;h2&gt;AppSettings.json&lt;/h2&gt; &lt;p&gt;However, .NET Core apps are a different kettle of fish. There is no web.config file (by default). If you File-&amp;gt;New Project and create a .NET Core web app, you’ll get an appsettings.json file. This is the “new” web.config if you will. If you then go to the .NET Core documentation, you’ll see that you can create multiple configuration files using “magic” names like appsettings.dev.json and appsettings.prod.json (these are loaded up during Startup.cs). I understand the appeal of this approach, but to me it feels like having multiple web.config files which you replace at deployment time (like web.dev.config and web.prod.config). I’m not even talking about config transforms – just full config files that you keep in source control and (conceptually) overwrite during deployment. So you’re duplicating code – which is bad juju.&lt;/p&gt; &lt;p&gt;I got to thinking about how to handle configuration for .NET Core apps, and after mulling it over and having a good breakfast chat fellow MVP &lt;a href="https://scottaddie.com/" target="_blank"&gt;Scott Addie&lt;/a&gt;, I thought about tokenizing the appsettings.json file. If I could figure out a clean way to tokenize the file at build time, then I could use my existing &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/ReplaceTokens" target="_blank"&gt;ReplaceTokens&lt;/a&gt; task (part of my &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;marketplace extension&lt;/a&gt;) during deploy time to fill in environment specific values. Unfortunately there’s no config transform for JSON files, so I decided to create a &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/Tokenizer" target="_blank"&gt;Tokenizer&lt;/a&gt; task that could read in a JSON file and then auto-replace values with tokens (based on the object hierarchy).&lt;/p&gt; &lt;h2&gt;Tokenizer Task&lt;/h2&gt; &lt;p&gt;To see this in action, I created a new .NET Core Web App in Visual Studio. I then added a custom config section. I ended up with an appsettings.json file that looks as follows:&lt;/p&gt;&lt;pre class="brush: js;"&gt;{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=aspnet-WebApplication1-26e8893e-d7c0-4fc6-8aab-29b59971d622;Trusted_Connection=True;MultipleActiveResultSets=true"
+  },
+  "Tricky": {
+    "Gollum": "Smeagol",
+    "Hobbit": "Frodo"
+  },
+  "Logging": {
+    "IncludeScopes": false,
+    "LogLevel": {
+      "Default": "Debug",
+      "System": "Information",
+      "Microsoft": "Information"
+    }
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;Looking at this config, I can see that I might want to change the ConnectionStrings.DefaultConnection as well as the Tricky.Gollum and Tricky.Hobbit settings (yes, I’m reading the Lord of the Rings – I’ve read it about once a year since I was 11). I may want to change Logging.LogLevel.Default too.&lt;/p&gt;
+&lt;p&gt;Since the file is JSON, I figured I could create a task that reads the file in and then walks the object hierarchy, replacing values with tokens as it goes. But I realized that you may not want to replace every value in the file, so the task would have to take an explicit include (for only replacing certain values) or exclude list (for replacing all but certain values).&lt;/p&gt;
+&lt;p&gt;I wanted the appsettings file to look like this once the tokenization had completed:&lt;/p&gt;&lt;pre class="brush: js; highlight: [3,6,7,12];"&gt;{
+  "ConnectionStrings": {
+    "DefaultConnection": "__ConnectionStrings.DefaultConnection__"
+  },
+  "Tricky": {
+    "Gollum": "__Tricky.Gollum__",
+    "Hobbit": "__Tricky.Hobbit__"
+  },
+  "Logging": {
+    "IncludeScopes": false,
+    "LogLevel": {
+      "Default": "__Logging.LogLevel.Default__",
+      "System": "Information",
+      "Microsoft": "Information"
+    }
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;You can see the tokens on the highlighted lines.&lt;/p&gt;
+&lt;p&gt;After coding for a while on the plane (#RoadWarrior) I was able to create a task for tokenizing a JSON file (perhaps in the future I’ll make more file types available – or I’ll get some Pull Requests!). Having recently added unit tests for my Node tasks, I was able to bang this task out rather quickly. &lt;/p&gt;
+&lt;h2&gt;The Build Definition&lt;/h2&gt;
+&lt;p&gt;With my shiny new Tokenize task, I was ready to see if I could get the app built and deployed. Here’s what my build definition looks like:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/91122559-5470-46fa-b8f5-e9c464d5cb7f.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/7b982804-8515-4c8d-a458-aa844cc2f3e5.png" width="406" height="356"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The build tasks perform the following operations:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Run dotnet with argument “restore” (restores the package dependencies) 
+&lt;li&gt;Tokenize the appsettings.json file
+&lt;li&gt;At this point I should have Test, Code Annalysis etc. – I’ve omitted these quality tasks for brevity 
+&lt;li&gt;Run dotnet with arguments “publish src/CoreWebDeployMe --configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)/Temp” (I’m publishing the folder that contains my .NET Core web app with the BuildConfiguration and placing the output in the Build.ArtifactStagingDirectory/Temp folder)
+&lt;li&gt;Zip the published folder (the zip task comes from &lt;a href="https://marketplace.visualstudio.com/items?itemName=Trackyon.trackyonadvantage" target="_blank"&gt;this extension&lt;/a&gt;)
+&lt;li&gt;Remove the temp folder from the staging directory (since all the files I need are now in the zip) 
+&lt;li&gt;Upload the zip as a build drop&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;The Tokenize task is configured as follows:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a5a4f06d-e255-4521-ad9e-5a5b46666842.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/5bfe206d-bff6-4adb-9dea-d89fb3c655e3.png" width="724" height="187"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Let’s look at the arguments:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Source Path – the path containing the file(s) I want to tokenize&lt;/li&gt;
+&lt;li&gt;File Pattern – the mini-match pattern for the file(s) within the Source Path I want to tokenize&lt;/li&gt;
+&lt;li&gt;Tokenize Type – I only have json for now&lt;/li&gt;
+&lt;li&gt;IncludeFields – the list of properties in the json file that I want the Tokenizer to tokenize&lt;/li&gt;
+&lt;li&gt;ExcludeFields – I could have used a list of properties I wanted to exclude from tokenization here instead of using the Include Fields property&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Once the build completes, I now have a potentially deployable .NET Core web application with a tokenized appsettings file. I could have skipped the zip task and just uploaded the site unzipped, but uploading lots of little files takes longer than uploading a single larger file. Also, I was thinking about the deployment – downloading a single larger file (I guessed) was going to be faster than downloading a bunch of smaller files.&lt;/p&gt;
+&lt;h2&gt;The Release&lt;/h2&gt;
+&lt;p&gt;I was expecting to have to unzip the zip file, replace the tokens in the appsettings.json file and then re-zip the file before invoking WebDeploy to push the zip file to Azure. However, the AzureRM WebDeploy task recently got updated, and I noticed that what used to be “Package File” was now “Package File or Folder”. So the release turned out to be really simple:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Unzip the zip file to a temp folder using an inline PowerShell script (why is there no complementary Unzip task from the Trackyon extension?)
+&lt;li&gt;Run ReplaceTokens on the appsettings.json file in the temp folder 
+&lt;li&gt;Run AzureRM WebDeploy using the temp folder as the source folder&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/f39f1990-af9b-45c5-ac5c-30784ab19dab.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/283a9350-102d-4f3f-b3ce-ea1c9a6722e9.png" width="545" height="234"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here’s how I configured the PowerShell task:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/4b94b9a1-f720-4169-b63f-7fa3fdbf3e86.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/b241102d-fe0a-4e24-a4c6-3411e22cc4d4.png" width="506" height="234"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The script takes in the sourceFile (the zip file) as well as the target path (which I set to a temp folder in the drop folder):&lt;/p&gt;&lt;pre class="brush: ps;"&gt;param(
+  $sourceFile,
+  $targetPath)
+
+Expand-Archive -Path $sourceFile -DestinationPath $targetPath -Force
+&lt;/pre&gt;
+&lt;p&gt;My first attempt deployed the site – but the ReplaceTokens task didn’t replace any tokens. After digging a little I figured out why – the default regex pattern – __(\w+)__ – doesn’t work when the token name have periods in them. So I just updated the regex to __(\w+[\.\w+]*)__ (which reads “find double underscore, followed by a word, followed by a period and word repeated 0 or more times, ending with double underscore”. &lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/961fd32e-87b7-4a81-9d49-590d1e5833d5.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a17eccde-040d-422e-8254-5c21663d9785.png" width="522" height="218"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;That got me closer – one more change I had to make was replacing the period with underscore in the variable names on the environment:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/be93b375-e5e0-4cde-ace9-41b6520e62ee.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/1208a734-c236-472c-832c-6d2991e0f027.png" width="522" height="371"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Once the ReplaceTokens task was working, the Deploy task was child’s play:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/9a92ca4f-f091-49cb-bbe0-8419047cbecc.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a5505b40-51b5-4c22-82bb-fd5706e59728.png" width="552" height="383"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I just made sure that the “Package or Folder” was set to the temp path where I unzipped the zip file in the first task. Of course at this point the appsettings.json now contains real environment-specific values instead of tokens, so WebDeploy can go and do its thing.&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;It is possible to apply the Build Once principle to .NET Core web applications, with a little help from my friends Tokenizer and ReplaceTokens in the build and release respectively. I think this approach is fairly clean – you get to avoid duplication in source code, build a single package and deploy to multiple environments. Of course my experimentation is available to your for free from the tasks in my &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;marketplace extension&lt;/a&gt;! Sound off in the comments if you think this is useful (or horrible)…&lt;/p&gt;
+&lt;p&gt;Happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="4421c06c-6374-418e-b7c9-dd3fcfc8c5d0">
+      <author>Thelson</author>
+      <email>thelson.dy@centare.com</email>
+      <website></website>
+      <ip>208.91.239.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:49.0) Gecko/20100101 Firefox/49.0</userAgent>
+      <date>2016-11-18 15:11:35</date>
+      <content>Great article...Kudos</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ad4ebce9-7766-40a3-a9fd-1e287fe1b626">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>208.91.239.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36</userAgent>
+      <date>2016-11-18 15:13:21</date>
+      <content>Thanks @Thelson! Glad to help.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c2c1b3fd-4940-4949-8d70-ab37e2cc04b4">
+      <author>Baskar Lingam</author>
+      <email>bskr.psgtech@gmail.com</email>
+      <website>https://baskidevops.com/</website>
+      <ip>161.5.6.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36</userAgent>
+      <date>2017-02-21 19:7:17</date>
+      <content>Can you share the complete code to use it as a build task?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="87d017d0-ede4-4921-a547-7a5ba37623f1">
+      <author>Alexandre</author>
+      <email>alexandre.izefler@gmail.com</email>
+      <website></website>
+      <ip>187.20.106.151</ip>
+      <userAgent>Mozilla/5.0 (iPad; CPU OS 10_1_1 like Mac OS X) AppleWebKit/602.1.50 (KHTML, like Gecko) CriOS/57.0.2987.100 Mobile/14B100 Safari/602.1</userAgent>
+      <date>2017-03-28 01:36:06</date>
+      <content>Great article! How should I use these extensions with applications in xamarin ios and android? Thank you.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="48f25ee1-6dea-466f-bb77-902aa6fa5a8d">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:38:14</date>
+      <content>Hi @Baskar - I&amp;#39;m not sure what you&amp;#39;re referring to - if you&amp;#39;re referring to the Json tokenization, I do have a build task for it. See the Tokenize task in http://bit.ly/cacbuildtasks.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e6262b67-5217-4a59-b4d8-04da7e245db6">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:39:50</date>
+      <content>Hi @Alexandre&lt;br /&gt;&lt;br /&gt;Take a look at this page: https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/VersionAssemblies&lt;br /&gt;&lt;br /&gt;What else are you wanting to do with Android and iOS?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5297ef2a-1faf-448c-a614-293b722a4a44">
+      <author>Marc Gatley</author>
+      <email>marc.gatley@rakuten.com</email>
+      <website></website>
+      <ip>133.237.7.81</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36</userAgent>
+      <date>2017-05-02 08:2:51</date>
+      <content>Nice article. I&amp;#39;m not using TFS at the moment but this has been a bit of a head-scratcher for my DevOps guys who aren&amp;#39;t fully up to speed with core</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="5c1ebd77-b724-473d-a503-280aca5588b1">
+      <author>kp</author>
+      <email>krishh.ps@gmail.com</email>
+      <website></website>
+      <ip>182.74.25.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36</userAgent>
+      <date>2017-06-05 08:58:32</date>
+      <content>Nice post. I would like to get some more information on this. Is it possible to run/execute the application locally with this tokenized appsettigs.json file? Is there any way to achieve this?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="c37192d7-5b3b-4ec1-a1f0-38a74a638815">
+      <author>David Spencer</author>
+      <email>dspencer@cardlytics.com</email>
+      <website></website>
+      <ip>209.208.228.244</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36</userAgent>
+      <date>2017-12-01 21:44:26</date>
+      <content>Just came across this as I am struggling with similar issues but with a different build and deployment system... &lt;br /&gt;&lt;br /&gt;Everything seemed promising except for a not so minor issue. You only doing a token replacement for strings in the configuration file. Seems like no problem until you start to consider more complex applications with you will very likely want to change the value of a boolean or numeric value which then makes Visual Studio pop errors because it is invalid json.&lt;br /&gt;&lt;br /&gt;Still looking for my solution, but if you have a work around it would be interesting to see.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="c0c86317-1eae-430a-8030-8bc44c7b774d">
+      <author>Quynh Le</author>
+      <email>quynhftw@gmail.com</email>
+      <website></website>
+      <ip>208.139.7.64</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36</userAgent>
+      <date>2018-07-31 21:22:16</date>
+      <content>How would you handle secret variables? &lt;br /&gt;&lt;br /&gt;Before I could manually enter a token and set it to __key1__. But now that there is a task that tokenizes the appsettings for you, how can I use secret variables without setting __key1__?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

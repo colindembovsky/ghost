@@ -45,7 +45,8 @@ export function fontToHtmlCard(node, builder, {addSection, nodeFinished}) {
         return;
     }
     //console.log("--> fontToHtmlCard invoked");
-    
+    if (node.parentNode.tagName === "LI") return;
+
     let payload = { html: node.outerHTML };
     let cardSection = builder.createCardSection('html', payload);
     addSection(cardSection);

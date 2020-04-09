@@ -1,0 +1,219 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>af19a9ac-9c7a-4c8c-9bc0-08d34c2546ba</id>
+  <title>Container DevOps Beyond Build: Part 2 - Traefik</title>
+  <slug>container-devops-beyond-build-part-2---traefik</slug>
+  <shortUrl>http://bit.ly/2VNPqNY</shortUrl>
+  <author></author>
+  <pubDate>2019-05-08 02:36:39</pubDate>
+  <lastModified>2019-11-21 12:24:24</lastModified>
+  <content>&lt;p&gt;Series:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;a href="https://colinsalmcorner.com/post/container-devops-beyond-build-part-1" target="_blank"&gt;Part 1: Intro&lt;/a&gt;&lt;/li&gt;&lt;li&gt;Part 2: Traefik (this post)&lt;/li&gt;&lt;li&gt;&lt;a href="https://colinsalmcorner.com/post/container-devops-beyond-build-part-3---canary-testing" target="_blank"&gt;Part 3: Canary Testing&lt;/a&gt;&lt;/li&gt;&lt;li&gt;&lt;a href="https://colinsalmcorner.com/post/container-devops-beyond-build-part-4---telemetry-with-prometheus" target="_blank"&gt;Part 4: Telemetry with Prometheus&lt;/a&gt;&lt;/li&gt;&lt;li&gt;&lt;a href="https://colinsalmcorner.com/post/container-devops-beyond-build-part-5---prometheus-operator" target="_blank"&gt;Part 5: Prometheus Operator&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;In Part 1 of this series, I outlined some of my goals and some of the thinking around what I think Container DevOps is - it's far more than just being able to build and run a container or two. Beyond just automating builds, you have to think about how you're going to release. Zero downtime and canary testing, resiliency and monitoring are all table stakes - but while I understand how to do that using Azure Web Apps, I hadn't done a lot of these for containerized applications. After working for a couple of months on a Kubernetes (k8s) version of .NET Core &lt;a href="https://github.com/microsoft/partsunlimited" target="_blank"&gt;PartsUnlimited&lt;/a&gt;, I have some thoughts to share on how I managed to put these practices into place.&lt;/p&gt;&lt;p&gt;When thinking about running containers in production, you have to think about the end to end journey, starting at building images right through deployment and into monitoring and tracing. I'm a firm believer in building quality into the pipeline early, so automated builds should unit test (with code coverage), do static analysis and finally package applications. In "traditional web" builds, the packaging usually means a zip or &lt;a href="https://www.iis.net/downloads/microsoft/web-deploy" target="_blank"&gt;WebDeploy&lt;/a&gt; package or &lt;a href="https://www.npmjs.com/" target="_blank"&gt;NPM&lt;/a&gt; package or even just a drop of files. When building container images, you're inevitably using a &lt;a href="https://docs.docker.com/engine/reference/builder/" target="_blank"&gt;Dockerfile&lt;/a&gt; - which makes compiling and packaging simple, but leaves a lot to be desired when you want to test code or do static analysis, package scanning and other quality controls. I've already blogged about how I was able to &lt;a href="https://colinsalmcorner.com/post/net-core-multi-stage-dockerfile-with-test-and-code-coverage-in-azure-pipelines" target="_blank"&gt;add unit testing and code coverage to a multi-stage Dockerfile&lt;/a&gt; - I just got &lt;a href="https://www.sonarqube.org/" target="_blank"&gt;SonarQube&lt;/a&gt; working too, so that's another post in the works.&lt;/p&gt;&lt;h2&gt;Works In My Orchestrator ™&lt;/h2&gt;&lt;p&gt;However, assume that we have an image in our container registry that we want to deploy. You've probably run that image on your local machine to make sure it at least starts up and exposes the right ports, so it works on your machine. Bonus points if you ran it in a development Kubernetes cluster! But now how do you deploy this new container to a production cluster? If you just use k8s Deployment &lt;a href="https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/" target="_blank"&gt;rolling update&lt;/a&gt; strategy. you'll get zero-downtime for free, since k8s brings up the new container and replaces the existing ones only when the new ones are ready (assuming you have good liveness and readiness probes defined). But how do you test the new version for only a small percentage of users? Or secure traffic to that service? Or if you're deploying multiple services (microservices anyone?) how do you monitor traffic flow in the service mesh? Or cut out "bad" services so that they don't crash your entire system?&lt;/p&gt;&lt;p&gt;With these questions in mind, I started to investigate how one does these sorts of things with deployments to k8s. The rest of this post is about my experiences.&lt;/p&gt;&lt;h2&gt;Ops Criteria&lt;/h2&gt;&lt;p&gt;Here's the list of criteria I had in mind to cover - and I'll evaluate three tools using these criteria:&lt;/p&gt;&lt;ol&gt;&lt;li&gt;Internal and External Routing - I want to be able to define how traffic "external" traffic (traffic originating outside the cluster) and "internal" traffic (traffic originating and terminating within the cluster) is routed between services.&lt;li&gt;Secure Communication - I want communication to endpoints to be secure - especially external traffic.&lt;li&gt;Traffic Shifting - I want to be able to shift traffic between services - especially for canary testing.&lt;li&gt;Resiliency - I want to be able to throttle connections or implement circuit breaking to keep my app as a whole resilient.&lt;li&gt;Tracing - I want to be able to see what's going on across my entire application.&lt;/li&gt;&lt;/ol&gt;&lt;p&gt;I explored three tools: &lt;a href="https://istio.io/" target="_blank"&gt;Istio&lt;/a&gt;, &lt;a href="https://linkerd.io/" target="_blank"&gt;Linkerd&lt;/a&gt; and &lt;a href="https://traefik.io/" target="_blank"&gt;Traefik&lt;/a&gt;. I'll evaluate each tool against the five criteria above. &lt;/p&gt;&lt;p&gt;Spoiler: Traefik won the race! &lt;/p&gt;&lt;p&gt;Disclaimer: some of these tools do more than these five things, so this isn't a wholistic showdown between these tools - it's a showdown over these five criteria only. Also, Traefik is essentially a reverse proxy on steroids, while Istio and Linkerd are service meshes - so you may need some functionality of a service mesh that Traefik can't provide.&lt;/p&gt;&lt;h3&gt;Internal and External Routing&lt;/h3&gt;&lt;p&gt;All three tools are capable of routing traffic. Istio and Linkerd both inject &lt;a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#how-pods-manage-multiple-containers" target="_blank"&gt;sidecar&lt;/a&gt; proxies to your containers. I like this approach since you can abstract away the communication/traffic/monitoring from your application code. This seemed to be promising, and while I was able to get some of what I wanted using both Istio and Linkerd, both had some challenges. Firstly, Istio is huge, rich and complicated. It has a lot of &lt;a href="https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/" target="_blank"&gt;Custom Resource Definitions&lt;/a&gt; (CRDs) - more than k8s itself in fact! So while it worked for routing like I wanted, it seemed very heavy. Linkerd worked for external routing, but due to limitations in the current implementation, I couldn't get it working to route internal traffic.&lt;/p&gt;&lt;p&gt;Let's say you have a website and make a code change - you want to test that in production - but only to a small percentage of users. With Azure App Services, you can use &lt;a href="https://colinsalmcorner.com/post/testing-in-production-routing-traffic-during-a-release" target="_blank"&gt;Traffic Manager and deployment slots&lt;/a&gt; for this kind of canary testing. Let's say you get the "external" routing working - most clients connecting to your website get the original version, while a small percentage get the new version. This is what I mean by "external" traffic. But what if you have a microservice architecture and your website code is calling internal services which call other internal services? Surely you want to be able to do the same sort of traffic shifting - that's "internal" routing - routing traffic internally within the cluster. Linkerd couldn't do that for me - mostly due to incompatibility between the control plane and the sidecars, I think.&lt;/p&gt;&lt;p&gt;Traefik did this easily via Ingress Controllers (abstractions native to k8s). I set up two controllers - one to handle "external" traffic and one to handle "internal" traffic - and it worked beautifully. More on this later.&lt;/p&gt;&lt;h3&gt;Secure Communication&lt;/h3&gt;&lt;p&gt;I didn't explore this topic too deeply with either Istio or Linkerd, but Traefik made securing external endpoints with certificates via &lt;a href="https://letsencrypt.org/" target="_blank"&gt;LetsEncrypt&lt;/a&gt; really easy. I tried to get secure communication for my internal services, but I was trying with a self-signed cert and I think that's what prevented it from working. I'm sure that you could just as easily add this capability into internal traffic using Traefik if you really needed to. We'll see this later too - but using a &lt;a href="https://docs.microsoft.com/en-us/azure/aks/static-ip" target="_blank"&gt;static IP and DNS on an Azure Load Balancer&lt;/a&gt;, I was able to get secure external endpoints with very little fuss!&lt;/p&gt;&lt;h3&gt;Traffic Shifting&lt;/h3&gt;&lt;p&gt;If you've got routing, then it follows that you should be able to shift traffic to different services (or more likely, different versions of the same service). I got this working in Istio (see my Github repo and mardown on how I did this &lt;a href="https://github.com/colindembovsky/istio-abtest" target="_blank"&gt;here&lt;/a&gt;) and Linkerd only worked for external traffic. With Istio you shift by defining a &lt;a href="https://istio.io/docs/reference/config/istio.networking.v1alpha3/#VirtualService" target="_blank"&gt;VirtualService&lt;/a&gt; - it's an Istio CRD that's a love-child between a Service and an Ingress. With Linkerd, traffic rules are specified using &lt;a href="https://linkerd.io/1/advanced/dtabs/" target="_blank"&gt;dtabs&lt;/a&gt; - it's a cool idea (abstracting routes) but the implementation was horrible to work with - trying to learn the obscure format and debug it was not great.&lt;/p&gt;&lt;p&gt;By far the biggest problem with both Istio and Linkerd is that their network routing doesn't understand readiness or liveness probes since the work via their sidecar containers. This becomes a problem when you're deploying a new version of a service using a rolling upgrade - as soon as the service is created, Istio or Linkerd start sending traffic to the endpoint, irrespective of the readiness of that deployment. You can probably work around this, but I found that I didn't have to if I used Traefik.&lt;/p&gt;&lt;p&gt;Traefik lets you declaratively specify weight rules to shift traffic using simple annotations on a standard Ingress resource. It's clean and intuitive when you see it. The traffic shifting also obeys readiness/liveness probes, so you don't start getting traffic routed to services/deployments that are not yet ready. Very cool!&lt;/p&gt;&lt;h3&gt;Resiliency&lt;/h3&gt;&lt;p&gt;First, there's a lot of things to discuss in terms of resiliency - for this post I'm just looking at features like zero-downtime deployment, circuit breaking and request limiting. Istio and Linkerd both have control planes for defining circuit breakers and request limiting - Traefik let's you define these as annotations. Again, this comparison is a little apples-for-oranges since Traefik is "just" a reverse proxy, while Istio and Linkerd are service meshes. However, the ease of declaration of these features is so simple in Traefik, it's compelling. Also, since Traefik builds "over" rolling updates in Deployments, you get zero-downtime deployment for free. If you're using Istio, you have to be careful about your deployments since you can get traffic to services that are not yet ready.&lt;/p&gt;&lt;h3&gt;Tracing&lt;/h3&gt;&lt;p&gt;Traefik offloads monitoring to Prometheus and the helm chart has hooks into &lt;a href="https://www.datadoghq.com/" target="_blank"&gt;DataDog&lt;/a&gt;, &lt;a href="https://zipkin.io/" target="_blank"&gt;Zipkin&lt;/a&gt; or &lt;a href="https://www.jaegertracing.io/" target="_blank"&gt;Jaeger&lt;/a&gt; for tracing. For my experiments, I deployed &lt;a href="https://prometheus.io/" target="_blank"&gt;Prometheus&lt;/a&gt; and &lt;a href="https://grafana.com/" target="_blank"&gt;Grafana&lt;/a&gt; for tracing and monitoring. Both Istio and Linkerd have control planes that include tracing - including mesh visualization - which can be really useful for tracing microservices since you can see traffic flow within the mesh. With Traefik, you need additional tools.&lt;/p&gt;&lt;h2&gt;Configuring Traefik Controllers&lt;/h2&gt;&lt;p&gt;So now you know some of the reasons that I like Traefik - but how do you actually deploy it? There are a couple components to Traefik: the &lt;a href="https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/" target="_blank"&gt;Ingress Controller&lt;/a&gt; (think of this as a proxy) and then &lt;a href="https://kubernetes.io/docs/concepts/services-networking/ingress/" target="_blank"&gt;ingresses&lt;/a&gt; themselves - these can be defined at the application level and specify how the controller should direct traffic to the services within the cluster. There's another component (conceptually) and that is the &lt;em&gt;ingress class&lt;/em&gt;: you can have multiple Traefik ingress controllers, and if you do, you need to specify a class for each controller. When you create an ingress, you also annotate that ingress to specify which controller should handle its traffic - you're essentially carving the ingress space into multiple partitions, each handled by a different controller.&lt;/p&gt;&lt;p&gt;For the controller, there are some other "under the hood" components such as secrets, config maps, deployments and services - but all of that can be easily deployed and managed via the &lt;a href="https://github.com/helm/charts/tree/master/stable/traefik" target="_blank"&gt;Traefik Helm chart&lt;/a&gt;. You can quite easily deploy Traefik with a lot of default settings using &lt;font face="Courier New"&gt;--set&lt;/font&gt; from the command line, but I found it started getting unwieldy. I therefore downloaded the default values.yml file and customized some of the values. When deploying Traefik, I simply pass in my customized values.yml file to specify my settings.&lt;/p&gt;&lt;p&gt;For my experiments I wanted two types of controller: an "external" controller that was accessible from the world and included SSL. I also wanted an "internal" controller that was not accessible outside of the cluster that I could use to do internal routing. I use &lt;a href="https://azure.microsoft.com/en-us/services/kubernetes-service/" target="_blank"&gt;Azure Kubernetes Service&lt;/a&gt; (AKS), so the code for this series assumes that.&lt;/p&gt;&lt;p&gt;Let's take a look at the values file of the "internal" controller:&lt;/p&gt;&lt;pre class="brush: plain"&gt;image: traefik
+imageTag: 1.7.7
+serviceType: NodePort
+
+kubernetes:
+  ingressClass: "dev-traefik-internal"
+ssl:
+  enabled: false
+
+acme:
+  enabled: false
+
+dashboard:
+  enabled: true
+  domain: traefik-internal-ui.aks
+rbac:
+  enabled: true
+metrics:
+  prometheus:
+    enabled: true
+    restrictAccess: false
+  datadog:
+    enabled: false
+  statsd:
+    enabled: false
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Lines 1-3: The image it "traefik" and we want the 1.7.7 version. Since this is just internal, we only need a &lt;a href="https://kubernetes.io/docs/concepts/services-networking/service/#nodeport" target="_blank"&gt;NodePort&lt;/a&gt; service (I tried ClusterIP, but that didn't work).&lt;/li&gt;&lt;li&gt;Line 6: we want this ingress controller to watch and manage traffic for Ingresses that have this class as their annotation. This is how we have multiple Traefik controllers within a cluster. I prepend the class with the namespace (dev) too!&lt;/li&gt;&lt;li&gt;Lines 7,8: Since this is an internal ingress, we don't need SSL. I tried to get this working, but suspect I had issues with the certs. If you need internal SSL, this is where you'd set it.&lt;/li&gt;&lt;li&gt;Lines 10,11: This is for generating a cert via LetsEncrypt. Not needed for our internal traffic.&lt;/li&gt;&lt;li&gt;Lines 14,15: Enable the dashboard. I accessed via port-forwarding, so the domain isn't critical.&lt;/li&gt;&lt;li&gt;Lines 16,17: RBAC is enabled.&lt;/li&gt;&lt;li&gt;Lines 18-25: tracing options - I just enabled Prometheus.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Let's now compare the values file for the "external" controller:&lt;/p&gt;&lt;pre class="brush: plain"&gt;image: traefik
+imageTag: 1.7.7
+serviceType: LoadBalancer
+loadBalancerIP: "101.22.98.189"
+
+kubernetes:
+  ingressClass: "dev-traefik-external"
+ssl:
+  enabled: true
+  enforced: true
+  permanentRedirect: true
+  upstream: false
+  insecureSkipVerify: false
+  generateTLS: false
+
+acme:
+  enabled: true
+  email: myemail@somewhere.com
+  onHostRule: true
+  staging: false
+  logging: false
+  domains:
+    enabled: true
+    domainsList:
+      - main: "mycoolaks.westus.cloudapp.azure.com"
+  challengeType: tls-alpn-01
+  persistence:
+    enabled: true
+    
+dashboard:
+  enabled: true
+  domain: traefik-external-ui.aks
+  
+rbac:
+  enabled: true
+metrics:
+  prometheus:
+    enabled: true
+    restrictAccess: false
+  datadog:
+    enabled: false
+  statsd:
+    enabled: false
+
+tracing:
+  enabled: false
+&lt;/pre&gt;&lt;p&gt;Most of the file is the same, but here are the differences:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 4: We specify the static IP we want the LoadBalancer to use - I have code that pre-creates this static IP (with DNS name) in Azure before I execute this script.&lt;/li&gt;&lt;li&gt;Line 7: We specify a different class to divide the "ingress space".&lt;/li&gt;&lt;li&gt;Lines 8-14: These are the LetsEncrypt settings, including the domain name, challenge type and persistence to store the cert settings.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Now that we have the controllers (internal and external) deployed, we can deploy "native" k8s services and ingresses (with the correct annotations) and everything Will Just Work ™.&lt;/p&gt;&lt;h2&gt;Configuring Ingresses&lt;/h2&gt;&lt;p&gt;Assuming you have the following service:&lt;/p&gt;&lt;pre class="brush: plain;"&gt;apiVersion: v1
+kind: Service
+metadata:
+  name: dev-partsunlimitedwebsite
+  namespace: dev
+spec:
+  type: NodePort
+  selector:
+    app: partsunlimited-website
+    function: web
+  ports:
+  - name: http
+    port: 80
+&lt;/pre&gt;&lt;p&gt;Then you can define the following ingress:&lt;/p&gt;&lt;pre class="brush: plain;"&gt;apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: dev-traefik-external
+  labels:
+    app: partsunlimited-website&lt;/pre&gt;&lt;pre class="brush: plain;"&gt;    function: web
+  name: dev-website-ingress
+  namespace: dev
+spec:
+  rules:
+  - host: mycoolaks.westus.cloudapp.azure.com
+    http:
+      paths:
+      - backend:
+          serviceName: dev-partsunlimitedwebsite
+          servicePort: http
+        path: /site
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 2: This resource is of type "Ingress"&lt;/li&gt;&lt;li&gt;Lines 4,5: We define the class - this ties this Ingress to the controller with this class - for our case, this is the "external" Traefik controller&lt;/li&gt;&lt;li&gt;Lines 12-18: We're specifying how the Ingress Controller (Traefik in this case) should route traffic. This is the simplest configuration - take requests coming to the host "mycoolaks.westus.cloudapp.azure.com" and route them to the "dev-partsunlimitedwebsite" service onto the "http" port (port 80 if you look at the service definition above).&lt;/li&gt;&lt;li&gt;Line 19: We can use the Traefik controller to front multiple services - using the path helps to route effectively.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;When you access the service, you'll see the secure padlock in the browser window and be able to see details for the valid cert:&lt;/p&gt;&lt;p&gt;&lt;a href="https://colinsalmcorner.com/posts/files/ce3df455-3a45-4f06-90bc-c38e3b102abf.png" target="_blank"&gt;&lt;img width="460" height="318" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="https://colinsalmcorner.com/posts/files/a0c1e4b5-1a1c-4088-93a8-4c079e55f85b.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The best thing is I didn't have to generate the cert myself - Traefik did it all for me.&lt;/p&gt;&lt;p&gt;There's more that we can configure on the Ingress - including the traffic shifting for canary or A/B testing. We can also annotate the service to include circuit-breaking - but I'll save that for another post now that I've laid out the foundation for traffic management using Traefik.&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Container DevOps requires thinking about how traffic is going to flow in your cluster - and while there are many tools for doing this, I like the combination of simplicity and power you get with Traefik. There's still a lot more to explore in Container DevOps - hopefully this post gives you some insight into my thoughts.&lt;/p&gt;&lt;p&gt;Happy container-ing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>docker</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="false" id="0423cf32-0848-4d23-8448-7dc97e9558a2">
+      <author>Darren</author>
+      <email>darren@dazdaz.org</email>
+      <website></website>
+      <ip>219.74.147.74</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36</userAgent>
+      <date>2019-06-14 15:17:55</date>
+      <content>Can you please post the excellent video onto YouTube which shows how you set this up ?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="5b323ef1-4954-4488-929b-17b0217f36fb">
+      <author>madhu</author>
+      <email>madhubalan324@gmail.com</email>
+      <website>https://www.fita.in/java-and-j2ee-training-in-chennai/</website>
+      <ip>157.51.198.85</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.87 Safari/537.36</userAgent>
+      <date>2019-08-01 06:54:16</date>
+      <content>I am really enjoying reading your well-written articles. It looks like you spend a lot of effort and time on your blog. I have bookmarked it and I am looking forward to reading new articles. Keep up the good work.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="096e23ec-8229-4546-be56-5f7b5dc4932e">
+      <author>Aasha</author>
+      <email>laashakrish23@gmail.com</email>
+      <website>https://www.fita.in/java-and-j2ee-training-in-chennai/</website>
+      <ip>60.243.42.210</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-02 09:39:29</date>
+      <content>Wonderfull Blog!!! Thanks for sharing this great post with us... waiting for your new updates...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="6cb2065f-c7db-4837-b6d4-cd2a479a3804">
+      <author>nikhil devan</author>
+      <email>nikhildevan123@gmail.com</email>
+      <website>https://www.fita.in/struts-training-in-chennai/</website>
+      <ip>27.5.84.46</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-02 10:14:09</date>
+      <content>awesome blog..thanks for sharing..waiting for next update...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="60ffc474-8a43-4043-b825-2b8bdbf94539">
+      <author>nikhil devan</author>
+      <email>nikhildevan123@gmail.com</email>
+      <website>https://www.fita.in/struts-training-in-chennai/</website>
+      <ip>27.5.84.46</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-02 10:14:27</date>
+      <content>nice blog</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="4978af9c-3263-4158-8f38-062badadc427">
+      <author>anu</author>
+      <email>anudeep23@gmail.com</email>
+      <website>https://www.fita.in/</website>
+      <ip>27.5.84.46</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.87 Safari/537.36</userAgent>
+      <date>2019-08-02 10:25:29</date>
+      <content>Great info. The content you wrote is very interesting to read. This will be loved by all age groups.&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps Training in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;Best DevOps Training in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps Training institute in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/microsoft-windows-azure-training-in-chennai/&amp;quot;&amp;gt;Azure Training in Chennai&amp;lt;/a&amp;gt;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 &lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/vmware-training-in-chennai/&amp;quot;&amp;gt;VMware Training in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/rpa-training-chennai/&amp;quot;&amp;gt;RPA Training in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps Training in Velachery&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps Training in Tambaram&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps Training in Adyar&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/devops-training-in-chennai/&amp;quot;&amp;gt;DevOps  Training in Vadapalani&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="2968bd1e-d4f8-4ebe-a64c-15d4e29c756c">
+      <author>nadiya</author>
+      <email>nadiyamahi1123@gmail.com</email>
+      <website>https://www.fita.in/ielts-coaching-chennai/</website>
+      <ip>49.206.124.89</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-02 11:13:15</date>
+      <content>Thank you for your efforts and I am inspiried with your written style. &lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/ielts-coaching-chennai/&amp;quot;&amp;gt;IELTS Coaching in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/ielts-coaching-chennai/&amp;quot;&amp;gt;Best IELTS Coaching centres in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/german-training-in-chennai/&amp;quot;&amp;gt;German Language Classes in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/japanese-classes-in-chennai/&amp;quot;&amp;gt;Japanese Language Classes in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/spoken-english-classes-in-chennai/&amp;quot;&amp;gt;Best Spoken English Classes in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/toefl-coaching-in-chennai/&amp;quot;&amp;gt;TOEFL Classes in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/ielts-coaching-chennai/&amp;quot;&amp;gt;IELTS Coaching in Tnagar&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.fita.in/ielts-coaching-chennai/&amp;quot;&amp;gt;IELTS Coaching in OMR&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="e10ab659-c8ab-4788-8dc2-ed6dc2e05c6f">
+      <author>aruna ram</author>
+      <email>sriram.geetha98@gmail.com</email>
+      <website>https://www.fita.in/linux-training-in-chennai/</website>
+      <ip>60.243.56.170</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-03 10:23:34</date>
+      <content>Great work...Well explanation for this topic, it was really informatical for me and thanks for sharing. Keep updating...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="86ca260f-9c44-4f62-9b22-74928fa52843">
+      <author>Education Franchise Opportunities in India</author>
+      <email>asma3589@gmail.com</email>
+      <website>https://www.fita.in/franchise-business-in-india/</website>
+      <ip>115.97.10.24</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36</userAgent>
+      <date>2019-08-06 12:12:26</date>
+      <content>This was helpful to me thanks for sharing this useful information. Kindly continue the work.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="876aafea-d09d-479c-b88e-15f10fb5b0d6">
+      <author>Niyaz Khan</author>
+      <email>niasvariya@gmail.com</email>
+      <website>https://www.fita.in/seo-training-in-chennai/</website>
+      <ip>27.5.10.118</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36</userAgent>
+      <date>2019-11-21 07:45:07</date>
+      <content>Wonderful Blog!!! Thanks for sharing this great information with us.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="103d29d6-1046-42ca-ac93-225e92c69bcb">
+      <author>rinjuesther</author>
+      <email>rinjuesther@gmail.com</email>
+      <website>https://www.fita.in/clinical-sas-training-in-chennai/</website>
+      <ip>27.5.70.64</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36</userAgent>
+      <date>2019-11-21 12:24:24</date>
+      <content>Nice Blog, Very Informative Content, waiting for next update...</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

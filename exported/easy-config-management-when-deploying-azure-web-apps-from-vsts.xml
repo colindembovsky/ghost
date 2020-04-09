@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>87511efc-04f5-428b-a7aa-87d82b8f6a83</id>
+  <title>Easy Config Management when Deploying Azure Web Apps from VSTS</title>
+  <slug>easy-config-management-when-deploying-azure-web-apps-from-vsts</slug>
+  <shortUrl>http://bit.ly/2nwQJUy</shortUrl>
+  <author></author>
+  <pubDate>2017-03-17 22:51:34</pubDate>
+  <lastModified>2018-07-03 14:51:56</lastModified>
+  <content>&lt;p&gt;A good DevOps pipeline should utilize the principle of build once, deploy many times. In fact, I’d go so far as to say it’s essential for a good DevOps pipeline. That means that you have to have a way to manage your configuration in such a way that the package coming out of the build process is tokenized somehow so that when you release to different environments you can inject environment-specific values. Easier said that done – until now.&lt;/p&gt; &lt;h2&gt;Doing it the Right but Hard Way&lt;/h2&gt; &lt;p&gt;Currently I’ve recommended that you use WebDeploy to do this. You define a publish profile to handle connection string and a parameters.xml file to handle any other config you want to tokenize during build. This produces a WebDeploy zip file along with a (now tokenized) SetParameters.xml file. Then you use the ReplaceTokens task from my &lt;a href="http://bit.ly/cacbuildtasks" target="_blank"&gt;VSTS build/release task pack extension&lt;/a&gt; and inject the environment values into the SetParameters.xml file before invoking WebDeploy. This works, but it’s complicated. You can read a &lt;a href="http://bit.ly/e2ewadep" target="_blank"&gt;full end to end walkthrough in this post&lt;/a&gt;.&lt;/p&gt; &lt;h2&gt;Doing it the Easy Way&lt;/h2&gt; &lt;p&gt;A recent release to the &lt;a href="https://github.com/Microsoft/vsts-tasks/blob/master/Tasks/AzureRmWebAppDeployment/README.md" target="_blank"&gt;Azure Web App deploy task&lt;/a&gt; in VSTS has just dramatically simplified the process! No need for parameters.xml or publish profiles at all.&lt;/p&gt; &lt;p&gt;Make sure your build is producing a WebDeploy zip file. You can read my end to end post on how to add the build arguments to the VS Build task – but now you don’t have to specify a publish profile. You also don’t need a parameters.xml in the solution. The resulting zip file will deploy (by default) with whatever values you have in the web.config at build time.&lt;/p&gt; &lt;p&gt;Here’s what I recommend:&lt;/p&gt; &lt;p&gt;&lt;font face="Courier New"&gt;/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(build.artifactStagingDirectory)"&lt;/font&gt;&lt;/p&gt; &lt;p&gt;You can now just paste that into the build task:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/657d0222-729e-447c-a46a-122b0b24ab9e.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/15034800-5f57-4cdf-995d-b8439e785b68.png" width="653" height="218"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;You can see the args (in the new build UI). This tells VS to create the WebDeploy zip and put it into the artifact staging directory. The Publish Artifact Drop task uploads anything that it’s the artifact staging directory (again, by default) – which at the time it runs should be the WebDeploy files.&lt;/p&gt; &lt;h2&gt;The Release&lt;/h2&gt; &lt;p&gt;Here’s where the magic comes in: drop in an Azure App Service Deploy task. Set it’s version to 3.*(preview). You’ll see a new section called “File Transforms &amp;amp; Variable Substitution Options”. Just enable the “XML Override substitution”.&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/1af3ab91-6d0f-4f71-9b47-d12a5165d104.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/1f640afd-820c-4eeb-b378-8a215c75b7b2.png" width="631" height="174"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;That’s it! Except for defining the values we want to use for the said substitution. To do this, open the web.config and look at your app setting keys or connection string names. Create a variable that matches the name of the setting and enter a value. In my example, I have Azure B2C so I need a key called “ida:Tenant” so I just created a variable with that name and set the value for the DEV environment. I did the same for the other web.config variables:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/fbf32097-75bf-4130-95d1-db285fe0e931.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/25157cd4-966d-4254-8b99-ab2932c2e60b.png" width="583" height="397"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Now you can run your release!&lt;/p&gt; &lt;h2&gt;Checking the Web.Config Using Kudu&lt;/h2&gt; &lt;p&gt;Once the release had completed, I wanted to check if the value had been set. I opened up the web app in the Azure portal, but there were no app settings defined there. I suppose that makes sense – the substitutions are made onto the web.config itself. So I just opened the Kudu console for the web app and cat’ed the web.config by typing “cat Web.config”. I could see that the environment values had been injected!&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/b824632d-0cc6-406f-8545-f14d8fc5b737.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/831d1f07-feb3-4a1b-93e4-fade36c84874.png" width="516" height="303"&gt;&lt;/a&gt;&lt;/p&gt; &lt;h2&gt;Conclusion&lt;/h2&gt; &lt;p&gt;It’s finally become easy to manage web configs using the VSTS Azure Web App Deploy task. No more publish profiles, parameters.xml files, SetParameters.xml files or token replacement. It’s refreshingly clean and simple. Good job VSTS team!&lt;/p&gt; &lt;p&gt;I did note that there is also the possibility of injecting environment-specific values into a json file – so if you have .NET CORE apps, you can easily inject values at deploy time.&lt;/p&gt; &lt;p&gt;Happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="29e9cb09-0286-4a46-9fd0-903985f07807">
+      <author>Nibras Manna</author>
+      <email>nibras85@outlook.com</email>
+      <website>http://www.nibrasmanna.com/</website>
+      <ip>50.224.10.154</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36 Edge/15.15063</userAgent>
+      <date>2017-07-13 14:28:08</date>
+      <content>Will this work when you have a web app, plus a few webjobs in its app_data folder? Will transforms apply to the app.config for the webjobs as well? or only for the main web.config?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="2d924f32-6658-40e7-acd7-4d13ebed4344">
+      <author>Harley</author>
+      <email>harley.mcnerthney@gmail.com</email>
+      <website></website>
+      <ip>208.65.57.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36</userAgent>
+      <date>2017-08-01 16:44:54</date>
+      <content>could this work with the application insights config?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="024cca67-b761-412a-9300-726b1950c63a">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:23:32</date>
+      <content>Hi @Nibras&lt;br /&gt;&lt;br /&gt;If I remember correctly, the webjobs use the web.config of the main site, so you can just manage settings there. Easy enough to test - just deploy a setting in the main web.config and console the value in the webjob.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9995451c-36e7-4b5b-b3bd-cc4f6133b3b6">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:26:01</date>
+      <content>Hi @Harley&lt;br /&gt;&lt;br /&gt;No, for that you&amp;#39;d need to fall back to parameters.xml with the file path in the parameter pointing to the AppInsights config. However, if you&amp;#39;re just managing the key (and nothing else) then you can use a Telemetry Initializer to read the key from the web.config.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6fcea83f-2add-40c3-9a3e-03fff152e10b">
+      <author>Sanjay</author>
+      <email>sanjay.bhagia@gmail.com</email>
+      <website></website>
+      <ip>192.36.28.75</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36</userAgent>
+      <date>2018-05-31 07:52:40</date>
+      <content>Hi, &lt;br /&gt;What if I want to set/replace attributes other than appSetting, connectionstrings. This approach doesn&amp;#39;t work on other sections of web.config.&lt;br /&gt;&lt;br /&gt;Thanks&lt;br /&gt;Sanjay</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="644ea55b-85b7-40c1-b5e0-58ab73e381e8">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>73.92.222.71</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-03 14:51:54</date>
+      <content>Hi @Sanjay&lt;br /&gt;&lt;br /&gt;In that case, you have 2 options: change your code or use parameters.xml.&lt;br /&gt;&lt;br /&gt;In the 1st case, you can get settings from appSettings, applicationSettings or connectionStrings. That way you simplify deployments.&lt;br /&gt;&lt;br /&gt;In the 2nd case, you can leave your code as-is and use a config transform to inject tokens, which are then exposed in a SetParameters.xml file. Then you have to use a ReplaceTokens task to inject values into the SetParameters.xml file before you deploy the site. You can read more about this method in this post: https://colinsalmcorner.com/post/end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

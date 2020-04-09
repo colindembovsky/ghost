@@ -1,0 +1,193 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>40c6fce7-fe35-409d-a699-a70693953628</id>
+  <title>Using Linked ARM Templates with VSTS Release Management</title>
+  <slug>using-linked-arm-templates-with-vsts-release-management</slug>
+  <shortUrl>http://bit.ly/2DArlFu</shortUrl>
+  <author></author>
+  <pubDate>2018-01-22 20:29:33</pubDate>
+  <lastModified>2019-04-20 12:52:54</lastModified>
+  <content>&lt;p&gt;If you've ever had to create a complex ARM template, you'll know it can be a royal pain. You've probably been tempted to split out your giant template into smaller templates that you can link to, only to discover that you can only link to a sub-template if the sub-template is accessible via some public URI. Almost all of the examples in the &lt;a href="https://github.com/Azure/azure-quickstart-templates" target="_blank"&gt;Template Quickstart repo&lt;/a&gt; that have links simply refer to the public Github URI of the linked template. But what if you want to refer to a private repo of templates?&lt;/p&gt;&lt;h2&gt;Using Blob Containers&lt;/h2&gt;&lt;p&gt;The solution is to use blob containers. You upload the templates to a private container in an Azure Storage Account and then create a SAS token for the container. Then you create the full file URI using the container URI and the SAS token. Sounds simple, right? Fortunately with VSTS Release Management, it actually is easy.&lt;/p&gt;&lt;p&gt;As an example, let's look at this template that is used to create a VNet and some subnets. First we'll look at the VNet template (the linked template) and then how to refer to it from a parent template.&lt;/p&gt;&lt;h3&gt;The Child Template&lt;/h3&gt;&lt;pre class="brush: javascript"&gt;{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnetName": {
+      "type": "string"
+    },
+    "vnetPrefix": {
+      "type": "string"
+    },
+    "subnets": {
+      "type": "object"
+    }
+  },
+  "variables": {
+  },
+  "resources": [
+    {
+      "name": "[parameters('vnetName')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "vnet"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetPrefix')]"
+          ]
+        }
+      }
+    },
+    {
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "tags": {
+        "displayName": "Subnets"
+      },
+      "copy": {
+        "name": "iterator",
+        "count": "[length(parameters('subnets').settings)]"
+      },
+      "name": "[concat(parameters('vnetName'), '/', parameters('subnets').settings[copyIndex()].name)]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[parameters('vnetName')]"
+      ],
+      "properties": {
+        "addressPrefix": "[parameters('subnets').settings[copyIndex()].prefix]"
+      }
+    }
+  ],
+  "outputs": {
+  }
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;There are 3 parameters: the VNet name and prefix (strings) and then an object that contains the subnet settings&lt;/li&gt;&lt;li&gt;The first resource is the VNet itself - nothing complicated there&lt;/li&gt;&lt;li&gt;The second resource uses copy to create 0 or more instances. In this case, we're looping over the subnets.settings array and creating a subnet for each element in that array, using copyIndex() as the index as we loop&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;There's really nothing special here - using a copy is slightly more advanced, and the subnets parameter is a complex object. Otherwise, this is plain ol' ARM json.&lt;/p&gt;&lt;h3&gt;The Parent Template&lt;/h3&gt;&lt;p&gt;The parent template has two things that are different from "normal" templates: it needs two parameters (containerUri and containerSasToken) that let it refer to the linked (child) template and it invokes the template by specifying a "Microsoft.Resources/deployments" resource type. Let's look at an example:&lt;/p&gt;&lt;pre class="brush: javascript"&gt;{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerUri": {
+      "type": "string"
+    },
+    "containerSasToken": {
+      "type": "string"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "apiVersion": "2017-05-10",
+      "name": "linkedTemplate",
+      "type": "Microsoft.Resources/deployments",
+      "properties": {
+        "mode": "incremental",
+        "templateLink": {
+          "uri": "[concat(parameters('containerUri'), '/Resources/vNet.json', parameters('containerSasToken'))]",
+          "contentVersion": "1.0.0.0"
+        },
+        "parameters": {
+          "vnetName": { "value": "testVNet" },
+          "vnetPrefix": { "value": "10.0.0.0/16" },
+          "subnets": {
+            "value": {
+              "settings": [
+                {
+                  "name": "subnet1",
+                  "prefix": "10.0.0.0/24"
+                },
+                {
+                  "name": "subnet2",
+                  "prefix": "10.0.1.0/24"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;There are two parameters that pertain to the linked template: the containerUri and the SAS token&lt;/li&gt;&lt;li&gt;In the resources, there is a "Microsoft.Resources/deployment" resource - this is how we invoke the child template&lt;/li&gt;&lt;li&gt;In the templateLink, the URI is constructed by concatenating the containerUri, the path to the child template within the container, and the SAS token&lt;/li&gt;&lt;li&gt;Parameters are passed inline - note that even simple parameters look like JSON objects (see vNetName and vnetPrefix)&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Initially I tried to make the subnets object an array: but this blew up on the serialization. So I made an object called "settings" that is an array. So the subnets value property is an object called "settings" that is an array. You can look back at the child template to see how I dereference the object to get the values: to get the name of a subnet, I use "parameters('subnet').settings[index].name" (where index is 0 or 1 or whatever). The copy uses the length() method to get the number of elements in the array and then I can use copyIndex() to get the current index within the copy.&lt;/p&gt;&lt;p&gt;Of course the parent template can contain other resources - I just kept this example really simple to allow us to zoom in on the linking bits.&lt;/p&gt;&lt;h3&gt;Source Structure&lt;/h3&gt;&lt;p&gt;Here's a look at how I laid out the files in the Azure Resource Group project:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d859a2fc-824c-4900-8029-6e6460e7874d.png" target="_blank"&gt;&lt;img width="296" height="211" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/70c8a31a-fe17-41ed-8319-a1db70eff95a.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;You can see how the vNet.json (the child template) is inside a folder called "Resources". I use that as the relative path when constructing the URI to the child template.&lt;/p&gt;&lt;h2&gt;The Release Definition&lt;/h2&gt;&lt;p&gt;Now all the hard work is done! To get this into a release, we just create a storage account in Azure (that we can copy the templates to) and we're good to go.&lt;/p&gt;&lt;p&gt;Now create a new release definition. Add the repo containing the templates as a release artifact. Then in your environment, drop two tasks: Azure File Copy and Azure Resource Group Deployment. We configure the Azure File Copy task to copy all our files to the storage account into a container called templates. We also need to give the task two variable names: one for the containerUri and one for the SAS token:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/ef6934b9-1161-4256-9e49-e7ecbb5f86b0.png" target="_blank"&gt;&lt;img width="273" height="168" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/8cab0747-bb3c-4265-a0ea-58193364e490.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Once this task has executed, the templates will be available in the (private) container with the same folder structure as we have in Visual Studio.&lt;/p&gt;&lt;p&gt;On the next task, we can select the parent template as the template to invoke. We can pass in any parameters that are needed - at the very least, we need the containerUri and SAS token, so we pass in the variables from the previous task using $() notation:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/061159e7-1035-4924-b653-82cd7d7280cf.png" target="_blank"&gt;&lt;img width="276" height="172" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/136c37f0-a276-4851-8ad5-bfad48ed208c.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Now we can run the release and voila - we'll have a vNet with two subnets.&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Refactoring templates into linked templates is good practice - it's DRY (don't repeat yourself) and can make maintenance of complicated templates a lot easier. Using VSTS Release Management and a storage container, we can quickly, easily and securely make linked templates available and it all just works ™.&lt;/p&gt;&lt;p&gt;Happy deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Cloud</category>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="d3d3e142-86ce-40c5-b4f1-dcf201d1a5ad">
+      <author>Mikael Krief</author>
+      <email>krief_mikael@hotmail.com</email>
+      <website>http://www.mikaelkrief.com/</website>
+      <ip>194.3.119.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36</userAgent>
+      <date>2018-02-01 15:25:13</date>
+      <content>Very great article !!!!!!&lt;br /&gt;Can you store this json files in your github ?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="3c3c54f5-ab37-4a3b-9021-ac9c3711b859">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:9:17</date>
+      <content>Hi @Mikael - I will soon!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8bfffe32-8bee-433d-b2de-b9807e52f5cd">
+      <author>Esben Bach</author>
+      <email>esben@ofn.dk</email>
+      <website></website>
+      <ip>85.112.146.27</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36</userAgent>
+      <date>2018-06-15 05:8:40</date>
+      <content>To make this really awesome, you could have a release definition/step for uploading the templates from git to blob storage instead of &amp;quot;we just create a storage account in Azure (that we can copy the templates to) and we&amp;#39;re good to go&amp;quot; - that&amp;#39;s way to much manual work :)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c2ca21c9-6129-482c-8c74-d1b60d5295fd">
+      <author>Kevin Bowman</author>
+      <email>kevbowuk@gmail.com</email>
+      <website></website>
+      <ip>163.156.213.193</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.117 Safari/537.36</userAgent>
+      <date>2018-07-02 15:8:51</date>
+      <content>Hi Colin, Great Article.  Have you thought about what to do when you don&amp;#39;t have the publish and deploy steps in the same pipeline ?  i.e How to generate/store the SAS token for reuse in other release pipelines ?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="6d58690c-ea62-47f0-a308-6f7bab30c862">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>73.92.222.71</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-03 14:44:10</date>
+      <content>@Kevin - yes, we use this task (https://marketplace.visualstudio.com/items?itemName=pascalnaber.PascalNaber-Xpirit-CreateSasToken) by Pascal Naber from the VSTS Marketplace to generate a token to the blob store in other environments or phases.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="3bc55a5b-155e-47a1-8029-efd4cf41b72b">
+      <author>Akhilesh</author>
+      <email>pbakhil@gmail.com</email>
+      <website></website>
+      <ip>193.172.166.98</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-04 11:47:29</date>
+      <content>Great article. I had follow the steps mentioned, but I get the below error when run the release from vsts&lt;br /&gt;&lt;br /&gt;Can not perform requested operation on nested resource. Parent resource not found&lt;br /&gt;&lt;br /&gt;2018-07-04T11:20:31.1450208Z Starting Deployment.&lt;br /&gt;2018-07-04T11:21:03.9755494Z There were errors in your deployment. Error code: DeploymentFailed.&lt;br /&gt;2018-07-04T11:21:03.9811127Z ##[error]At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/arm-debug for usage details.&lt;br /&gt;2018-07-04T11:21:03.9820903Z ##[error]Details:&lt;br /&gt;2018-07-04T11:21:03.9823299Z ##[error]Conflict: {&lt;br /&gt;  &amp;quot;status&amp;quot;: &amp;quot;Failed&amp;quot;,&lt;br /&gt;  &amp;quot;error&amp;quot;: {&lt;br /&gt;    &amp;quot;code&amp;quot;: &amp;quot;ResourceDeploymentFailure&amp;quot;,&lt;br /&gt;    &amp;quot;message&amp;quot;: &amp;quot;The resource operation completed with terminal provisioning state &amp;#39;Failed&amp;#39;.&amp;quot;,&lt;br /&gt;    &amp;quot;details&amp;quot;: [&lt;br /&gt;      {&lt;br /&gt;        &amp;quot;code&amp;quot;: &amp;quot;DeploymentFailed&amp;quot;,&lt;br /&gt;        &amp;quot;message&amp;quot;: &amp;quot;At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/arm-debug for usage details.&amp;quot;,&lt;br /&gt;        &amp;quot;details&amp;quot;: [&lt;br /&gt;          {&lt;br /&gt;            &amp;quot;code&amp;quot;: &amp;quot;NotFound&amp;quot;,&lt;br /&gt;            &amp;quot;message&amp;quot;: &amp;quot;{\r\n  \&amp;quot;error\&amp;quot;: {\r\n    \&amp;quot;code\&amp;quot;: \&amp;quot;ParentResourceNotFound\&amp;quot;,\r\n    \&amp;quot;message\&amp;quot;: \&amp;quot;Can not perform requested operation on nested resource. Parent resource &amp;#39;digital-demo-eventhub01/digital-demo-eventhub-classa-online&amp;#39; not found.\&amp;quot;\r\n  }\r\n}&amp;quot;&lt;br /&gt;          },&lt;br /&gt;          {&lt;br /&gt;            &amp;quot;code&amp;quot;: &amp;quot;NotFound&amp;quot;,&lt;br /&gt;            &amp;quot;message&amp;quot;: &amp;quot;{\r\n  \&amp;quot;error\&amp;quot;: {\r\n    \&amp;quot;code\&amp;quot;: \&amp;quot;ParentResourceNotFound\&amp;quot;,\r\n    \&amp;quot;message\&amp;quot;: \&amp;quot;Can not perform requested operation on nested resource. Parent resource &amp;#39;digital-demo-eventhub01/digital-demo-eventhub-classa-offline&amp;#39; not found.\&amp;quot;\r\n  }\r\n}&amp;quot;&lt;br /&gt;          }&lt;br /&gt;        ]&lt;br /&gt;      }&lt;br /&gt;    ]&lt;br /&gt;  }&lt;br /&gt;} undefined&lt;br /&gt;2018-07-04T11:21:03.9824787Z ##[error]Task failed while creating or updating the template deployment.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="e1693fe1-2022-4345-8a24-6598f5a74b54">
+      <author>Joey Chömpff</author>
+      <email>mail@jsc-projects.nl</email>
+      <website></website>
+      <ip>77.162.85.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-27 11:33:29</date>
+      <content>If you put in Blob Prefix: $(Release.EnvironmentName)/$(Release.DefinitionName)/$(Release.ReleaseName) then all your releases are stored with a folder structure. Don&amp;#39;t forget to apply this path in your ARM template.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="57448239-70d1-4046-888f-48b36f9510ae">
+      <author>Bill sherman</author>
+      <email>bcjmk@hotmail.com</email>
+      <website></website>
+      <ip>70.91.144.193</ip>
+      <userAgent>Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Mobile/15E148 Safari/604.1</userAgent>
+      <date>2019-04-20 12:52:54</date>
+      <content>How would you test the release? I’m thinking to use Test-AZResourceGroupDeployment with parameters to ensure all the linked templates are accessible and parameters align. I don’t think I want to actually deploy the template. &lt;br /&gt;&lt;br /&gt;Possibly, I could build a test.parameters.deploy.json for a simple validation. &lt;br /&gt;&lt;br /&gt;Have you tried these approaches?&lt;br /&gt;Thanks for the hint here. I’m trying to get this to work in Azure DevOps.</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

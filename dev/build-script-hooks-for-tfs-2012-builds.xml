@@ -1,0 +1,210 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>72f2a5ba-171f-4501-ac5f-6ee0152fba8b</id>
+  <title>Build Script Hooks for TFS 2012 Builds</title>
+  <slug>build-script-hooks-for-tfs-2012-builds</slug>
+  <shortUrl>http://bit.ly/1fxV68r</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2014-01-22 13:51:00</pubDate>
+  <lastModified>2020-04-06 05:54:27</lastModified>
+  <content>&lt;p&gt;EDIT: My colleague Tyler Doerksen pointed out in his comments that my solution doesn’t do any error checking of the scripts. If your script fails, the build happily continues. I’ve added &lt;a href="http://www.colinsalmcorner.com/2014/01/error-handling-poor-mans-runscript-in.html" target="_blank"&gt;another post&lt;/a&gt; to show how to add error handling.&lt;/p&gt; &lt;p&gt;One of my favorite features about the TFS 2013 Builds is the script hooks – there are pre- and post-build as well as pre- and post-test hooks. These make customizing build a whole lot easier. For example, customizing the build so that your assembly versions match your build number &lt;a href="http://www.colinsalmcorner.com/2013/07/matching-binary-version-to-build-number.html" target="_blank"&gt;is a snap&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;I set out to implement the same logic in a 2012 build this morning – unfortunately, the RunScript build activity from the 2013 template is only in the 2013 TFS Build assembly.&lt;/p&gt; &lt;p&gt;So I came up with a “poor-man’s” run-script equivalent for 2012 builds (with the best part being you don’t need any custom assemblies, so the edit can be applied directly to your build template without having to pull it into a solution). I’ll walk you through the steps of customizing the default build – in this example I’m only doing pre- and post-build scripts, but the principles would be the same for pre- and post-test scripts.&lt;/p&gt; &lt;h2&gt;Challenge 1 – Invoking PowerShell&lt;/h2&gt; &lt;p&gt;The first challenge is how do you invoke a PowerShell script from within the build? It’s fairly easy: use the InvokeProcess activity.&lt;/p&gt; &lt;p&gt;First you’ll need to add workflow arguments for the pre- and post-build script paths as well as their corresponding args. Open your build workflow and click on “Arguments”. Enter 4 “In String” arguments as follows:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-A0SlTFrXZK8/Ut-woxu6NEI/AAAAAAAABLk/LgyhQ3CP7zM/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-n3XDr5QsH10/Ut-wpsUu8gI/AAAAAAAABLs/2mMlrsLAvYo/image_thumb%25255B1%25255D.png?imgmax=800" width="435" height="177"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;You can add defaults if you like.&lt;/p&gt; &lt;p&gt;I always like to put custom arguments in a separate section of the build parameters, so that anyone creating a build from the template can see them and read their descriptions. You do this by clicking the “…” button in the Default Value column of the “Metadata” argument and filling in some metadata for your arguments:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-6Caj4I539nE/Ut-wqToYgPI/AAAAAAAABL0/d94g2x3w-G8/s1600-h/image%25255B7%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh3.ggpht.com/-UljBJ6TNYAQ/Ut-wq-Dg2CI/AAAAAAAABL8/ePeDUlft-2w/image_thumb%25255B3%25255D.png?imgmax=800" width="329" height="273"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;Now go to the workflow and find the MSBuild Activity in the heart of the workflow that does the compilation (be careful – there’s one that does a clean of the workspace too – you don’t want that one). Just above the ForEach (For Each Project in BuildSettings.ProjectsToBuild) activity, add an If activity (this will automatically add in a sequence to wrap the activities we’re adding) and set its condition to &lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;Not String.IsNullOrEmpty(PreBuildScriptPath)&lt;/font&gt;&lt;/p&gt; &lt;p&gt;and in the Then of the If activity add a “ConvertWorkspaceItem” activity and an InvokeProcess activity. In the InvokeProcess activity, drag a “WriteBuildMessage” and “WriteBuildError” activity onto the area below stdOutput and errOutput respectively. Set the “Message” property of each Write activity to stdOutput and errOutput respectively.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh4.ggpht.com/-vIOv0L3w1IA/Ut-wrs-GLLI/AAAAAAAABME/7-8_QsbEE7M/s1600-h/image%25255B11%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-aS6oqjAyftg/Ut-wsXlgPgI/AAAAAAAABMM/IgNvSQMJLlY/image_thumb%25255B5%25255D.png?imgmax=800" width="249" height="343"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Click on the sequence activity that your activities are in. We’ll need two local variables: preBuildScriptLocalPath and postBuildScriptLocalPath (both strings).&lt;/p&gt; &lt;p&gt;Now in the ConvertWorkspaceItem activity, set the following properties:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;DisplayName:&lt;font size="2" face="Courier New"&gt; “Get pre-build script local path”&lt;/font&gt;  &lt;li&gt;Input:&lt;font size="2" face="Courier New"&gt; PreBuildScriptPath&lt;/font&gt;  &lt;li&gt;Output: &lt;font size="2" face="Courier New"&gt;preBuildScriptLocalPath&lt;/font&gt;  &lt;li&gt;Workspace: &lt;font size="2" face="Courier New"&gt;Workspace&lt;/font&gt;&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Set the following properties in the InvokeProcess activity:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Arguments: &lt;font size="2" face="Courier New"&gt;String.Format(" ""&amp; '{0}' {1}"" ", prebuildScriptLocalPath, PreBuildScriptArgs)&lt;/font&gt;  &lt;li&gt;DisplayName: &lt;font size="2" face="Courier New"&gt;“Run pre-build script”&lt;/font&gt;  &lt;li&gt;FileName: &lt;font size="2" face="Courier New"&gt;“PowerShell”&lt;/font&gt;&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Now you can copy this whole “If” activity and paste it below the “ForEach” (the one that does contains the MSBuild activity) and rename pre to post – this implements your post-build hook.&lt;/p&gt; &lt;p&gt;Don’t forget that you’ll need to change PowerShell’s execution policy on your build server. Log in to your build server and run PowerShell as an administrator. Run the following:&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;Set-ExecutionPolicy RemoteSigned&lt;/font&gt;&lt;/p&gt; &lt;p&gt;Now you’re almost set…&lt;/p&gt; &lt;h2&gt;Challenge 2 – Environment Variables&lt;/h2&gt; &lt;p&gt;When I created a script for a 2013 build to version the assemblies, I relied on the fact that the 2013 build sets some environment variables that you can use in your scripts. Here’s a snippet showing 2 environment variables I used in my &lt;a href="http://www.colinsalmcorner.com/2013/07/matching-binary-version-to-build-number.html" target="_blank"&gt;versioning script&lt;/a&gt;:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$pathToSearch = $env:TF_BUILD_SOURCESDIRECTORY,
+  [string]$buildNumber = $env:TF_BUILD_BUILDNUMBER,
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;You can see I’m getting $env:TF_BUILD_BUILDNUMBER. Well, in the 2012 workflow, these variables aren’t set, so you have to add an activity to do it.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Just above your “If” activity for the pre-build script invocation, add an InvokeMethod activity (this is in the “Primitives” section of the workflow designer toolbox). &lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh5.ggpht.com/-ZDfuvAp7Sy4/Ut-wtSBw6aI/AAAAAAAABMU/DptMqrg6gAc/s1600-h/image%25255B15%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-EUWdOsDWxzI/Ut-wuAp2r1I/AAAAAAAABMc/i8yS-yCdVLA/image_thumb%25255B7%25255D.png?imgmax=800" width="256" height="342"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Set the following properties:&lt;/p&gt;&lt;br /&gt;&lt;ul&gt;&lt;br /&gt;&lt;li&gt;MethodName: SetEnvironmentVariable &lt;br /&gt;&lt;li&gt;TargetType: System.Environment&lt;/li&gt;&lt;/ul&gt;&lt;br /&gt;&lt;p&gt;Then you need to set different parameters for each environment variable you want to set. Click on the “…” next to the value of the Parameters property:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-KvKAIkIe4AM/Ut-wusSu33I/AAAAAAAABMk/Cc82aqusQsU/s1600-h/image%25255B19%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-78axFRtXjIA/Ut-wvY49xeI/AAAAAAAABMs/p-6sSH_MTs8/image_thumb%25255B9%25255D.png?imgmax=800" width="412" height="139"&gt;&lt;/a&gt; In this one I set 2 parameters: “In String TF_BUILD_SOURCESDIRECTORY” and “In String SourcesDirectory” to set the sources directory environment variable. I did the same for binaries directory and build number, each time using the name from &lt;a href="http://msdn.microsoft.com/en-us/library/vstudio/dn376353.aspx#scripts" target="_blank"&gt;this list&lt;/a&gt; (see the TF_BUILD environment variables section) and the value from the corresponding workflow argument or variable. Then I could use the same PowerShell script that I used in my 2013 builds without having to modify it.&lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Creating a Build Definition&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;Now when you create a build definition, make sure that you include the folder that contains your scripts into the build workspace. Then set your script paths (using the source control paths) and arguments appropriately, for example:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-UacgKu522uo/Ut-wwHm4IiI/AAAAAAAABM0/mLHR81iOT5A/s1600-h/image%25255B23%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-3V0EjbZKtsU/Ut-wwmH38OI/AAAAAAAABM8/6Ljc-YStxY4/image_thumb%25255B11%25255D.png?imgmax=800" width="420" height="85"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Happy customizing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="62040290-ad67-4ecc-a679-c1e2e8eb4ab9">
+      <author>Tyler Doerksen</author>
+      <email>noreply@blogger.com</email>
+      <website>http://blog.tylerdoerksen.com</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-01-22 17:12:47</date>
+      <content>Hey Colin, nice post. I definitely agree that is one of the best features of the 2013 builds.&lt;br /&gt;&lt;br /&gt;One thing. In the example you are not checking the output int of the execution. You will see the errors from your script but that will not be enough to change the status of the build.&lt;br /&gt;&lt;br /&gt;Also you don't have to change the execution policy on the build server if you set the -ExecutionPolicy parameter on the powershell.exe command line. Check out powershell.exe -help for info</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="432434aa-78ed-49cb-a993-007992d50eb6">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-01-23 08:47:48</date>
+      <content>Thanks for pointing that out Tyler - I've added another post about how to handle errors.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ea87e587-1548-4a78-a1f2-981b52205234">
+      <author>Jordan Hotmann</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/17036076151396961402</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-04-16 19:6:14</date>
+      <content>Wow, I had no idea about the metadata editor.  That will clean up my build definition quite a bit!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0ad7d5e0-f00e-4d70-a1a2-95d987bdeb33">
+      <author>Marc</author>
+      <email>mpaliotti@epicor.com</email>
+      <website></website>
+      <ip>204.19.199.154</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 18:6:26</date>
+      <content>I&amp;#39;ve implemented this, but I&amp;#39;m not sure how to pass my argument&lt;br /&gt;&lt;br /&gt;I need to pass a String array as part of the arguments...&lt;br /&gt;&lt;br /&gt;my call will look like this..&lt;br /&gt;script path = &amp;quot;c:\test.ps1&amp;quot;&lt;br /&gt;arguments = builds `&amp;quot;Test 1`&amp;quot;, `&amp;quot;Test 2`&amp;quot;, `&amp;quot;Test 3`&amp;quot;&lt;br /&gt;&lt;br /&gt;This is not working for me :(</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="49812e58-4651-416b-84ec-8d91a4ac5dc4">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 18:42:51</date>
+      <content>@Marc&lt;br /&gt;&lt;br /&gt;You have to use the @() syntax to specify an array.&lt;br /&gt;&lt;br /&gt;For example, here&amp;#39;s a script &amp;quot;test.ps1&amp;quot;:&lt;br /&gt;param(&lt;br /&gt;    [string[]]$array&lt;br /&gt;)&lt;br /&gt;Write-Host $array.Count&lt;br /&gt;Write-Host $array[0]&lt;br /&gt;&lt;br /&gt;To invoke the script, run:&lt;br /&gt;.\test.ps1 -array @(&amp;quot;abc&amp;quot;, &amp;quot;cde&amp;quot;)&lt;br /&gt;&lt;br /&gt;This outputs:&lt;br /&gt;2&lt;br /&gt;abc&lt;br /&gt;&lt;br /&gt;Hope this helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6d7104b9-8d9e-4d2b-ae28-a9dfbd514c7a">
+      <author>Marc</author>
+      <email>mpaliotti@epicor.com</email>
+      <website></website>
+      <ip>204.19.199.154</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 20:20:07</date>
+      <content>I got it to work. Thanks. But I wanted to know what the difference was between having an InvokeProcess and RunScript process? The default template in TFS 2013 uses a RunScript where in your blog, you advise us to use an InvokeProcess process.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a4d5edfc-42af-400c-b6bb-3d3d7b744b5f">
+      <author>Marc</author>
+      <email>mpaliotti@epicor.com</email>
+      <website></website>
+      <ip>204.19.199.154</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 20:21:26</date>
+      <content>Never mind. I should have read. Should I be using the RunScript instead of InvokeProcess?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="fd0f0848-8b4b-40ca-ba34-886b4d980518">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-08-26 20:30:09</date>
+      <content>Hey Marc - 2012 doesn&amp;#39;t have &amp;quot;InvokeProcess&amp;quot; so that&amp;#39;s why I advise it for 2012 workflows. However, if you&amp;#39;re on TFS 2013, then you should be using the RunScript activity.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a38411f1-fea8-4aa3-b221-c55b8d876d61">
+      <author>Marc</author>
+      <email>mpaliotti@epicor.com</email>
+      <website></website>
+      <ip>204.19.199.154</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-29 14:3:30</date>
+      <content>I wish it was easy to pass arguments. I&amp;#39;ve been trying to figure out how to pass a String array. It was so much easier to use an InvokeProcess activity :(</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="83a2149e-c232-4d31-9310-0ec3b855a01a">
+      <author>Mark</author>
+      <email>gilligan128@gmail.com</email>
+      <website>http://ryder.com/</website>
+      <ip>12.229.139.14</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36</userAgent>
+      <date>2015-01-16 14:17:53</date>
+      <content>Tried doing this with Post-test script, but it runs even when the tests fail.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="3fbe5474-fce2-4f2a-a148-423bbeb7b58c">
+      <author>Colin Svingen</author>
+      <email>swoogan@gmail.com</email>
+      <website>http://swoogan.blogspot.ca/</website>
+      <ip>216.183.93.178</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.111 Safari/537.36</userAgent>
+      <date>2015-02-17 17:25:46</date>
+      <content>Hello,&lt;br /&gt;&lt;br /&gt;For your variables PreBuildScriptPath and PostBuildScriptPath, try setting the Editor field in the MetaData Editor to &amp;quot;Microsoft.TeamFoundation.Build.Controls.ServerFileBrowserEditor, Microsoft.TeamFoundation.Build.Controls&amp;quot;. &lt;br /&gt;&lt;br /&gt;This gives you are nice File Browser to pick your scripts&amp;#39; location from source control.&lt;br /&gt;&lt;br /&gt;Otherwise, excellent guide. It really saved me a lot of time.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="401bfd4a-c55d-4920-aa5c-4aea75fdab35">
+      <author>Santosh</author>
+      <email>santoshkotagis@outlook.com</email>
+      <website></website>
+      <ip>183.78.187.83</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.2 (KHTML, like Gecko) Chrome/15.0.874.0 Safari/535.2</userAgent>
+      <date>2015-03-16 05:31:20</date>
+      <content>Hi,&lt;br /&gt;The above article certainly helped for me in my project. Could you please let me know how to extend the versioning the same for Nuget packages as well. As we are using the nuget packaging in our project.&lt;br /&gt;&lt;br /&gt;Thanks in advance.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="1a57de49-cc0d-49cc-bca1-caaef985fb01">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:50:15</date>
+      <content>Hi @Mark&lt;br /&gt;&lt;br /&gt;You&amp;#39;ll have to check for the test status in the Post-Test script invocation. Neno Loje wrote a util to get the test status here: http://blogs.msmvps.com/vstsblog/2014/05/20/getting-the-compile-and-test-status-as-environment-variables-when-extending-tf-build-using-scripts/&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="67b287a4-41db-4d4f-b72e-c506ff94e808">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:51:07</date>
+      <content>Hi @Colin Svingen&lt;br /&gt;&lt;br /&gt;Nice tip about the file explorer setting in the metadata! Thanks!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="bc82255d-fbac-4276-9ca4-c10ef49a7d8b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:53:59</date>
+      <content>Hi @Santosh&lt;br /&gt;&lt;br /&gt;You can change the values of the file extension and version regex match in the arguments passed to the script. Change the file extension to &amp;quot;*.nuspec&amp;quot; and then change the regex to just have 3 digits instead of 4 (for nuspec versioning). Just do this before calling the NuGet package command.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ae83ea9c-5755-470a-81c3-cd8cabf4904a">
+      <author>Nick McCollum</author>
+      <email>nickjmc@aol.com</email>
+      <website></website>
+      <ip>216.99.65.84</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-05-21 21:45:36</date>
+      <content>If the PowerShell script contains Write-Host or Write-Output statements, where does the output get written in the TFS build logs? My script is working, but I cannot find where the output from these statements is being written. Thanks.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="fce78ee9-093b-4c87-abec-9c01a99490c5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:40:44</date>
+      <content>@Nick - try Write-Verbose. You have to play around with this a bit - redirecting the stderr and stdout streams in the builds is tricky.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8018ef60-44d9-446d-8a43-a79a55f1d964">
+      <author>megha</author>
+      <email>megha.sgowda@gmail.com</email>
+      <website></website>
+      <ip>204.95.150.205</ip>
+      <userAgent>Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; WOW64; Trident/6.0)</userAgent>
+      <date>2016-02-01 22:33:10</date>
+      <content>Hi,&lt;br /&gt;I am trying to customize the tfs 2012 template as mentioned in your post , but having problem to create an Invokemethod activity for setting environment variable.&lt;br /&gt;I have VS2015 and TFS2012 , getting the error &amp;quot;Environment does not have a public static method named &amp;#39;SetEnvironmentVariable&amp;#39; matching the parameter types,generic type arguments,and generic type constraints supplied to InvokeMethod&amp;quot;&lt;br /&gt;&lt;br /&gt;Appreciate any kind of help.&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;Megha</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="899cdd8a-a7c7-4b8c-9d4a-e915f0b52da4">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:37:54</date>
+      <content>Hi @Megha&lt;br /&gt;&lt;br /&gt;I&amp;#39;d really suggest you get onto the new Build engine - support for XAML builds will end at some stage, and the functionality of the new system is just so much better. TFS 2012 is already 2 versions behind! Please let me know if you&amp;#39;d like help upgrading.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="42f8c361-c0f9-48c9-9164-b856c6452683">
+      <author>William</author>
+      <email>wgf@ieee.org</email>
+      <website></website>
+      <ip>24.141.49.180</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.116 Safari/537.36</userAgent>
+      <date>2016-10-01 16:49:28</date>
+      <content>You have these instructions:&lt;br /&gt;&lt;br /&gt;Now in the ConvertWorkspaceItem activity, set the following properties:&lt;br /&gt;&lt;br /&gt;DisplayName: “Get pre-build script local path”&lt;br /&gt;Input: PreBuildScriptPath&lt;br /&gt;Output: preBuildScriptLocalPath&lt;br /&gt;Workspace: Workspace&lt;br /&gt;&lt;br /&gt;I am not seeing an Output property in the ConvertWorkspaceItem Activity&lt;br /&gt;&lt;br /&gt;The only properties I have are these:&lt;br /&gt;&lt;br /&gt;Direction&lt;br /&gt;DisplayName&lt;br /&gt;Input&lt;br /&gt;Result&lt;br /&gt;Workspace&lt;br /&gt;&lt;br /&gt;Is this a typeo or am I missing something?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="19b1c4b8-1325-401b-8847-3274d0ba6a59">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>98.189.39.157</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36</userAgent>
+      <date>2016-10-27 20:39:39</date>
+      <content>Hi @William&lt;br /&gt;&lt;br /&gt;Which version of TFS are you on? This article is for getting some 2013 functionality in 2012. But those are both older versions of TFS - so I&amp;#39;d highly recommend upgrading to TFS 2015 to get access to the new build agent. It&amp;#39;s a far better build engine, and you won&amp;#39;t even need to solve this problem.</content>
+    </comment>
+  </comments>
+  <viewCount>61532</viewCount>
+</post>

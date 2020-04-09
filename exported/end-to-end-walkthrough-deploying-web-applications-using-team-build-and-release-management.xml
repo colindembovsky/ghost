@@ -1,0 +1,299 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>3e2e295b-080f-41a9-ad93-6c4116932d08</id>
+  <title>End to End Walkthrough: Deploying Web Applications Using Team Build and Release Management</title>
+  <slug>end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management</slug>
+  <shortUrl>http://www.colinsalmcorner.com/post/end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management</shortUrl>
+  <author></author>
+  <pubDate>2016-10-21 19:32:19</pubDate>
+  <lastModified>2019-05-04 09:33:04</lastModified>
+  <content>&lt;p&gt;I’ve posted previously about deploying web applications using Team Build and Release Management (see &lt;a href="http://colinsalmcorner.com/post/config-per-environment-vs-tokenization-in-release-management" target="_blank"&gt;Config Per Environment vs Tokenization in Release Management&lt;/a&gt; and &lt;a href="http://colinsalmcorner.com/post/webdeploy-configs-and-web-release-management" target="_blank"&gt;WebDeploy, Configs and Web Release Management&lt;/a&gt;). However, reviewing those posts recently at customers I’ve been working with, I’ve realized that these posts are a little outdated, you need pieces of both to form a full picture and the scripts that I wrote for those posts are now encapsulated in Tasks in my &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;marketplace extension&lt;/a&gt;. So in this post I’m going to do a complete end-to-end walkthrough of deploying web applications using Team Build and Release Management. I’ll be including handling configs – arguably the hardest part of the whole process.&lt;/p&gt; &lt;h2&gt;Overview&lt;/h2&gt; &lt;p&gt;Let’s start with an overview of the process. I like to think of three distinct “areas” – source control, build and release. Conceptually you have tokenized config in source control (more on how to do this coming up). Then you have a build that takes in the source control and produces a WebDeploy package – &lt;em&gt;a single tokenized package that is potentially deployable to multiple environments&lt;/em&gt;. The build should not have to know about anything environment specific (such as the correct connection string for Staging or Production, for example). Then release takes in the package and (conceptually) performs two steps: inject environment values for the tokens, and then deploy using WebDeploy. Here’s a graphic (which I’ll refer to as the Flow Diagram) of the process:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/774fea15-bff2-4a5c-9ee4-3ec8ee2ab4e1.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/0696e9ca-6e0f-4595-a7f5-08ddaa9ed66b.png" width="749" height="395"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;I’ve got some details in this diagram that we’ll cover shortly, so don’t worry about the details for now. The point is to clearly separate responsibilities (especially for build and release): build compiles source code, runs tests and performs static code analysis and so on. It shouldn’t have to know anything about environments – the output of the build is a single package with “holes” for environment values (tokens). Release will take in this single package and deploy it to each environment, plugging environment values into the holes as it goes. This guarantees that the bits you test in Dev and Staging are the same bits that get deployed to Prod!&lt;/p&gt; &lt;h2&gt;Deep Dive: Configuration&lt;/h2&gt; &lt;p&gt;Let’s get down into the weeds of configuration. If you’re going to produce a single package from build, then how should you handle config? Typically you have (at least) a connection string that you want to be different for each environment. Beyond that you probably have appSettings as well. If the build shouldn’t know about these values when it’s creating the package, then how do you manage config? Here are a some options:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Create a web.config for each environment in source control  &lt;ul&gt; &lt;li&gt;Pros: All your configs are in source control in their entirety  &lt;li&gt;Cons: Lots of duplications – and you have to copy the correct config to the correct environment; requires a re-build to change config values in release management&lt;/li&gt;&lt;/ul&gt; &lt;li&gt;Create a config transform for each environment  &lt;ul&gt; &lt;li&gt;Pros: Less duplication, and you have all the environment values in source control  &lt;li&gt;Cons: Requires a project (or solution) config per environment, which can lead to config bloat; requires that you create a package per environment during build; requires a re-build to change config values in release management&lt;/li&gt;&lt;/ul&gt; &lt;li&gt;Tokenize using a single transform and parameters.xml &lt;/li&gt; &lt;ul&gt; &lt;li&gt;Pros: No duplication; enables a single package that can be deployed to multiple environments; no rebuild required to change config values in release management  &lt;li&gt;Cons: Environment values aren’t in source control (though they’re in Release Management); learning curve&lt;/li&gt;&lt;/ul&gt;&lt;/ol&gt; &lt;p&gt;Furthermore, if you’re targeting Azure, you can use the same techniques as targeting IIS, or you can use Azure Resource Manager (ARM) templates to manage your configuration. This offloads the config management to the template and you assume that the target Azure Web App is correctly configured at the time you run WebDeploy.&lt;/p&gt; &lt;p&gt;Here’s a decision tree to make this a bit easier to digest:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/b1cffea2-7866-4dcf-9d14-f45b2ada68e2.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/57b55985-d6c4-41fe-b93f-4e5408368d74.png" width="733" height="435"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Let’s walk through it:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;If you’re deploying to Azure, and using ARM templates, just make sure that you configure the settings correctly in the template (I won’t cover how to do this in this post)  &lt;li&gt;If you’re deploying to IIS (or you’re deploying to Azure and don’t have ARM templates or just want to manage config in the same manner as you would for IIS), you should create a single publish profile using right-click-&amp;gt;Publish (on the web application) called “Release”. This should target the release configuration and you should tokenize the connection strings in the wizard (details coming up)  &lt;li&gt;Next, if you have appSettings, you’ll have to create a parameters.xml file (details coming up)  &lt;li&gt;Commit to source control&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;For the remainder of this post I’m going to assume that you’re deploying to IIS (or to Azure and handling config outside of an ARM template).&lt;/p&gt; &lt;h3&gt;Creating a Publish Profile&lt;/h3&gt; &lt;p&gt;So what is this publish profile and why do you need it? The publish profile enables you to:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;provide a single transform (via the Web.release.config) that makes your config release-ready (removing the debug compilation property, for example)  &lt;li&gt;tokenize the connection strings&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;To create the profile, right-click your web application project and select “Publish…”. Then do the following:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Select “Custom” to create a new custom profile. Name this “Release” (you can name this anything, but you’ll need to remember the name for the build later)  &lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/78397225-1cbf-453c-a940-e9982a93a85b.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/eceddac6-78f8-4ce8-9dfe-e183f9c91b29.png" width="298" height="237"&gt;&lt;/a&gt;  &lt;li&gt;On the Connection page, change the Publish method to “Web Deploy Package”. Type anything you want for the filename and leave the site name empty. Click Next.  &lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/f23edb73-ed6e-4aa5-bfa6-ad4b25b6896a.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/8ae35ddc-e25b-4c4a-befa-010ca01bd112.png" width="298" height="237"&gt;&lt;/a&gt;  &lt;li&gt;On the Settings page, select the configuration you want to compile. Typically this is Release – remember that the name of the configuration here is how the build will know which transform to apply. If you set this to Release, it will apply Web.Release.config – if you set it to Debug it will apply Web.Debug.Release. Typically you want to specify Release here since you’re aiming to get this site into Prod (otherwise why are you coding at all?) and you probably don’t want debug configuration in Prod!  &lt;li&gt;You’ll see a textbox for each connection string you have in your Web.config. You can either put a single token in or a tokenized connection string. In the example below, I’ve used a single token (“__AppDbContextStr__”) for the one connection string and a tokenized string (“Server=__DbServer__;Initial Catalog=__DbName__;User Name=__DbUser__;Password=__DbPassword__”) for the other (just so you can see the difference). I’m using double underscore pre- and post-fix for the tokens:  &lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a9ba6f7c-f0d2-411e-952f-74026144eaf0.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/1e67b4a8-0cb0-438b-bf41-81263ebe7de4.png" width="300" height="309"&gt;&lt;/a&gt;  &lt;li&gt;Now click “Close” (don’t hit publish). When prompted to save the profile, select yes. This creates a Release.pubxml file in the Properties folder (the name of the file is the name of the profile you selected earlier):  &lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/028a55c0-5785-4849-959d-8a690e1441d7.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/1ff23295-0800-4a82-8c74-b6c8f7ef5c59.png" width="303" height="134"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt; &lt;h3&gt;Creating a parameters.xml File&lt;/h3&gt; &lt;p&gt;The publish profile takes care of the connection strings – but you will have noticed that it doesn’t ask for values for appSettings (or any other configuration) anywhere. In order to tokenize anything in your web.config other than connection strings, you’ll need to create a parameters.xml file (yes, it has to be called that) in the root of your web application project. When the build runs, it will use this file to expose properties for you to tokenize (it doesn’t actually transform the config at build time).&lt;/p&gt; &lt;p&gt;Here’s a concrete example: in my web.config, I have the following snippet:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [3];"&gt;&amp;lt;appSettings&amp;gt;
+  ...
+  &amp;lt;add key="Environment" value="debug!" /&amp;gt;
+&amp;lt;/appSettings&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;There’s an appSetting key called “Environment” that has the value “debug!”. When I run or debug out of Visual Studio, this is the value that will be used. If I want this value to change on each environment I target for deployment, I need to add a parameters.xml file to the root of my web application with the following xml:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;?xml version="1.0" encoding="utf-8" ?&amp;gt;
+&amp;lt;parameters&amp;gt;
+  &amp;lt;parameter name="Environment" description="doesn't matter" defaultvalue="__Environment__" tags=""&amp;gt;
+    &amp;lt;parameterentry kind="XmlFile" scope="\\web.config$" match="/configuration/appSettings/add[@key='Environment']/@value"&amp;gt;
+    &amp;lt;/parameterentry&amp;gt;
+  &amp;lt;/parameter&amp;gt;
+&amp;lt;/parameters&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Lines 3-6 are repeated for each parameter I want to configure. Let’s take a deeper look:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;parameter name (line 3) – by convention it should be the name of the setting you’re tokenizing 
+&lt;li&gt;parameter description (line 3) – totally immaterial for this process, but you can use it if you need to. Same with tags. 
+&lt;li&gt;parameter defaultvalue (line 3) – this is the token you want injected – notice the double underscore again. Note that this can be a single token or a tokenized string (like the connection strings above) 
+&lt;li&gt;parameterentry match (line 4) – this is the xpath to the bit of config you want to replace. In this case, the xpath says in the “configuration” element, find the “appSetting” element, then find the “add” element with the key property = ‘Environment’ and replace the value parameter with the defaultvalue.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here you can see the parameters.xml file in my project:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/40c8a86e-f910-4b91-80b7-ae417d834f89.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/13b93fe8-2aa0-4963-93fe-8d8a32cc131c.png" width="216" height="333"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;To test your transform, right-click and publish the project using the publish profile (for this you may want to specify a proper path for the Filename in the Connection page of the profile). After a successful publish, you’ll see 5 files. The important files are the zip file (where the bits are kept – this is all the binary and content files, no source files) and the SetParameters.xml file:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/43e2a952-000a-4581-9ea3-e2df5058807e.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/dc8c4a62-ccb8-4944-8946-6ab51549f722.png" width="532" height="125"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Opening the SetParameters.xml file, you’ll see the following:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [4,5,6];"&gt;&amp;lt;?xml version="1.0" encoding="utf-8"?&amp;gt;
+&amp;lt;parameters&amp;gt;
+  &amp;lt;setParameter name="IIS Web Application Name" value="Default Web Site/WebDeployMe_deploy" /&amp;gt;
+  &amp;lt;setParameter name="Environment" value="__Environment__" /&amp;gt;
+  &amp;lt;setParameter name="DefaultConnection-Web.config Connection String" value="__AppDbContextStr__" /&amp;gt;
+  &amp;lt;setParameter name="SomeConnection-Web.config Connection String" value="Server=__DbServer__;Initial Catalog=__DbName__;User Name=__DbUser__;Password=__DbPassword__" /&amp;gt;
+&amp;lt;/parameters&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;You’ll see the tokens for the appSetting (Environment, line 4) and the connection strings (lines 5 and 6). Note how the tokens live in the SetParameters.xml file, not in the web.config file! In fact, if you dive into the zip file and view the web.config file, you’ll see this:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [2,3,7];"&gt;&amp;lt;connectionStrings&amp;gt;
+  &amp;lt;add name="DefaultConnection" connectionString="$(ReplacableToken_DefaultConnection-Web.config Connection String_0)" providerName="System.Data.SqlClient" /&amp;gt;
+  &amp;lt;add name="SomeConnection" connectionString="$(ReplacableToken_SomeConnection-Web.config Connection String_0)" providerName="System.Data.SqlClient" /&amp;gt;
+&amp;lt;/connectionStrings&amp;gt;
+&amp;lt;appSettings&amp;gt;
+  ...
+  &amp;lt;add key="Environment" value="debug!" /&amp;gt;
+&amp;lt;/appSettings&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;You can see that there are placeholders for the connection strings, but the appSetting is unchanged from what you have in your web.config! As long as your connection strings have placeholders and your appSettings are in the SetParameters.xml file, you’re good to go – don’t worry, WebDeploy will still inject the correct values for your appSettings at deploy time (using the xpath you supplied in the parameters.xml file).&lt;/p&gt;
+&lt;h2&gt;Deep Dive: Build&lt;/h2&gt;
+&lt;p&gt;You’re now ready to create the build definition. There are some additional build tasks which may be relevant – such as creating dacpacs from SQL Server Data Tools (SSDT) projects to manage database schema changes – that are beyond the scope of this post. As for the web application itself, I like to have builds do the following:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Version assemblies to match the build number (optional, but recommended) 
+&lt;li&gt;Run unit tests, code analysis and other build verification tasks 
+&lt;li&gt;Create the WebDeploy package&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;To version the assemblies, you can use the VersionAssemblies task from my &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;build tasks extension in the marketplace&lt;/a&gt;. You’ll need the ReplaceTokens task for the release later, so just install the extension even if you’re not versioning. To show the minimum setup required to get the release working, I’m skipping unit tests and code analysis – but this is only for brevity. I highly recommend that &lt;a href="http://colinsalmcorner.com/post/why-you-absolutely-need-to-unit-test" target="_blank"&gt;unit testing&lt;/a&gt; and code analysis become part of every build you have.&lt;/p&gt;
+&lt;p&gt;Once you’ve created a build definition:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Click on the General tab and change the build number format to 1.0.0$(rev:.r). This makes the first build have the number 1.0.0.1, the second build 1.0.0.2 etc. 
+&lt;li&gt;Add a VersionAssemblies task as the first task. Set the Source Path to the folder that contains the projects you want to version (typically the root folder). Leave the rest defaulted. 
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/3fdf8cd8-facf-4e27-ab99-0ed18975350f.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/852b438e-1036-48b6-9960-dee8d366289c.png" width="435" height="196"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;Leave the NuGet restore task as-is (you may need to edit the solution filter if you have multiple solutions in the repo) 
+&lt;li&gt;On the VS Build task, edit the MSBuild Arguments parameter to be &lt;font face="Courier New"&gt;/p:DeployOnBuild=true /p:PublishProfile=Release /p:PackageLocation=$(build.artifactstagingdirectory)&lt;/font&gt; 
+&lt;ul&gt;
+&lt;li&gt;This tells MSBuild to publish the site using the profile called Release (or whatever name you used for the publish profile you created) and place the package in the build artifact staging directory 
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/2fda7c25-9194-4f17-8d4e-de8ebd7369fd.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/6cae9fce-241a-4162-8d15-1807ac5d2666.png" width="611" height="153"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;Now you should put in all your code analysis and test tasks – I’m omitting them for brevity 
+&lt;li&gt;The final task should be to publish the artifact staging directory, which at this time contains the WebDeploy package for your site 
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a83bd59e-2b0c-4405-a9e8-7b357aef64ac.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/e487be58-b7bf-4be6-93c3-8ad769ace1ec.png" width="553" height="217"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Run the build. When complete, the build drop should contain the site zip and SetParameters.xml file (as well as some other files):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/f3ddc364-ce7f-4502-a3a3-549b554aa40a.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/0eb528d2-d7a7-41df-84b2-4bf259c5dae1.png" width="649" height="211"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You now have a build that is potentially deployable to multiple environments.&lt;/p&gt;
+&lt;h2&gt;Deep Dive: Release&lt;/h2&gt;
+&lt;p&gt;In order for the release to work correctly, you’ll need to install some extensions from the Marketplace. If you’re targeting IIS, you need to install the &lt;a href="https://marketplace.visualstudio.com/items?itemName=ms-vscs-rm.iiswebapp" target="_blank"&gt;IIS Web App Deployment Using WinRM&lt;/a&gt; Extension. For both IIS and Azure deployments, you’ll need the ReplaceTokens task from &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;my custom build tasks extension&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;There are a couple of ways you can push the WebDeploy package to IIS:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Use the IIS Web App Deployment using WinRM task. This is fairly easy to use, &lt;em&gt;but requires that you copy the zip and SetParameters files to the target server deploying&lt;/em&gt;. 
+&lt;li&gt;Use the cmd file that gets generated with the zip and SetParameters files to deploy remotely. This requires you to know the cmd parameters and to have the WebDeploy remote agent running on the target server.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;I recommend the IIS task generally – unless for some or other reason you don’t want to open up WinRM.&lt;/p&gt;
+&lt;p&gt;So there’s some configuration required on the target IIS server:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Install WebDeploy 
+&lt;li&gt;Install WebDeploy Remote Agent – for using the cmd. Note: if you install via Web Platform Installer you’ll need to go to Programs and Features and Modify the existing install, since the remote agent isn’t configured when installing WebDeploy via WPI 
+&lt;li&gt;Configure WinRM – for the IIS task. You can run “winrm quickconfig” to get the service started. If you need to deploy using certificates, then you’ll have to configure that too (I won’t cover that here) 
+&lt;li&gt;Firewall – remember to open ports for WinRM (5895 or 5986 for default WinRM HTTP or HTTPS respectively) or 8172 for the WebDeploy remote agent (again, this is the default port) 
+&lt;li&gt;Create a service account that has permissions to copy files and “do stuff” in IIS – I usually recommend that this user account be a local admin on the target server&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Once you’ve done that, you can create the Release Definition. Create a new release and specify the build as the primary artifact source. For this example I’m using the IIS task to deploy (and create the site in IIS – this is optional). Here are the tasks you’ll need and their configs:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Replace Tokens Task 
+&lt;ul&gt;
+&lt;li&gt;Source Path – the path to the folder that contains the SetParameters.xml file within the drop 
+&lt;li&gt;Target File Pattern – set to *.SetParameters.xml 
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/2c310cdf-b57c-477b-b871-fd42589b5ec3.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/8f7c1569-46bd-47d4-85f3-cfbdffa71aca.png" width="782" height="247"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;Windows Machine File Copy Task 
+&lt;ul&gt;
+&lt;li&gt;Copy the drop folder (containing the SetParameters.xml and website zip files) to a temp folder on the target server. Use the credentials of the service account you created earlier. I recommend using variables for all the settings. 
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/0b1d1624-05f5-46ed-b1dd-174bd43bee8d.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/b4d102bb-e130-4885-9dd1-53e7005bd392.png" width="780" height="295"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;(Optional) WinRM – IIS Web App Management Task 
+&lt;ul&gt;
+&lt;li&gt;Use this task to create (or update) the site in IIS, including the physical path, host name, ports and app pool. If you have an existing site that you don’t want to mess with, then skip this task. 
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/4c08facb-f44a-4a55-bc84-d5498355d7de.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a3bd502f-3644-464d-b60d-764e0468e420.png" width="783" height="491"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;WinRM – IIS Web App Deployment Task 
+&lt;ul&gt;
+&lt;li&gt;This task takes the (local) path of the site zip file and the SetParameters.xml file and deploys to the target IIS site. 
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/69d3456e-12fc-4133-bd4e-2bb9be8c67fd.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; padding-top: 0px; padding-left: 0px; display: inline; padding-right: 0px; border-top-width: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/9069ba71-d0bc-4e94-8b99-8e6ea9196f89.png" width="784" height="332"&gt;&lt;/a&gt; 
+&lt;li&gt;You can supply extra WebDeploy args if you like – there are some other interesting switches under the MSDeploy Additional Options section.&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Finally, open the Environment variables and supply name/value pairs for the values you want injected. In the example I’ve been using, I’ve got a token for Environment and then I have a tokenized connection string with tokens for server, database, user and password. These are the variables that the Replace Tokens task uses to inject the real environment-specific values into the SetParameters file (in place of the tokens). When WebDeploy runs, it transforms the web.config in the zip file with the values that are in the SetParameters.xml file. Here you can see the variables:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/84b88615-45bd-46d0-9fff-7be7d606c2d6.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/955909c6-ebe8-4b89-8ee2-6cf5e04ffcf8.png" width="427" height="323"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You’ll notice that I also created variables for the Webserver name and admin credentials that the IIS and Copy Files tasks use.&lt;/p&gt;
+&lt;p&gt;You can of course do other things in the release – like run integration tests or UI tests. Again for brevity I’m skipping those tasks. Also remember to make the agent queue for the environment one that has an agent that can reach the target IIS server for that environment. For example I have an agent queue called “webdeploy” with an agent that can reach my IIS server:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/00a30998-705a-4572-bc12-5c0223e33058.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/5f6d3bba-6e6a-4c3e-b6fd-465bcde179be.png" width="555" height="213"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I’m now ready to run the deployment. After creating a release, I can see that the tasks completed successfully! Of course the web.config is correct on the target server too.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c0042ad8-6884-4e88-a58a-44cc995bef5b.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/8a049eba-a5b4-421d-8811-414610eafdf2.png" width="518" height="310"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h2&gt;Deploying to Azure&lt;/h2&gt;
+&lt;p&gt;As I’ve noted previously if you’re deploying to Azure, you can put all the configuration into the ARM template (see an example &lt;a href="https://github.com/Microsoft/PartsUnlimited/blob/master/env/Templates/Website.json" target="_blank"&gt;here&lt;/a&gt; – note how the connection strings and Application Insights appSettings are configured on the web application resource). That means you don’t need the publish profile or parameters.xml file. You’ll follow exactly the same process for the build (just don’t specify the PublishProfile argument). The release is a bit easier too – you first deploy the resource group using the Azure Deployment: Create or Update Resource Group task like so:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c3826514-e9cd-4e4e-ab60-e86d057ca282.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/8f8b4569-4f02-4d7c-9012-77b018862fe8.png" width="614" height="233"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can see how I override the template parameters – that’s how you “inject” environment specific values.&lt;/p&gt;
+&lt;p&gt;Then you use a Deploy AzureRM Web App task (no need to copy files anywhere) to deploy the web app like so:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/86f31379-edfc-47e9-a7e8-6bb67791d5ab.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/d7f9617f-7dae-43d3-a99c-184761542e68.png" width="612" height="300"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I specify the Azure Subscription – this is an Azure ARM service endpoint that I’ve preconfigured – and then the website name and optionally the deployment slot. Here I am deploying to the Dev slot – there are a couple extensions in the marketplace that allow you to swap slots (usually after you’ve smoke-tested the non-prod slot to warm it up and ensure it’s working correctly). This allows you to have zero downtime. The important bit here is the Package or Folder argument – this is where you’ll specify the path to the zip file.&lt;/p&gt;
+&lt;p&gt;Of course if you don’t have the configuration in an ARM template, then you can just skip the ARM deployment task and run the Deploy AzureRM Web App task. There is a parameter called SetParameters file (my &lt;a href="https://github.com/Microsoft/vsts-tasks/pull/1748" target="_blank"&gt;contribution&lt;/a&gt; to this task!) that allows you to specify the SetParameters file. You’ll need to do a Replace Tokens task prior to this to make sure that environment specific values are injected.&lt;/p&gt;
+&lt;p&gt;For a complete walkthrough of deploying a Web App to Azure with an ARM template, look at this &lt;a href="https://github.com/Microsoft/PartsUnlimited/tree/master/docs/HOL-Continuous_Deployment" target="_blank"&gt;hands-on-lab&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Once you understand the pieces involved in building, packaging and deploying web applications, you can fairly easily manage configuration without duplicating yourself – including connection strings, appSettings and any other config – using a publish profile and a parameters.xml file. Then using marketplace extensions, you can build, version, test and package the site. Finally, in Release Management you can inject environment specific values for your tokens and WebDeploy to IIS or to Azure.&lt;/p&gt;
+&lt;p&gt;Happy deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="2afb79d5-31c6-448a-956b-431417d1b586">
+      <author>Hesham Desouky</author>
+      <email>hdesouky@gmail.com</email>
+      <website>http://www.nebrastech.com/</website>
+      <ip>41.69.155.9</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36</userAgent>
+      <date>2016-11-14 23:33:15</date>
+      <content>Thanks for the great blog post&lt;br /&gt;I am using the replace token task and everything is working OK if the variables are defined in the release definition level&lt;br /&gt;However when define variable in release stage level, the replace token task didn&amp;#39;t see the defined variable&lt;br /&gt;&lt;br /&gt;Am i missing something</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="a6f34f0a-0013-46d8-b5f3-99e646273bcb">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>208.91.239.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36</userAgent>
+      <date>2016-11-18 15:12:52</date>
+      <content>Hi @Hesham - no, the variables should work at either level. Make sure that you name the variable without the __ pre- or post-fix (so the name of the variable in the release definition should be Environment, not __Environment__).&lt;br /&gt;&lt;br /&gt;If this persists, please create an issue (including logs) here: https://github.com/colindembovsky/cols-agent-tasks/issues</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="149ce16c-6e9b-4169-a2da-2c707c631c5a">
+      <author>Issa Fram</author>
+      <email>issafram@gmail.com</email>
+      <website></website>
+      <ip>208.87.237.201</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36</userAgent>
+      <date>2016-12-12 19:35:44</date>
+      <content>I have been using MSDeploy just for the simple reason of pushing out the files.&lt;br /&gt;But I don&amp;#39;t really understand the point of using the parameter file.&lt;br /&gt;&lt;br /&gt;The XDT transformations are much more powerful.&lt;br /&gt;&lt;br /&gt;Or am I missing something?&lt;br /&gt;&lt;br /&gt;Current process I am using is this:  &lt;br /&gt;1. Web Deploy to target app / folder.&lt;br /&gt;2. Inject variables (token replacement) into config transform (based on environment variable DEV / PROD / etc).&lt;br /&gt;3. Transform Web.config using transformed config transform. (used an extension for this task).&lt;br /&gt;&lt;br /&gt;Does that sound unreasonable or am I missing any value by not using the MSDeploy parameters.xml file?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="b222473f-50a3-4f0d-91a2-5705fc52138f">
+      <author>Sam</author>
+      <email>sam.kni8s@gmail.com</email>
+      <website></website>
+      <ip>65.217.78.44</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36</userAgent>
+      <date>2017-02-27 14:29:29</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;I am a newbie in software development and currently I am using TFS2015 Vnext to deploy my web app to IIS and had a lame question. what is the difference between using Windows Machine File Copy task and IIS Web App Deployment task?&lt;br /&gt;&lt;br /&gt;I know that File Copy task is used to copy binaries from one machine to another.&lt;br /&gt;&lt;br /&gt;and when I tried to use IIS - Web App Deployment task it asked me to package my binaries in build definition and during deployment it picked that zip and placed the same at IIS virtual directory.&lt;br /&gt;&lt;br /&gt;Is there any other feature that II-Web App Deployment can be used?&lt;br /&gt;&lt;br /&gt;Dint try but just heard that II-Web App Management can only be used to create new website\AppPool and unable to edit or start,stop,restart website\AppPool.&lt;br /&gt;&lt;br /&gt;Clarification on these would be highly appreciated.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="432542de-5f0f-4c72-bbf5-cd40083dc86e">
+      <author>Sam</author>
+      <email>sam.kni8s@gmail.com</email>
+      <website></website>
+      <ip>65.217.78.44</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36</userAgent>
+      <date>2017-02-27 14:41:43</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;I am a newbie in software development and currently I am using TFS2015 Vnext to deploy my web app to IIS and had a lame question. what is the difference between using Windows Machine File Copy task and IIS Web App Deployment task?&lt;br /&gt;&lt;br /&gt;I know that File Copy task is used to copy binaries from one machine to another.&lt;br /&gt;&lt;br /&gt;and when I tried to use IIS - Web App Deployment task it asked me to package my binaries in build definition and during deployment it picked that zip and placed the same at IIS virtual directory.&lt;br /&gt;&lt;br /&gt;Is there any other feature that II-Web App Deployment can be used?&lt;br /&gt;&lt;br /&gt;Dint try but just heard that II-Web App Management can only be used to create new website\AppPool and unable to edit or start,stop,restart website\AppPool.&lt;br /&gt;&lt;br /&gt;Clarification on these would be highly appreciated.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="508c5023-592d-445b-924f-362776300d58">
+      <author>Ami Adler</author>
+      <email>ami@df.com</email>
+      <website></website>
+      <ip>63.199.123.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2017-02-27 19:36:59</date>
+      <content>Colin, how do you suggest that we handle a situation where there is one element/value in some environments, but multiple in others.  For example, in DEV we reference a single caching server, but in Staging we have two.  Is this a scenario in which you would use the config transformations or is there another way to handle it using your method?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ac3e0c87-9b6c-485c-ae83-a5e2fd382fc9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:43:42</date>
+      <content>Hi @Sam&lt;br /&gt;&lt;br /&gt;You can use the IIS Extension in the marketplace to both create/update websites and app pools in IIS as well as restart app pools (using the IIS Manage Task). To deploy a web app you need to create a webdeploy package as outlined in this post and then use the IIS Deploy task from the same extension to push the webdeploy package to the target server.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="f2884f8b-c1da-438e-b01c-1460d754e505">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:44:46</date>
+      <content>Hi @Ami&lt;br /&gt;&lt;br /&gt;I&amp;#39;d suggest that you make a single appSetting and comma-separate the values. That way the list will have a single value for DEV and multiple (comma-separated) values in other environments, but there is still only a single key.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="9a211d4e-f38c-4904-9767-c1dd94146ccb">
+      <author>Rohit</author>
+      <email>jachakrohit07@gmail.com</email>
+      <website></website>
+      <ip>50.201.118.34</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36</userAgent>
+      <date>2017-04-21 17:37:00</date>
+      <content>Why dont you have $ sign in the setparameters xml file but you have dollar sign in web.config file? I am new to this</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="ba4417da-e2c5-42c6-8058-f805c2a95111">
+      <author>Billy Nieto</author>
+      <email>billy.nieto@hyster-yale.com</email>
+      <website></website>
+      <ip>192.183.214.163</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2017-07-07 23:56:47</date>
+      <content>I have been attempting to run through your instructions to setup a release definition for a website I own.  I&amp;#39;m having issues actually replacing the tokens in my *.SetParameters.xml file.  Can you please help me figure out what is going wrong?&lt;br /&gt;&lt;br /&gt;My release logs show none of the tokens are being replaced like your screenshots demonstrate.  Here is an excerpt from my logs:&lt;br /&gt;: Starting regex replacement in [D:\Agents\_work\r5\a\[Project Name]\drop\[Project Name].Server.Wcf.SetParameters.xml]&lt;br /&gt;: ##[section]Finishing: Replace tokens in $(System.DefaultWorkingDirectory)/[Project Name] Build/drop&lt;br /&gt;&lt;br /&gt;My Replace Tokes task is setup as follows:&lt;br /&gt;Token Regex: __(\w )__&lt;br /&gt;&lt;br /&gt;My web.config looks like this:&lt;br /&gt;&amp;lt;?xml version=&amp;quot;1.0&amp;quot;?&amp;gt;&lt;br /&gt;&amp;lt;configuration&amp;gt;&lt;br /&gt;  &amp;lt;applicationSettings&amp;gt;&lt;br /&gt;    &amp;lt;[Project Name].Server.Properties.Settings&amp;gt;&lt;br /&gt;      &amp;lt;setting name=&amp;quot;TeamworksSchema&amp;quot; serializeAs=&amp;quot;String&amp;quot;&amp;gt;&lt;br /&gt;        &amp;lt;value&amp;gt;lombardi&amp;lt;/value&amp;gt;&lt;br /&gt;      &amp;lt;/setting&amp;gt;&lt;br /&gt;    &amp;lt;/[Project Name].Server.Properties.Settings&amp;gt;&lt;br /&gt;  &amp;lt;/applicationSettings&amp;gt;&lt;br /&gt;  ...&lt;br /&gt;  &amp;lt;connectionStrings&amp;gt;&lt;br /&gt;    &amp;lt;add name=&amp;quot;Performance&amp;quot; connectionString=&amp;quot;...&amp;quot; providerName=&amp;quot;...&amp;quot; /&amp;gt;&lt;br /&gt;    &amp;lt;add name=&amp;quot;Processes&amp;quot; connectionString=&amp;quot;...&amp;quot; providerName=&amp;quot;...&amp;quot; /&amp;gt;&lt;br /&gt;    &amp;lt;add name=&amp;quot;COReleaseProcessDatabase&amp;quot; connectionString=&amp;quot;...&amp;quot; providerName=&amp;quot;...&amp;quot;/&amp;gt;&lt;br /&gt;  &amp;lt;/connectionStrings&amp;gt;&lt;br /&gt;&amp;lt;/configuration&amp;gt;&lt;br /&gt;&lt;br /&gt;My parameters.xml file is this:&lt;br /&gt;&amp;lt;?xml version=&amp;quot;1.0&amp;quot; encoding=&amp;quot;utf-8&amp;quot; ?&amp;gt;&lt;br /&gt;&amp;lt;parameters&amp;gt;&lt;br /&gt;  &amp;lt;parameter name=&amp;quot;TeamworksSchema&amp;quot; defaultvalue=&amp;quot;__Teamworks Schema__&amp;quot; tags=&amp;quot;&amp;quot;&amp;gt;&lt;br /&gt;    &amp;lt;parameterentry kind=&amp;quot;XmlFile&amp;quot; scope=&amp;quot;\\web.config$&amp;quot; match=&amp;quot;/configuration/applicationSettings/[Project Name].Server.Properties.Settings/setting[@name=&amp;#39;TeamworksSchema&amp;#39;]/value/@value&amp;quot;&amp;gt;&lt;br /&gt;    &amp;lt;/parameterentry&amp;gt;&lt;br /&gt;  &amp;lt;/parameter&amp;gt;&lt;br /&gt;&amp;lt;/parameters&amp;gt;&lt;br /&gt;&lt;br /&gt;My Release.pubxml file looks like this:&lt;br /&gt;  ...&lt;br /&gt;  &amp;lt;ItemGroup&amp;gt;&lt;br /&gt;    &amp;lt;MSDeployParameterValue Include=&amp;quot;Processes-Web.config Connection String&amp;quot;&amp;gt;&lt;br /&gt;      &amp;lt;ParameterValue&amp;gt;__Processes Connection String__&amp;lt;/ParameterValue&amp;gt;&lt;br /&gt;    &amp;lt;/MSDeployParameterValue&amp;gt;&lt;br /&gt;    &amp;lt;MSDeployParameterValue Include=&amp;quot;Performance-Web.config Connection String&amp;quot;&amp;gt;&lt;br /&gt;      &amp;lt;ParameterValue&amp;gt;__Performance Connection String__&amp;lt;/ParameterValue&amp;gt;&lt;br /&gt;    &amp;lt;/MSDeployParameterValue&amp;gt;&lt;br /&gt;    &amp;lt;MSDeployParameterValue Include=&amp;quot;Database-Web.config Connection String&amp;quot;&amp;gt;&lt;br /&gt;      &amp;lt;ParameterValue&amp;gt;__Connection String__&amp;lt;/ParameterValue&amp;gt;&lt;br /&gt;    &amp;lt;/MSDeployParameterValue&amp;gt;&lt;br /&gt;  &amp;lt;/ItemGroup&amp;gt;&lt;br /&gt;&lt;br /&gt;And finally my release variables are as follows:&lt;br /&gt;Teamworks Schema: lombardi&lt;br /&gt;Connection String: ...&lt;br /&gt;Performance Connection String: ...&lt;br /&gt;Processes Connection String: ...&lt;br /&gt;&lt;br /&gt;Thanks in advance!&lt;br /&gt;Billy</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="a5262e5d-37e5-4e00-ab59-51eab67ba6eb">
+      <author>Billy Nieto</author>
+      <email>billy.nieto@hyster-yale.com</email>
+      <website></website>
+      <ip>192.183.214.163</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2017-07-08 00:6:00</date>
+      <content>Here is the drop&amp;#39;s .SetParameters.xml file:&lt;br /&gt;&amp;lt;?xml version=&amp;quot;1.0&amp;quot; encoding=&amp;quot;UTF-8&amp;quot;?&amp;gt;&lt;br /&gt;&amp;lt;parameters&amp;gt;&lt;br /&gt;&amp;lt;setParameter value=&amp;quot;Default Web Site/[Project Name].Server.Wcf_deploy&amp;quot; name=&amp;quot;IIS Web Application Name&amp;quot;/&amp;gt;&lt;br /&gt;&amp;lt;setParameter value=&amp;quot;__Teamworks Schema__&amp;quot; name=&amp;quot;TeamworksSchema&amp;quot;/&amp;gt;&lt;br /&gt;&amp;lt;setParameter value=&amp;quot;__Performance Connection String__&amp;quot; name=&amp;quot;Performance-Web.config Connection String&amp;quot;/&amp;gt;&lt;br /&gt;&amp;lt;setParameter value=&amp;quot;__Processes Connection String__&amp;quot; name=&amp;quot;Processes-Web.config Connection String&amp;quot;/&amp;gt;&lt;br /&gt;&amp;lt;setParameter value=&amp;quot;__Connection String__&amp;quot; name=&amp;quot;Database-Web.config Connection String&amp;quot;/&amp;gt;&lt;br /&gt;&amp;lt;/parameters&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="451f253e-b905-4fb4-ac9b-085694f291d0">
+      <author>Harley</author>
+      <email>harley.mcnerthney@gmail.com</email>
+      <website></website>
+      <ip>208.65.57.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36</userAgent>
+      <date>2017-08-01 15:49:33</date>
+      <content>Colin thank you so much for this post, I was really struggling with how to update the application insights instrumentation key.  I am sure this will be helpful.  I am first just trying the steps as you laid them out, then once I have that working , will try to apply it for the application insights key.&lt;br /&gt;&lt;br /&gt;My question:&lt;br /&gt;Will this work with the Deploy Azure App Service task?  I am following through, and can see all the pieces in the right places from the artifacts, however when the task is complete, I only see this in the logs and the value has not been update:&lt;br /&gt;&lt;br /&gt;2017-08-01T15:36:00.8138385Z Starting regex replacement in [d:\a\r1\a\Website\drop\LoewsNet.SetParameters.xml]&lt;br /&gt;2017-08-01T15:36:00.8138385Z Replaced token [Environment]&lt;br /&gt;2017-08-01T15:36:00.8168379Z ##[section]Finishing: Replace tokens in $(System.DefaultWorkingDirectory)/Website/drop&lt;br /&gt;&lt;br /&gt;I was expecting to see the value that was replaced in the log.  I also can confirm through scm, that the &amp;quot;debug!&amp;quot; value for Environment remains &amp;quot;debug!&amp;quot;&lt;br /&gt;&lt;br /&gt;Our dev is on azure, however our staging and prod are on prem.  I want to use consistent release task steps between the 3 environments.  Which is why I am not using the newly added Azure website setparams.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="49cf4588-e616-4156-ad2a-a6f08432a438">
+      <author>Phil George</author>
+      <email>phil@philgeorge.com</email>
+      <website></website>
+      <ip>90.127.171.219</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36</userAgent>
+      <date>2017-08-26 07:17:59</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Thanks for the great post. It&amp;#39;s clarified a lot of points for me, but I&amp;#39;d like to know why we need to use the Replace Tokens extension.  We can already use environment variables for certain things like $(ServerName) for example. So for the Deployment task why not specify Web Deploy Parameter File name like : $(WebDeployParamFile) for each environment?  I&amp;#39;m guessing that the deployment can and will only contain one &amp;lt;MyProjectName&amp;gt;.SetParameters.xml file, and therefore the Replace Tokens extension is updating the projet&amp;#39;s SetParameters.xml file with the environment variables in the drop folder.  &lt;br /&gt;Thanks,&lt;br /&gt;Phil</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="d835e181-9b40-4dc1-bb37-a40edd9cdc1f">
+      <author>Jeff Bowman</author>
+      <email>jeff.bowman@intexx.com</email>
+      <website></website>
+      <ip>209.193.47.239</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36</userAgent>
+      <date>2018-02-15 00:10:19</date>
+      <content>It appears from a quick scan of this post that the publisher (in this case me) will need admin access to the target IIS.&lt;br /&gt;&lt;br /&gt;This, in turn, would preclude publishing to shared hosting, e.g. GoDaddy.&lt;br /&gt;&lt;br /&gt;Am I correct?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="fad1364b-4a0c-4592-838f-153029b4da6c">
+      <author>Paolo Ponzano</author>
+      <email>paolo.ponzano@gmail.com</email>
+      <website></website>
+      <ip>165.125.178.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.75 Safari/537.36</userAgent>
+      <date>2018-09-18 13:58:20</date>
+      <content>Excuse me, what if I wish to copy the file to a temp dir (even better to a random folder) then delete it after the publish? (I mean in the Deploy IIS App)&lt;br /&gt;&lt;br /&gt;Thanks in advance</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="1c61de68-0c1f-4413-b85f-0eceb42afd08">
+      <author>Paolo Ponzano</author>
+      <email>paolo.ponzano@gmail.com</email>
+      <website></website>
+      <ip>165.125.178.19</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.75 Safari/537.36</userAgent>
+      <date>2018-09-25 08:24:20</date>
+      <content>Excuse me,&lt;br /&gt;When I perform a connection string tokenization, have I to put in the parameters.xml as well the DbUser entry? what should I specify as match?&lt;br /&gt;&lt;br /&gt;Thanks in advance</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="0ee26883-25a8-41e1-9bf9-fd44b8ad2e0c">
+      <author>josphene josphene</author>
+      <email>hasnainimranpapa@gmail.com</email>
+      <website>https://webdesignprofessioneel.be/</website>
+      <ip>103.75.246.87</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36</userAgent>
+      <date>2019-05-04 07:47:43</date>
+      <content>This is a great post. I like this topic.This site has lots of advantage.I found many interesting things from this site. It helps me in many ways.Thanks for posting this again.	&amp;lt;a href=&amp;quot;https://webdesignprofessioneel.be/&amp;quot;&amp;gt;Webdesign&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="8a18c92a-fe1d-4c8e-81fb-84a4dad435b1">
+      <author>josphene josphene</author>
+      <email>hasnainimranpapa@gmail.com</email>
+      <website>https://webdesignprofessioneel.be/</website>
+      <ip>103.75.246.87</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36</userAgent>
+      <date>2019-05-04 09:33:04</date>
+      <content>This is a great article thanks for sharing this informative information. I will visit your blog regularly for some latest post. I will visit your blog regularly for Some latest post.	&amp;lt;a href=&amp;quot;https://webdesignwebshop.be/&amp;quot;&amp;gt;Webdesign&amp;lt;/a&amp;gt;</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

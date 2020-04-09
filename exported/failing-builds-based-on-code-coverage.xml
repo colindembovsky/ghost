@@ -1,0 +1,81 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2ed5e073-5c57-4d78-a1da-13de1e03f60d</id>
+  <title>Failing Builds based on Code Coverage</title>
+  <slug>failing-builds-based-on-code-coverage</slug>
+  <shortUrl>http://bit.ly/1fy0SH6</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-02-08 17:01:00</pubDate>
+  <lastModified>2020-04-08 07:42:50</lastModified>
+  <content>&lt;p&gt;The logical next step after you start unit testing your code is to analyse code coverage. You can do this easily in TFS by enabling Code Coverage in the test settings of the default build template. But what about failing builds (or checkins) based on low code coverage?&lt;/p&gt; &lt;p&gt;Out of the box, there’s nothing that can do that. You could write a checkin policy that inspects code coverage, but you’d have to make sure it’s deployed to all VS instances. Or, you could implement the logic in a build, and then make the build a rolling gated checkin build. That way if the build fails for low coverage, the checkin is discarded.&lt;/p&gt; &lt;h2&gt;Modifying the Default Template&lt;/h2&gt; &lt;p&gt;I’ve created a CodeActivity for your toolbox that will inspect the test coverage and return the coverage percentage. You can then easily implement some logic from there.&lt;/p&gt; &lt;p&gt;To get started, you’ll have to import the Custom assembly (link at the bottom of this post). Follow steps 1 to 3 of my &lt;a href="http://colinsalmcorner.blogspot.com/2013/02/custom-build-task-include-merged.html" target="_blank"&gt;previous custom build post&lt;/a&gt; to get going.&lt;/p&gt; &lt;p&gt;Now you can add the ColinsALMCorner.CustomBuildTasks in to the imports of your workflow:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh4.ggpht.com/-uFYwr-eopiI/URUS_LxqDYI/AAAAAAAAAnU/zxwdE1TfSqA/s1600-h/image%25255B2%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-nSLjQI64yqU/URUTAn7hq-I/AAAAAAAAAnc/ApNLrZoXdlo/image_thumb.png?imgmax=800" width="244" height="203"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Click on the Arguments tab and add an Int32 in argument called “CoverageFailureIfBelow”. Set the metadata as follows:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-ydfIeHUXePk/URUTBhLTkGI/AAAAAAAAAnk/eIEBsALcjiY/s1600-h/image%25255B6%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-pPjB5feSLkA/URUTEF5clcI/AAAAAAAAAns/D71dF3t2yok/image_thumb%25255B2%25255D.png?imgmax=800" width="334" height="320"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Now scroll down in the workflow until &lt;strong&gt;after&lt;/strong&gt; the testing section, between “If CompilationStatus = Uknown” and “If TestingStatus = Uknown”. Add a Sequence between the two If activities called “Check Coverage”.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh4.ggpht.com/-ajVXY2oML4U/URUTFWhpdlI/AAAAAAAAAn0/14bzM6-jTh0/s1600-h/image%25255B10%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-jfWeLc0BmvA/URUTIP_I1QI/AAAAAAAAAoA/CQQpNfXpOB4/image_thumb%25255B4%25255D.png?imgmax=800" width="270" height="361"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Click on Variables at the bottom of the workflow window and create an Int32 variable (scoped to Check Coverage, called coverageTotal). You can double-click the sequence to “zoom in”.&lt;/p&gt; &lt;p&gt;The “GetCoverageTotal” activity relies on the test attachments that the test engine uploads to TFS when the tests are completed (most notably the Code Coverage attachment). Since this is done asynchronously, I introduced a Delay activity. Add a new Argument to the workflow (if you don’t want to hard-code the delay) and set its default to 10 seconds.&lt;/p&gt; &lt;p&gt;Set the Timeout of the Delay activity to &lt;/p&gt; &lt;p&gt;&lt;font face="Courier New"&gt;Timespan.FromSeconds(arg)&lt;/font&gt;&lt;/p&gt; &lt;p&gt;where &lt;em&gt;arg&lt;/em&gt; is the name of your timeout argument.&lt;/p&gt; &lt;p&gt;Drop a “GetCoverageTotal” activity (from the custom assembly) into the sequence (NOTE: You may have to import the assembly into the Toolbox if you’ve never done that before). Set the properties as follows:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-xtYLqShGV-A/URUTJNV5wuI/AAAAAAAAAoI/7f8eS6KBBU8/s1600-h/image%25255B30%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-YeCIihP6MAM/URUTKlUyRbI/AAAAAAAAAoQ/2UuYhVr6ek0/image_thumb%25255B14%25255D.png?imgmax=800" width="433" height="147"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Once that’s done, you now have the coverage total, so you can do whatever you need to. Here’s what I did:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-34TlW0CDXYw/URUTL_MsdzI/AAAAAAAAAoY/_00-xufRTq8/s1600-h/image%25255B34%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-TZ6t_0yDqh0/URUTNQab3lI/AAAAAAAAAog/ReNMBCE2zPw/image_thumb%25255B16%25255D.png?imgmax=800" width="255" height="372"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;I put an If that evaluates if the total coverage is too low or not. If the coverage is too low, I set the BuildDetail.TestStatus to TestStatus.Failed. I also set the overall build status to PartiallySucceeded. I then have a WriteBuildWarning (“Failing build because coverage is too low”) or WriteBuildMessage (“Coverage is acceptable”) depending on the result.&lt;/p&gt; &lt;p&gt;Now I just queue up a build, and voila – I can now fail it for low coverage (or in this case, set the result to Partially Successful).&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-o2UxodX4KM4/URUTOtdjo0I/AAAAAAAAAoo/ybzXtjAjo-o/s1600-h/image%25255B26%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-Xs3LDlV2Bsk/URUTTg3K0rI/AAAAAAAAAow/ba5PAMSuyy0/image_thumb%25255B12%25255D.png?imgmax=800" width="374" height="320"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;You can download the dll and the DefaultCoverageTemplate.11.1.xaml from my &lt;a href="http://sdrv.ms/XsMf8h" target="_blank"&gt;skydrive&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Happy coverage!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="b8f2df7e-11cf-4399-85dc-8dac443717ca">
+      <author>Unknown</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/09777548730316712631</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-04-09 15:8:41</date>
+      <content>Hi,&lt;br /&gt;I have performed the exact same steps as mentioned by you. I am using Visual Studio 2012 and TFS 2012. I am geetting the following error in my build template :&lt;br /&gt;Exception Message: Object reference not set to an instance of an object. (type NullReferenceException)&lt;br /&gt;Exception Stack Trace:    at System.Activities.Statements.Throw.Execute(CodeActivityContext context)&lt;br /&gt;   at System.Activities.CodeActivity.InternalExecute(ActivityInstance instance, ActivityExecutor executor, BookmarkManager bookmarkManager)&lt;br /&gt;   at System.Activities.Runtime.ActivityExecutor.ExecuteActivityWorkItem.ExecuteBody(ActivityExecutor executor, BookmarkManager bookmarkManager, Location resultLocation)&lt;br /&gt;&lt;br /&gt;Can you please help me out with this?&lt;br /&gt;&lt;br /&gt;Regards</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="37252eb3-d21b-4de9-abb7-2a86a64036c3">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-04-30 20:50:09</date>
+      <content>does the dll need to be registered using "GAC util" ?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="13eccc00-6ace-41d9-b64e-4a126796c4fa">
+      <author>Shreyman36</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/14593862259182411595</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-05-01 18:4:57</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;I am following your process for code coverage threshold, everything is working fine but getting error value at GetCodeCoverageTotal activity.&lt;br /&gt;&lt;br /&gt;do I need to register the your dll on our build server using GACUtil? </content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="abe1e63a-53e5-42f9-ad21-af25e8d67341">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-05-20 08:2:44</date>
+      <content>A few people have asked if the custom activity should be registered in the GAC - the answer is no - but you do have to check the assembly into a source control folder, and then configure your build controller. On the build controller properties, you'll see a property for "Versio Control path to custom assemblies" - just point that to the folder that you check this custom assembly into and the build should pick it up.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="2a7ecba7-e1de-440a-9f13-3b5c1d328400">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-06-01 17:47:08</date>
+      <content>Nullref for me as well. Any fix coming for this?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="12a6adcd-b799-451f-b4f3-03938fe5a6bb">
+      <author>bsktcase</author>
+      <email>noreply@blogger.com</email>
+      <website>http://blog.bsktcase.com/</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-09-25 21:3:30</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Would this approach also work for the manual test code coverage introduced in VS 2012.1?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="7c53cb4c-d1f3-42ff-a75a-04b3f52cdf20">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-09-29 22:6:45</date>
+      <content>Unfortunately, no. Manual test coverage adds coverage data after the build is completed (you have to test against the build with the Code Coverage adapter enabled). The adapter then adds the manual coverage to the already completed build. This activity is executed before the build completed (when automated coverage is available), so the manual coverage "update" can't be taken into account. I'd suggest you use the build quality indicator for the sort of logic you want - though it's going to have to be manual.</content>
+    </comment>
+  </comments>
+  <viewCount>63522</viewCount>
+</post>

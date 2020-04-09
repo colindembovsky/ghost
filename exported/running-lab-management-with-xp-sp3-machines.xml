@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>76a570a7-36fe-42e5-8805-57f783afbe02</id>
+  <title>Running Lab Management with XP SP3 Machines</title>
+  <slug>running-lab-management-with-xp-sp3-machines</slug>
+  <shortUrl>http://bit.ly/1meJcmH</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-06-16 13:24:00</pubDate>
+  <lastModified>2020-04-06 23:21:21</lastModified>
+  <content>&lt;p&gt;If you’re running Lab Management with lab machines with XP SP3, you may run into a problem where the Test Agent is never ready for running tests.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-5JMaUoD2vsQ/TfnobWAUwyI/AAAAAAAAAQk/oxtyWf30Ucs/s1600-h/image%25255B3%25255D.png"&gt;&lt;img style="background-image: none; border-bottom: 0px; border-left: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; margin-left: auto; border-top: 0px; margin-right: auto; border-right: 0px; padding-top: 0px" title="image" border="0" alt="image" src="http://lh6.ggpht.com/-zzOipzaI7HI/TfnocA_gTbI/AAAAAAAAAQo/no1SmH4izqE/image_thumb%25255B1%25255D.png?imgmax=800" width="368" height="63"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;The environment was starting up fine and configuring both network isolation as well as the workflow agent. However, the Test Capability was continually not ready – the event logs had a message like this:&lt;/p&gt; &lt;p&gt;Unable to connect to the controller on 'TFSMachine.Domain:6901'. The agent can connect to the controller but the controller cannot connect to the agent because of following reason: An error occurred while processing the request on the server: System.IO.IOException: The write operation failed, see inner exception. ---&gt; System.ComponentModel.Win32Exception: &lt;strong&gt;The message or signature supplied for verification has been altered.&lt;/strong&gt;&lt;/p&gt; &lt;p&gt;Scratching around led me to this rather helpful blog site: &lt;a href="http://social.msdn.microsoft.com/Forums/en-US/vststest/thread/df043823-ffcf-46a4-9e47-1c4b8854ca13/" target="_blank"&gt;Troubleshooting Guide for Visual Studio Test Controller and Agent&lt;/a&gt;. The problem is mentioned there – it’s a problem with a Windows hotfix (KB968389) which you simply need to uninstall from the XP Lab machine. Reboot and you’re good to go.&lt;/p&gt; &lt;p&gt;Happy Labbing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Lab Management</category>
+  </categories>
+  <comments></comments>
+  <viewCount>1371</viewCount>
+</post>

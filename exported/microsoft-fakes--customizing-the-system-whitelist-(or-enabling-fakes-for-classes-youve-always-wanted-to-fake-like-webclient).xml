@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>d831b783-6130-41d8-a92d-856ea78ac89c</id>
+  <title>Microsoft Fakes – Customizing the System Whitelist (or, enabling Fakes for classes you’ve always wanted to fake, like WebClient)</title>
+  <slug>microsoft-fakes--customizing-the-system-whitelist-(or-enabling-fakes-for-classes-youve-always-wanted-to-fake-like-webclient)</slug>
+  <shortUrl>http://bit.ly/1n0djh6</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2012-06-25 13:35:00</pubDate>
+  <lastModified>2020-04-08 07:19:32</lastModified>
+  <content>&lt;p&gt;So you’re sitting down planning some tests for your shiny new code, only to find that your code uses WebClient to download a file. No problem – you’ve been reading about Microsoft’s new Fakes framework, so you just right-click the System reference in your test project and select “Create Fakes” and you get a bunch of cool fakes to work with.&lt;/p&gt; &lt;p&gt;But going a bit deeper into the Rabbit Hole, you realize that there are no fakes for System.Net classes. What gives?&lt;/p&gt; &lt;h2&gt;The White-List&lt;/h2&gt; &lt;p&gt;It turns out that when you right-click a reference and select “Add Fakes” a fakes file is created for that assembly in the Fakes folder. When you add a Fakes lib for System, you in fact get 2 fakes files: one for mscorlib and one for System.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-7RSmvbea-NI/T-hM8-M9AyI/AAAAAAAAAZE/RX-xVTCfsFQ/s1600-h/image2.png"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; margin-left: auto; border-left-width: 0px; margin-right: auto; padding-top: 0px" title="image" border="0" alt="image" src="http://lh6.ggpht.com/-3N5Oqrx3-6s/T-hM93wWrLI/AAAAAAAAAZM/aEt9u8h-zbg/image_thumb.png?imgmax=800" width="244" height="218"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Since System is a large library, the Fakes framework doesn’t automatically generate you a fake for every System class. One of the classes that doesn’t have a fake created by default is System.Net.WebClient. In order to force a fake Shim for this class, you’ll need to override the default “white-list” of classes. Fortunately this is relatively straight-forward to do.&lt;/p&gt; &lt;h2&gt;The Fakes Config File&lt;/h2&gt; &lt;p&gt;Double-click System.fakes to open it in the editor – it’s just an XML file. It does come with an XSD, so as you type in this file IntelliSense will guide you (just like the Force, Luke). Within the &lt;Assembly&gt; tag, add a &lt;ShimGeneration&gt; tag and within that an &lt;Add&gt; tag and you’re good to go. Here’s my Fakes file for adding a WebClient fake:&lt;/p&gt;&lt;pre class="brush: xml; ruler: true;"&gt;&lt;Fakes xmlns="http://schemas.microsoft.com/fakes/2011/"&gt;&lt;br /&gt;  &lt;Assembly Name="System" Version="4.0.0.0"/&gt;&lt;br /&gt;  &lt;ShimGeneration&gt;&lt;br /&gt;    &lt;Add FullName="System.Net.WebClient"/&gt;&lt;br /&gt;  &lt;/ShimGeneration&gt;&lt;br /&gt;&lt;/Fakes&gt;&lt;br /&gt;&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;Remember to recompile!&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Here’s some example code using the WebClient fake:&lt;/p&gt;&lt;pre class="brush: csharp; ruler: true;"&gt;public class HttpFunctions&lt;br /&gt;{&lt;br /&gt;    public void Download(string url, string fileName)&lt;br /&gt;    {&lt;br /&gt;        var w = new WebClient();&lt;br /&gt;        w.DownloadFile(url, fileName);&lt;br /&gt;        &lt;br /&gt;    }&lt;br /&gt;}&lt;br /&gt;&lt;br /&gt;[TestClass]&lt;br /&gt;public class UnitTest1&lt;br /&gt;{&lt;br /&gt;    [TestMethod]&lt;br /&gt;    public void TestFakeWebClient()&lt;br /&gt;    {&lt;br /&gt;        using (ShimsContext.Create())&lt;br /&gt;        {&lt;br /&gt;            ShimWebClient.AllInstances.DownloadFileStringString = (w, url, fileName) =&gt;&lt;br /&gt;            {&lt;br /&gt;                File.WriteAllText(fileName, url);&lt;br /&gt;            };&lt;br /&gt;&lt;br /&gt;            var c = new HttpFunctions();&lt;br /&gt;            string guidFileName = Guid.NewGuid().ToString() + ".html";&lt;br /&gt;            c.Download("http://www.bing.com", guidFileName);&lt;br /&gt;&lt;br /&gt;            Assert.IsTrue(File.Exists(guidFileName));&lt;br /&gt;            string contents = File.ReadAllText(guidFileName);&lt;br /&gt;            Assert.AreEqual("http://www.bing.com", contents);&lt;br /&gt;            File.Delete(guidFileName);&lt;br /&gt;        }&lt;br /&gt;    }&lt;br /&gt;}&lt;br /&gt;&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;Happy faking!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Testing</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="45b7e770-c570-4bce-b53d-6ac7588f3f20">
+      <author>Liangying Wei</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/15412062601744516185</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-09-18 09:46:31</date>
+      <content>Really appreciate. Saves me tons of time!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6869fdd3-0e05-402c-9a36-3c668a3aafe9">
+      <author>Omar Gameel Salem</author>
+      <email>omar.gamil.salem@gmail.com</email>
+      <website>http://www.codeproject.com/script/Articles/MemberArticles.aspx?amid=3411232</website>
+      <ip>203.62.151.180</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36</userAgent>
+      <date>2014-06-03 06:44:17</date>
+      <content>great tip!&lt;br /&gt;Thanks for sharing</content>
+    </comment>
+  </comments>
+  <viewCount>4122</viewCount>
+</post>

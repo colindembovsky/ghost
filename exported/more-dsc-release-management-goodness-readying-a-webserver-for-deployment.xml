@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>More DSC Release Management Goodness: Readying a Webserver for Deployment</title>
+  <slug>more-dsc-release-management-goodness-readying-a-webserver-for-deployment</slug>
+  <shortUrl>http://bit.ly/1kH1ebc</shortUrl>
+  <author></author>
+  <pubDate>2014-07-10 08:22:08</pubDate>
+  <lastModified>2015-07-21 11:58:31</lastModified>
+  <content>&lt;p&gt;In my previous couple of posts (&lt;a href="http://colinsalmcorner.com/post/powershell-dsc-remotely-configuring-a-node-to-rebootnodeifneeded" target="_blank"&gt;PowerShell DSC: Configuring a Remote Node to “RebootIfNeeded”&lt;/a&gt; and &lt;a href="http://colinsalmcorner.com/post/using-powershell-dsc-in-release-management-the-hidden-manual"&gt;Using PowerShell DSC in Release Management: The Hidden Manual&lt;/a&gt;) I started to experiment with Release Management’s new PowerShell DSC capabilities. I’ve been getting some great help from Bishal Prasad, one of the developers on Release Management – without his help I’d never have gotten this far!&lt;/p&gt; &lt;h2&gt;Meta Mofs&lt;/h2&gt; &lt;p&gt;To configure a node (the DSC parlance for a machine) you need to create a DSC script that configures the LocalConfigurationManager. When I first saw this, I thought this was a great feature – unfortunately, when you invoke the config script, it doesn’t produce a mof file (like “normal” DSC scripts that use resources like File and WindowsFeature) so you can’t use Start-DscConfiguration to push it to remote servers. You need to invoke Set-DscLocalConfigurationManager. The reason is that a config that targets LocalConfigurationManager produces a meta.mof instead of a mof file.&lt;/p&gt; &lt;p&gt;If you try to run a PowerShell script in Release Management that produces a meta.mof, you’ll see a failure like this:&lt;/p&gt; &lt;p&gt;&lt;font face="Courier New"&gt;Unable to find the mof file. Make sure you are generating the MOF in the DSC script in the current directory.&lt;/font&gt;&lt;/p&gt; &lt;p&gt;Of course this is because Release Management expects a mof file, and if you’re just producing a meta.mof file, the invocation will fail.&lt;/p&gt; &lt;p&gt;We may see support for meta.mofs in future versions of Release Management (hopefully sooner than later) but until then the workaround is to make sure that you include the LocalConfigurationManager settings inside a config that produces a mof file. Then you include two commands at the bottom of the script: first the command to “compile” the configuration – this produces a mof file as well as a meta.mof file. Then you call Set-DscLocalConfigurationManager explicitly to push the meta.mof and let Release Management handle the mof file. Here’s an example that configures a node to reboot if needed and ensures that the Webserver role is present:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration WebServerPreReqs
+{
+    Node $AllNodes.where{ $_.Role -eq "WebServer" }.NodeName
+    {
+        # tell the node to reboot if necessary
+        LocalConfigurationManager
+        {
+            RebootNodeIfNeeded = $true
+        }
+
+        WindowsFeature WebServerRole
+        {
+            Name = "Web-Server"
+            Ensure = "Present"
+        }
+    }
+}
+
+WebServerPreReqs -ConfigurationData $configData
+
+# invoke Set-DscLocalConfigurationManager directly since RM doesn't yet support this
+Set-DscLocalConfigurationManager -Path .\WebServerPreReqs -Verbose
+
+&lt;/pre&gt;
+&lt;p&gt;You can see that there is a LocalConfigurationManager setting (line 6). Line 19 “compiles” the config – given a list of nodes in $configData that includes just a single node (say fabfiberserver) you’ll see fabfiberserver.mof and fabfiberserver.meta.mof files in the current directory after calling the script. Since RM itself takes care of pushing the mof file, we need to explicitly call Set-DscLocalConfigurationManager in order to push the meta.mof file (line 22).&lt;/p&gt;
+&lt;p&gt;Now you can use this script just like you would any other DSC script in RM.&lt;/p&gt;
+&lt;h2&gt;Setting up the Release&lt;/h2&gt;
+&lt;p&gt;Utilizing this script in a Release is easy – create a component that has “Source” set to your build output folder (or a network share for deploying bins that are not built in TFS build) and set the deployment tool to “Run PowerShell on Standard Environment”. I’ve called my component “Run DSC Script”.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/15596a48-9aab-418d-b421-c0119d9c9564.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/1ec52f6d-cf6f-44ff-badf-db448d8537dc.png" width="644" height="338"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;&lt;font color="#404b55"&gt;Now on the Release Template, right-click the Components node in the toolbox and add in the script component, then drag it onto the designer inside your server block (which you’ll also need to drag on from your list of servers). Then just set the paths and username and password correctly and you’re good to go.&lt;/font&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/9b0ec259-0987-4ea3-b372-224af65cf19a.png" width="350" height="160"&gt;I’ve saved this script as “WebServerPreReqs.ps1” in the Scripts folder of my build output folder – you can see the path there in the ScriptPath parameter. My configData script is also in the scripts folder (remember the ScriptPath and ConfigurationFilePath are relative to the source path that you configure in the component). Now you can start a release!&lt;/p&gt;
+&lt;h3&gt;Inspecting the Logs&lt;/h3&gt;
+&lt;p&gt;Once the release has completed, you can open the tool logs for the “Run DSC Script” component and you’ll see two “sets” of entrties. Both sets are prefixed with [SERVERNAME], indicating which node the logs pertain to. Here we can see a snippet of the Set-DscLocalConfigurationManager invocation logs (explicitly deploying the meta.mof):&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ Start&amp;nbsp; Set&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ Start&amp;nbsp; Resource ]&amp;nbsp; [MSFT_DSCMetaConfiguration]&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ Start&amp;nbsp; Set&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&amp;nbsp; [MSFT_DSCMetaConfiguration]&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ End&amp;nbsp;&amp;nbsp;&amp;nbsp; Set&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&amp;nbsp; [MSFT_DSCMetaConfiguration]&amp;nbsp; in 0.0620 seconds.&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ End&amp;nbsp;&amp;nbsp;&amp;nbsp; Resource ]&amp;nbsp; [MSFT_DSCMetaConfiguration]&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ End&amp;nbsp;&amp;nbsp;&amp;nbsp; Set&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&lt;br&gt;Operation 'Invoke CimMethod' complete.&lt;br&gt;Set-DscLocalConfigurationManager finished in 0.207 seconds.&lt;/font&gt; 
+&lt;p&gt;Just after these entries, you’ll see a second set of entries – this time for the remainder of the DSC invocation that RM initiates (which deploys the mof): 
+&lt;p&gt;&lt;font face="Courier New"&gt;An LCM method call arrived from computer FABFIBERSERVER with user sid S-1-5-21-3349151495-1443539541-1735948571-1106.&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ Start&amp;nbsp; Resource ]&amp;nbsp; [[WindowsFeature]WebServerRole]&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ Start&amp;nbsp; Test&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&amp;nbsp; [[WindowsFeature]WebServerRole]&lt;br&gt;[FABFIBERSERVER]:&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; [[WindowsFeature]WebServerRole] The operation 'Get-WindowsFeature' started: Web-Server&lt;br&gt;[FABFIBERSERVER]:&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; [[WindowsFeature]WebServerRole] The operation 'Get-WindowsFeature' succeeded: Web-Server&lt;br&gt;[FABFIBERSERVER]: LCM:&amp;nbsp; [ End&amp;nbsp;&amp;nbsp;&amp;nbsp; Test&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ]&amp;nbsp; [[WindowsFeature]WebServerRole]&amp;nbsp; in 0.8910 seconds.&lt;/font&gt; 
+&lt;p&gt;In the next post I’ll look at using DSC to configure the rest of my webserver features as well as create a script for installing and configuring SQL Server. Then we’ll be in a good position to configure deployment of a web application (and its database) onto an environment that we know has everything it needs to run the application.&lt;/p&gt;
+&lt;p&gt;In the meantime – happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>DevOps</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="1128dd2b-6118-420e-a575-8ae8f4f4a36a">
+      <author>San</author>
+      <email>santu_live@live.com</email>
+      <website></website>
+      <ip>131.107.159.213</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-01-14 21:48:47</date>
+      <content>Great Info .&lt;br /&gt;&lt;br /&gt;I wonder what parameters does the  deployment tool to “Run PowerShell on Standard Environment &amp;quot;  is defined to. I cannot find that tool in my new installation .Is that custom ?&lt;br /&gt;&lt;br /&gt;San</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="6be71a3f-e7c4-4df9-bd67-5ed09fa7d3f3">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:47:31</date>
+      <content>Hi @San&lt;br /&gt;&lt;br /&gt;You have to target &amp;quot;vNext&amp;quot; environments to get the &amp;quot;Run PowerShell on Standard Environment&amp;quot; activity - it&amp;#39;s not available on agent-based environments.</content>
+    </comment>
+  </comments>
+  <viewCount>70611</viewCount>
+  <id>62b9be8e-8df7-49fb-9f60-d644c2be8e9c</id>
+</post>

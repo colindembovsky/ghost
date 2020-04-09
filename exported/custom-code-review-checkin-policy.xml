@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2c998041-3f46-4481-8c07-11def62db972</id>
+  <title>Custom Code Review Checkin Policy</title>
+  <slug>custom-code-review-checkin-policy</slug>
+  <shortUrl>http://bit.ly/1kos20m</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2012-12-20 23:33:00</pubDate>
+  <lastModified>2020-04-08 06:23:58</lastModified>
+  <content>&lt;p&gt;Over the last couple of months, I’ve been doing a lot of VS / TFS 2012 demos, as well as installing / configuring / customizing TFS at customers. Everyone loves the Code Review Workflow, but inevitably the question gets asked, “Can I enforce code review on check-in”? Out of the box you can’t, but I created a custom policy for this.&lt;/p&gt; &lt;p&gt;You can get the policy from the &lt;a href="http://visualstudiogallery.msdn.microsoft.com/c476b708-77a8-4065-b9d0-919ab688f078" target="_blank"&gt;VS Gallery&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Note: this policy only works with “out of the box” Code Review Request and Response work item types in TFS 2012 and for VS 2012.&lt;/p&gt; &lt;p&gt;You can also configure how “strict” the review policy should be:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;The policy will fail if the Code Review Request is not Closed  &lt;li&gt;The policy will fail if any response result is 'Needs Work'  &lt;li&gt;The policy will pass if all response results are 'Looks Good' or &lt;/li&gt; &lt;ul&gt; &lt;li&gt;the policy will pass if all response results are 'Looks Good' or 'With Comments'&lt;/li&gt;&lt;/ul&gt;&lt;/ul&gt; &lt;p&gt;&lt;img style="float: none; margin-left: auto; display: block; margin-right: auto" src="http://i1.visualstudiogallery.msdn.s-msft.com/c476b708-77a8-4065-b9d0-919ab688f078/image/file/91116/1/capture.png" width="300" height="176"&gt;&lt;/p&gt; &lt;p&gt;If the policy fails, you’ll get a friendly message reminding you to get a review!&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-bK5Hs1G5t2s/UNOEBvcXJtI/AAAAAAAAAiI/P1EkUhJXmkw/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-4zufP2hpTXg/UNOEC2eJ49I/AAAAAAAAAiQ/v4KUoVUk6Y4/image_thumb%25255B1%25255D.png?imgmax=800" width="291" height="177"&gt;&lt;/a&gt;&lt;/p&gt;  &lt;p&gt;Happy reviewing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>ALM</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="02251999-de4f-420e-b9cd-9e439ba49172">
+      <author>Anand Zadbuke</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/12162873815413908321</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-03-07 09:1:08</date>
+      <content>Can you point me to the source of this policy please.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0dfd02c1-96da-4402-a0c2-ca918c66335b">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-07-04 10:17:56</date>
+      <content>Hi there, where can i get the code review request and response work item types?&lt;br /&gt;At the moment i have TFS 2010 and VS2012 professional.&lt;br /&gt;We are upgrading to TFS 2012 but would I have to get them somewhere specific?&lt;br /&gt;Do we need higher than VS2012 pro to do this?&lt;br /&gt;&lt;br /&gt;Note: this policy only works with “out of the box” Code Review Request and Response work item types in TFS 2012 and for VS 2012.&lt;br /&gt;&lt;br /&gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0f6a8e60-32d3-4b8e-8dfa-e4203021438a">
+      <author>Unknown</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/03644285190189791341</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-11-27 22:13:34</date>
+      <content>Colin, Thanks for this. &lt;br /&gt;&lt;br /&gt;Question: &lt;br /&gt;If we multiple reviewers, how can we configure to be allowed to check-in after 1 person review is complete? &lt;br /&gt;In TFS, we do not have way to mark reviewers "Required" or "Optional"</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e23dccdf-7baf-4c93-a677-0ad7c78e2b04">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-11-29 16:4:57</date>
+      <content>I haven't built this into the tool. As a work-around, you could simply remove the "other" reviewers from the review before checking in.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6c5e64ca-177e-4ff9-b7f2-f40059a5ffa9">
+      <author>Juergen</author>
+      <email>juergen.ernst@pta.de</email>
+      <website></website>
+      <ip>195.243.149.155</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:29.0) Gecko/20100101 Firefox/29.0</userAgent>
+      <date>2014-08-13 14:47:18</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;your link points to the VS2013 Version. Is ther still a VS2012 version? Where can we get it?&lt;br /&gt;Would be very kind if you could help us.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="0b9fe373-1d8c-40d9-a16a-22285214fcdb">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 17:38:10</date>
+      <content>I&amp;#39;ve just posted a 2012 version of the policy - find it here: http://bit.ly/1pdqT28</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="bf6e29d4-9dc8-462f-9890-1c41f8217031">
+      <author>Isaac</author>
+      <email>isaac.el-serafi@agricorp.com</email>
+      <website></website>
+      <ip>207.61.28.122</ip>
+      <userAgent>Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)</userAgent>
+      <date>2014-10-08 19:0:24</date>
+      <content>I installed this utility -2012 version- But I don&amp;#39;t know how to use it..&lt;br /&gt;I expected to see an access to it from Team explorer, setting, source control ...&lt;br /&gt;Can you please help</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="98ca1cd1-734e-4fee-a9c7-63180c9dad5e">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>27.254.21.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-22 01:45:45</date>
+      <content>Hi @Isaac&lt;br /&gt;&lt;br /&gt;Make sure you open the Team Project Source Control settings - not the Team Project Collection Source Control settings!&lt;br /&gt;&lt;br /&gt;Hope that helps.</content>
+    </comment>
+  </comments>
+  <viewCount>47696</viewCount>
+</post>

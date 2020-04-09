@@ -1,0 +1,368 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Aurelia: Object Binding Without Dirty Checking</title>
+  <slug>aurelia-object-binding-without-dirty-checking</slug>
+  <shortUrl>http://bit.ly/1N0NB6r</shortUrl>
+  <author></author>
+  <pubDate>2015-03-23 14:31:53</pubDate>
+  <lastModified>2015-07-21 11:58:29</lastModified>
+  <content>&lt;p&gt;Over the past few weeks I have been developing a Web UI using &lt;a href="http://aurelia.io/" target="_blank"&gt;Aurelia&lt;/a&gt; by &lt;a href="https://twitter.com/eisenbergeffect" target="_blank"&gt;Rob Eisenberg&lt;/a&gt;. It’s really well thought out – though it’s got a steep learning curve at the moment since the documentation is still very sparse. Of course it hasn’t officially released yet, so that’s understandable!&lt;/p&gt; &lt;h2&gt;TypeScript&lt;/h2&gt; &lt;p&gt;I love &lt;a href="http://www.typescriptlang.org/" target="_blank"&gt;TypeScript&lt;/a&gt; – if it wasn’t for TypeScript, I would really hate Javascript development! Aurelia is written in &lt;a href="https://github.com/lukehoban/es6features" target="_blank"&gt;ES6&lt;/a&gt; and ES7 which is &lt;a href="https://babeljs.io/" target="_blank"&gt;transpiled to ES5&lt;/a&gt;. You can easily write Aurelia apps in TypeScript – you can &lt;a href="https://www.npmjs.com/package/gulp-typescript" target="_blank"&gt;transpile in Gulp&lt;/a&gt; if you want to – otherwise Visual Studio will transpile to Javascript for you anyway. Since I use TypeScript, I also use &lt;a href="https://github.com/cmichaelgraham/aurelia-typescript" target="_blank"&gt;Mike Graham’s TypeScript Aurelia sample repos&lt;/a&gt;. He has some great samples there if you’re just getting started with Aurelia/TypeScript. Code for this post comes from the “aurelia-vs-ts” solution in that repo.&lt;/p&gt; &lt;h2&gt;Binding in Aurelia&lt;/h2&gt; &lt;p&gt;Aurelia has many powerful features out the box – and most of its components are pluggable too – so you can switch out components as and when you need to. Aurelia allows you to separate the view (html) from the view-model (a Javascript class). When you load a view, Aurelia binds the properties of the view-model with the components in the view. This works beautifully for primitives – Aurelia knows how to create a binding between an HTML element (or property) and the object property. Let’s look at home.html and home.ts to see how this works:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [3,5,8,12,16];"&gt;&amp;lt;template&amp;gt;
+  &amp;lt;section&amp;gt;
+    &amp;lt;h2&amp;gt;${heading}&amp;lt;/h2&amp;gt;
+
+    &amp;lt;form role="form" submit.delegate="welcome()"&amp;gt;
+      &amp;lt;div class="form-group"&amp;gt;
+        &amp;lt;label for="fn"&amp;gt;First Name&amp;lt;/label&amp;gt;
+        &amp;lt;input type="text" value.bind="firstName" class="form-control" id="fn" placeholder="first name"&amp;gt;
+      &amp;lt;/div&amp;gt;
+      &amp;lt;div class="form-group"&amp;gt;
+        &amp;lt;label for="ln"&amp;gt;Password&amp;lt;/label&amp;gt;
+        &amp;lt;input type="text" value.bind="lastName" class="form-control" id="ln" placeholder="last name"&amp;gt;
+      &amp;lt;/div&amp;gt;
+      &amp;lt;div class="form-group"&amp;gt;
+        &amp;lt;label&amp;gt;Full Name&amp;lt;/label&amp;gt;
+        &amp;lt;p class="help-block"&amp;gt;${fullName | upper}&amp;lt;/p&amp;gt;
+      &amp;lt;/div&amp;gt;
+      &amp;lt;button type="submit" class="btn btn-default"&amp;gt;Submit&amp;lt;/button&amp;gt;
+    &amp;lt;/form&amp;gt;
+  &amp;lt;/section&amp;gt;
+&amp;lt;/template&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;This is the view (html) for the home page (views\home.html). You bind to variables in the view-model using the ${var} syntax (lines 3 and 16). You can also bind attributes directly – like value.bind=”firstName” in line 8 binds the value of the input box to the “firstName” property. Line 16 uses a value converter to convert the value of the bound parameter to uppercase. Line 5 binds a function to the submit action. I don’t want to get into all the Aurelia binding capabilities here – that’s for another discussion.&lt;/p&gt;
+&lt;p&gt;Here’s the view-model (views\home.ts):&lt;/p&gt;&lt;pre class="brush: js;"&gt;export class Home {
+    public heading: string;
+    public firstName: string;
+    public lastName: string;
+
+    constructor() {
+        this.heading = "Welcome to Aurelia!";
+        this.firstName = "John";
+        this.lastName = "Doe";
+    }
+
+    get fullName() {
+        return this.firstName + " " + this.lastName;
+    }
+
+    welcome() {
+        alert("Welcome, " + this.fullName + "!");
+    }
+}
+
+export class UpperValueConverter {
+    toView(value) {
+        return value &amp;amp;&amp;amp; value.toUpperCase();
+    }
+}
+
+&lt;/pre&gt;
+&lt;p&gt;The code is very succinct – and easy to test. Notice the absence of any “binding plumbing”. So how does the html know to update when values in the view-model change? (If you’ve ever used &lt;a href="http://knockoutjs.com/" target="_blank"&gt;Knockout&lt;/a&gt; you’ll be wondering where the observables are!)&lt;/p&gt;
+&lt;h2&gt;Dirty Binding&lt;/h2&gt;
+&lt;p&gt;The bindings for heading, firstName and lastName are primitive bindings – in other words, when Aurelia binds the html to the property, it creates an observer on the property so that when the property is changed, a notification of the change is triggered. It’s all done under the covers for you so you can just assume that any primitive on any model will trigger change notifications to anything bound to them.&lt;/p&gt;
+&lt;p&gt;However, if you’re not using a primitive, then Aurelia has to fall-back on “dirty binding”. Essentially it sets up a polling on the object (&lt;a href="https://github.com/aurelia/binding/issues/37" target="_blank"&gt;every 120ms&lt;/a&gt;). You’ll see this if you put a console.debug into the getter method:&lt;/p&gt;&lt;pre class="brush: js;"&gt;get fullName() {
+    console.debug("Getting fullName");
+    return this.firstName + " " + this.lastName;
+}
+&lt;/pre&gt;
+&lt;p&gt;Here’s what the console looks like when you browse (the console just keeps logging forever and ever):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/8acee728-be52-4af3-b44d-1d1a26a9fdd3.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ac40cfab-c6ba-443d-a71b-c3f352680c44.png" width="408" height="314"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;Unfortunately there simply isn’t an easy way around this problem.&lt;/p&gt;
+&lt;h2&gt;Declaring Dependencies&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://github.com/jdanyow" target="_blank"&gt;Jeremy Danyow&lt;/a&gt; did however leverage the pluggability of Aurelia and wrote a plugin for observing computed properties without dirty checking called &lt;a href="https://github.com/jdanyow/aurelia-computed" target="_blank"&gt;aurelia-computed&lt;/a&gt;. This is now incorporated&amp;nbsp; into Aurelia and is plugged in by default.&lt;/p&gt;
+&lt;p&gt;This plugin allows you to specify dependencies explicitly – thereby circumventing the need to dirty check. Here are the changes we need to make:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Add a definition for the declarePropertyDependencies() method in Aurelia.d.ts (only necessary for TypeScript) 
+&lt;li&gt;Add an import to get the aurelia-binding libs 
+&lt;li&gt;Register the dependency&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;Add these lines to the bottom of the aurelia.d.ts file (in the typings\aurelia folder):&lt;/p&gt;&lt;pre class="brush: js;"&gt;declare module "aurelia-binding" {
+    function declarePropertyDependencies(moduleType: any, propName: string, deps: any[]): void;
+}
+&lt;/pre&gt;
+&lt;p&gt;This just lets Visual Studio know about the function for compilation purposes.&lt;/p&gt;
+&lt;p&gt;Now change home.ts to look as follows:&lt;/p&gt;&lt;pre class="brush: js; highlight: [1,15,24];"&gt;import aub = require("aurelia-binding");
+
+export class Home {
+    public heading: string;
+    public firstName: string;
+    public lastName: string;
+
+    constructor() {
+        this.heading = "Welcome to Aurelia!";
+        this.firstName = "John";
+        this.lastName = "Doe";
+    }
+
+    get fullName() {
+        console.debug("Getting fullName");
+        return this.firstName + " " + this.lastName;
+    }
+
+    welcome() {
+        alert("Welcome, " + this.fullName + "!");
+    }
+}
+
+aub.declarePropertyDependencies(Home, "fullName", ["firstName", "lastName"]);
+
+export class UpperValueConverter {
+    toView(value) {
+        return value &amp;amp;&amp;amp; value.toUpperCase();
+    }
+}
+
+&lt;/pre&gt;
+&lt;p&gt;The highlighted lines are the lines I added in. Line 24 is the important line – this explicitly registers a dependency on the “fullName” property of the Home class – on “firstName” and “lastName”. Now any time either firstName or lastName changes, the value of “fullName” is recalculated. Bye-bye polling!&lt;/p&gt;
+&lt;p&gt;Here’s the console output now:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/79850200-d5b2-41d3-961e-16eee681f751.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/64c1c8eb-ed5d-42b2-b9ca-98da6ea7c8f2.png" width="281" height="324"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;We can see that the fullName getter is called 4 times. This is a lot better than polling the value every 120ms. (I’m not sure why it’s called 4 times – probably to do with how the binding is initially set up. Both firstName and lastName change when the page loads and they are instantiated to “John” and “Doe” so I would expect to see a couple firings of the getter function at least).&lt;/p&gt;
+&lt;h2&gt;Binding to an Object&lt;/h2&gt;
+&lt;p&gt;So we’re ok to bind to primitives – but we get stuck again when we want to bind to objects. Let’s take a look at app-state.ts (in the scripts folder):&lt;/p&gt;&lt;pre class="brush: js; highlight: [24,37,47];"&gt;import aur = require("aurelia-router");
+
+export class Redirect implements aur.INavigationCommand {
+    public url: string;
+    public shouldContinueProcessing: boolean;
+
+    /**
+      * Application redirect (works with approuter instead of current child router)
+      *
+      * @url the url to navigate to (ex: "#/home")
+      */
+    constructor(url) {
+        this.url = url;
+        this.shouldContinueProcessing = false;
+    }
+
+    navigate(appRouter) {
+        appRouter.navigate(this.url, { trigger: true, replace: true });
+    }
+}
+
+class AppState {
+    public isAuthenticated: boolean;
+    public userName: string;
+
+    /**
+      * Simple application state
+      *
+      */
+    constructor() {
+        this.isAuthenticated = false;
+    }
+
+    login(username: string, password: string): boolean {
+        if (username == "Admin" &amp;amp;&amp;amp; password == "xxx") {
+            this.isAuthenticated = true;
+            this.userName = "Admin";
+            return true;
+        }
+        this.logout();
+        return false;
+    }
+
+    logout() {
+        this.isAuthenticated = false;
+        this.userName = "";
+    }
+}
+
+var appState = new AppState();
+export var state = appState;
+
+&lt;/pre&gt;
+&lt;p&gt;The AppState is a static global object that tracks the state of the application. This is a good place to track logged in user, for example. I’ve added in the highlighted lines so that we can expose AppState.userName. Let’s open nav-bar.ts (in views\controls) and add a getter so that the nav-bar can display the logged in user’s name:&lt;/p&gt;&lt;pre class="brush: js;"&gt;import auf = require("aurelia-framework");
+import aps = require("scripts/app-state");
+
+export class NavBar {
+    static metadata = auf.Behavior.withProperty("router");
+
+    get userName() {
+        console.debug("Getting userName");
+        return aps.state.userName;
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;We can now bind to userName in the nav-bar.html view:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [24];"&gt;&amp;lt;template&amp;gt;
+  &amp;lt;nav class="navbar navbar-default navbar-fixed-top" role="navigation"&amp;gt;
+    &amp;lt;div class="navbar-header"&amp;gt;
+      &amp;lt;button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1"&amp;gt;
+        &amp;lt;span class="sr-only"&amp;gt;Toggle Navigation&amp;lt;/span&amp;gt;
+        &amp;lt;span class="icon-bar"&amp;gt;&amp;lt;/span&amp;gt;
+        &amp;lt;span class="icon-bar"&amp;gt;&amp;lt;/span&amp;gt;
+        &amp;lt;span class="icon-bar"&amp;gt;&amp;lt;/span&amp;gt;
+      &amp;lt;/button&amp;gt;
+      &amp;lt;a class="navbar-brand" href="#"&amp;gt;
+        &amp;lt;i class="fa fa-home"&amp;gt;&amp;lt;/i&amp;gt;
+        &amp;lt;span&amp;gt;${router.title}&amp;lt;/span&amp;gt;
+      &amp;lt;/a&amp;gt;
+    &amp;lt;/div&amp;gt;
+
+    &amp;lt;div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1"&amp;gt;
+      &amp;lt;ul class="nav navbar-nav"&amp;gt;
+        &amp;lt;li repeat.for="row of router.navigation" class="${row.isActive ? 'active' : ''}"&amp;gt;
+          &amp;lt;a href.bind="row.href"&amp;gt;${row.title}&amp;lt;/a&amp;gt;
+        &amp;lt;/li&amp;gt;
+      &amp;lt;/ul&amp;gt;
+
+      &amp;lt;ul class="nav navbar-nav navbar-right"&amp;gt;
+        &amp;lt;li&amp;gt;&amp;lt;a href="#"&amp;gt;${userName}&amp;lt;/a&amp;gt;&amp;lt;/li&amp;gt;
+        &amp;lt;li class="loader" if.bind="router.isNavigating"&amp;gt;
+          &amp;lt;i class="fa fa-spinner fa-spin fa-2x"&amp;gt;&amp;lt;/i&amp;gt;
+        &amp;lt;/li&amp;gt;
+      &amp;lt;/ul&amp;gt;
+    &amp;lt;/div&amp;gt;
+  &amp;lt;/nav&amp;gt;
+&amp;lt;/template&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;I’ve added line 24. Of course we’ll see polling if we run the solution as is. So we can just declare the dependency, right? Let’s try it:&lt;/p&gt;&lt;pre class="brush: js; highlight: [2,13];"&gt;import auf = require("aurelia-framework");
+import aub = require("aurelia-binding");
+import aps = require("scripts/app-state");
+
+export class NavBar {
+    static metadata = auf.Behavior.withProperty("router");
+
+    get userName() {
+        return aps.state.userName;
+    }
+}
+
+aub.declarePropertyDependencies(NavBar, "userName", [aps.state.userName]);
+&lt;/pre&gt;
+&lt;p&gt;Seems to compile and run – but the value of userName is never updated!&lt;/p&gt;
+&lt;p&gt;It turns out that we can only declare dependencies to the same object (and only to primitives) using declarePropertyDependencies. Seems like we’re stuck.&lt;/p&gt;
+&lt;h2&gt;The Multi-Observer&lt;/h2&gt;
+&lt;p&gt;I posed this question on the &lt;a href="https://gitter.im/Aurelia/Discuss" target="_blank"&gt;gitter discussion page for Aurelia&lt;/a&gt;. The guys working on Aurelia (and the community) are very active there – I’ve been able to ask Rob Eisenberg himself questions! Jeremy Danyow is also active on there (as is Mike Graham) so getting help is usually quick. Jeremy quickly verified that declarePropertyDependencies cannot register dependencies on other objects. However, he promptly whacked out the “Multi-Observer”. Here’s the TypeScript for the class:&lt;/p&gt;&lt;pre class="brush: js;"&gt;import auf = require("aurelia-framework");
+
+export class MultiObserver {
+    static inject = [auf.ObserverLocator];
+
+    constructor(private observerLocator: auf.ObserverLocator) {
+    }
+
+    /**
+     * Set up dependencies on an arbitrary object.
+     * 
+     * @param properties the properties to observe
+     * @param callback the callback to fire when one of the properties changes
+     * 
+     * Example:
+     * export class App {
+     *      static inject() { return [MultiObserver]; }
+     *      constructor(multiObserver) {
+     *        var session = {
+     *          fullName: 'John Doe',
+     *          User: {
+     *            firstName: 'John',
+     *            lastName: 'Doe'
+     *          }
+     *        };
+     *        this.session = session;
+     *
+     *        var disposeFunction = multiObserver.observe(
+     *          [[session.User, 'firstName'], [session.User, 'lastName']],
+     *          () =&amp;gt; session.fullName = session.User.firstName + ' ' + session.User.lastName);
+     *      }
+     *    }
+     */
+    observe(properties, callback) {
+        var subscriptions = [], i = properties.length, object, propertyName;
+        while (i--) {
+            object = properties[i][0];
+            propertyName = properties[i][1];
+            subscriptions.push(this.observerLocator.getObserver(object, propertyName).subscribe(callback));
+        }
+
+        // return dispose function
+        return () =&amp;gt; {
+            while (subscriptions.length) {
+                subscriptions.pop()();
+            }
+        }
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;Add this file to a new folder called “utils” under “views”. To get this to compile, you have to add this definition to the aurelia.d.ts file (inside the aurelia-framework module declaration):&lt;/p&gt;&lt;pre class="brush: js;"&gt;interface IObserver {
+    subscribe(callback: Function): void;
+}
+
+class ObserverLocator {
+    getObserver(object: any, propertyName: string): IObserver;
+}
+&lt;/pre&gt;
+&lt;p&gt;Now we can use the multi-observer to register a callback when any property on any object changes. Let’s do this in the nav-bar.ts file:&lt;/p&gt;&lt;pre class="brush: js;"&gt;import auf = require("aurelia-framework");
+import aub = require("aurelia-binding");
+import aps = require("scripts/app-state");
+import muo = require("views/utils/multi-observer");
+
+export class NavBar {
+    static metadata = auf.Behavior.withProperty("router");
+    static inject = [muo.MultiObserver];
+
+    dispose: () =&amp;gt; void;
+    userName: string;
+
+    constructor(multiObserver: muo.MultiObserver) {
+        // set up a dependency on the session router object
+        this.dispose = multiObserver.observe([[aps.state, "userName"]],() =&amp;gt; {
+            console.debug("Setting new value for userName");
+            this.userName = aps.state.userName;
+        });
+    }
+
+    deactivate() {
+        this.dispose();
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;We register the function to execute when the value of the property on the object changes – we can execute whatever code we want in this callback.&lt;/p&gt;
+&lt;p&gt;Here’s the console after logging in:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/a26b14ee-c3c9-4c15-8178-b751902c6100.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/8e3cd17e-5009-4696-a620-22534f09ba62.png" width="499" height="355"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;There’s no polling – the view-model is bound to the userName primitive on the view-model. But whenever the value of userName on the global state object changes, we get to update the value. We’ve successfully avoided the dirty checking!&lt;/p&gt;
+&lt;p&gt;One last note: we register the dependency callback into a function object called “dispose”. We can then simply call this function when we want to unregister the callback (to free up resources). I’ve put the call in the deactivate() method, which is the method Aurelia calls on the view-model when navigating away from it. In this case it’s not really necessary, since the nav-bar is “global” and we won’t navigate away from it. But if you use the multi-observer in a view-model that is going to be unloaded (or navigated away from), be sure to put the dispose function somewhere sensible.&lt;/p&gt;
+&lt;p&gt;A big thank you to Jeremy Danyow for his help!&lt;/p&gt;
+&lt;p&gt;Happy binding!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="4dc31569-4fd4-4a7c-8186-f9d65e8d29e7">
+      <author>amit</author>
+      <email>amit.handa@gmail.com</email>
+      <website></website>
+      <ip>182.68.169.254</ip>
+      <userAgent>Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36</userAgent>
+      <date>2015-03-23 15:19:46</date>
+      <content>nice article, good info. Thanks for sharing. keep it up. cheers.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="367dbc10-0b22-46e7-aa57-6bc9721c910f">
+      <author>Gabriel</author>
+      <email>nobody@nowhere.com</email>
+      <website></website>
+      <ip>62.12.161.4</ip>
+      <userAgent>Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2327.5 Safari/537.36</userAgent>
+      <date>2015-03-23 15:39:06</date>
+      <content>I guess it will work with JS7 decorators too. @see https://pbs.twimg.com/media/CAoWj5rUgAMGWU9.png</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5feaefe7-6183-4668-b9ab-80d27f1e0ff5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.95.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-23 18:45:53</date>
+      <content>@Gabriel - Unfortunately TypeScript doesn&amp;#39;t (yet) support decorators!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="730b3cf1-49a8-4df3-9c1f-cdcc744ddd7f">
+      <author>Jeremy</author>
+      <email>jdanyow@gmail.com</email>
+      <website>http://danyow.net/</website>
+      <ip>73.38.189.26</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.50 Safari/537.36</userAgent>
+      <date>2015-03-24 14:34:08</date>
+      <content>nice article Colin!</content>
+    </comment>
+  </comments>
+  <viewCount>4488</viewCount>
+  <id>bc966292-6e4f-4da0-9bca-3803edadbd19</id>
+</post>

@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>PaaS and Time Compression in the Cloud</title>
+  <slug>paas-and-time-compression-in-the-cloud</slug>
+  <shortUrl>http://bit.ly/1H5u2ZG</shortUrl>
+  <author></author>
+  <pubDate>2015-06-22 09:31:08</pubDate>
+  <lastModified>2015-07-21 11:58:28</lastModified>
+  <content>&lt;p&gt;Recently I got to write a couple of articles which were posted on the &lt;a href="http://blog.nwcadence.com/" target="_blank"&gt;Northwest Cadence Blog&lt;/a&gt;. I am not going to reproduce them here, so please read them on the NWCadence blog from the links below.&lt;/p&gt; &lt;h2&gt;PaaS&lt;/h2&gt; &lt;p&gt;The first, &lt;a href="http://blog.nwcadence.com/paas-architecture-designing-for-the-cloud/" target="_blank"&gt;PaaS Architecture: Designing Apps for the Cloud&lt;/a&gt; covers some of the considerations you’ll need to make if you’re porting your applications to the Cloud. Moving your website to a VM with IIS is technically “moving to the cloud”, but this is IaaS (infrastructure as a service) rather than PaaS (platform as a service). If you’re going to unlock true scale from the cloud, you’re going to have to move towards PaaS.&lt;/p&gt; &lt;p&gt;Unfortunately, you can’t simply push any site into PaaS, since you’ll need to consider where and how your data is stored, how your authentication is going to work, and most importantly, how your application will handle scale up – being spread over numerous servers simultaneously. The article deals with some these and other considerations you’ll need to make.&lt;/p&gt; &lt;h2&gt;Time Compression&lt;/h2&gt; &lt;p&gt;The second article, &lt;a href="http://blog.nwcadence.com/compressing-time-a-competitive-advantage/" target="_blank"&gt;Compressing Time: A Competitive Advantage&lt;/a&gt; is written off the back of Joe Weinman’s excellent white paper &lt;a href="https://azureinfo.microsoft.com/rs/microsoftdemandcenter/images/EN-CNTNT-Whitepaper-Timeforthecloud.pdf?mkt_tok=3RkMMJWWfF9wsRokuKvKZKXonjHpfsX97%2BUsXa%2BwlMI%2F0ER3fOvrPUfGjI4CTcFlI%2BSLDwEYGJlv6SgFS7XCMadx37gOUxM%3D" target="_blank"&gt;Time for the Cloud&lt;/a&gt;. Weinman asserts that “moving to the cloud” is not a guarantee of success in and of itself – companies must strategically utilize the advantages cloud computing offers. While there are many cloud computing advantages, Weinman focuses on what he calls &lt;em&gt;time compression&lt;/em&gt; – the cloud’s ability to speed &lt;em&gt;time to market&lt;/em&gt; as well as &lt;em&gt;time to scale&lt;/em&gt;. Again, I consider some of the implications you’ll need to be aware of when you’re moving applications to the cloud.&lt;/p&gt; &lt;p&gt;Happy cloud computing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Cloud</category>
+  </categories>
+  <comments></comments>
+  <viewCount>600</viewCount>
+  <id>ffdc18cc-651e-415c-ba1a-f286c1460ef1</id>
+</post>

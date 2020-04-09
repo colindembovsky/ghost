@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Enabling JavaScript Code Coverage Link in Builds</title>
+  <slug>enabling-javascript-code-coverage-link-in-builds</slug>
+  <shortUrl>http://bit.ly/1k0X2Ga</shortUrl>
+  <author></author>
+  <pubDate>2014-05-14 13:43:03</pubDate>
+  <lastModified>2015-07-21 02:31:05</lastModified>
+  <content>&lt;p&gt;In a &lt;a href="http://colinsalmcorner.com/post/unit-testing-javascript-in-vs-2012" target="_blank"&gt;previous post&lt;/a&gt; I wrote about how to do JavaScript unit testing in VS 2012. The same procedure applies to VS 2013 – but the &lt;a href="http://visualstudiogallery.msdn.microsoft.com/f8741f04-bae4-4900-81c7-7c9bfb9ed1fe" target="_blank"&gt;Chutzpah test adapter&lt;/a&gt; now allows you to run code coverage too. At the end of my post I link to another blog entry about how to enable the tests to run during team builds.&lt;/p&gt; &lt;p&gt;I recently added some tests to a VS 2013 solution I was working on and was pleased to see that when you “Analyze Code Coverage for all Tests” in the Test Explorer, VS pops open a nicely formatted html page that shows you your JavaScript coverage. I wanted to have that file available in my build results too. Looking at the test results folder of the local VS test run, I saw that Chutzpah created an html file called “_Chutzpah.coverage.html”. I wanted that script to be copied to the drop folder of the build and create a link in the build summary that you could click to open it.&lt;/p&gt; &lt;h2&gt;Post-Test Script&lt;/h2&gt; &lt;p&gt;Fortunately you can do this without even having to customize the build template – as long as you’re using the TfvcTemplate.12.xaml template – the default build template that ships with TFS 2013. This build has some really useful script hooks – and there’s one for running a post-test script. I knew I could easily copy the Chutpah result file to the drop folder – no problem. But how do you add to the build summary report from a script that’s running “outside” the workflow? If you customize the workflow you can use the WriteCustomSummaryInformation activity, but I wanted to do this without modifying the template.&lt;/p&gt; &lt;p&gt;After mailing the ChampsList, &lt;a href="http://www.geekswithblogs.net/jakob/Default.aspx" target="_blank"&gt;Jakob Ehn&lt;/a&gt; pointed me in the right direction – I needed to use the &lt;a href="http://msdn.microsoft.com/en-us/library/microsoft.teamfoundation.build.client.informationnodeconverters.addcustomsummaryinformation.aspx" target="_blank"&gt;InformationNodeCoverters.AddCustomSummaryInformation&lt;/a&gt; method. Once I had that, the rest of the PowerShell script was almost trivial. I did hit one snag – I need the Team Project Collection URI for the script to work, but for some reason the value of the TF_BUILD_COLLECTIONURI &lt;a href="http://msdn.microsoft.com/en-us/library/hh850448.aspx" target="_blank"&gt;build environment variable&lt;/a&gt; was empty. Updating my build agent to VS 2013 Update 2 resolved this issue. Here’s the script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$testResultsDir = $env:TF_BUILD_TESTRESULTSDIRECTORY,
+  [string]$dropLocation = $env:TF_BUILD_DROPLOCATION,
+  [string]$tpcUri = $env:TF_BUILD_COLLECTIONURI,
+  [string]$buildUri = $env:TF_BUILD_BUILDURI
+)
+
+$coverageFileName = "\_Chutzpah.coverage.html"
+$jsScriptResultsFile = $testResultsDir + $coverageFileName
+if (Test-Path($jsScriptResultsFile)) {
+    try {
+        Write-Host "Copying Chutzpah coverage files"
+        copy $jsScriptResultsFile $dropLocation
+
+        # add the link into the build summary
+        Write-Host "Loading TFS assemblies"
+        [Reflection.Assembly]::LoadWithPartialName('Microsoft.TeamFoundation.Client')
+        [Reflection.Assembly]::LoadWithPartialName('Microsoft.TeamFoundation.Build.Client')
+    
+        Write-Host "Getting build object"
+        $tpc = [Microsoft.TeamFoundation.Client.TfsTeamProjectCollectionFactory]::GetTeamProjectCollection($tpcUri)
+        $buildService = $tpc.GetService([Microsoft.TeamFoundation.Build.Client.IBuildServer])
+        $build = $buildService.GetBuild($buildUri)
+
+        Write-Host "Writing Chutzpah coverage link to build summary"
+        $message = "Javascript testing was detected. Open [coverage results]($dropLocation\$coverageFileName)"
+        [Microsoft.TeamFoundation.Build.Client.InformationNodeConverters]::AddCustomSummaryInformation($build.Information, $message, "ConfigurationSummary", "Javascript Coverage", 200)
+        $build.Information.Save();
+
+        # all is well with the world
+        Write-Host "Success!"
+        exit 0
+    }
+    catch {
+        Write-Error $_
+        exit 1
+    }
+} else {
+    # let the build know there were no coverage files
+    Write-Warning "No Chutzpah coverage file detected"
+    exit 0
+}
+&lt;/pre&gt;
+&lt;p&gt;I saved this to my build scripts folder under source control and checked it in.&lt;/p&gt;
+&lt;p&gt;Opening up the build definition, I had to create a second build run to run the JavaScript tests – here’s the settings I used:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/a4f94785-d8fd-4e7b-af54-c648bc1c77a6.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b236a53c-1ed2-4625-b4b9-340b571d9299.png" width="413" height="484"&gt;&lt;/a&gt; Note how I’ve enabled Code Coverage in the options dropdown.&lt;/p&gt;
+&lt;p&gt;I added this folder to the source mappings for my build and then called the script in the post-test settings of the build:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/6ad64dfc-ef5a-4c5b-b343-f0a25e2a5071.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/c9497e2e-6641-4866-86ad-7bf08f41ba7e.png" width="644" height="201"&gt;&lt;/a&gt; Now when I run my build, I get a link to the JavaScript coverage file:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/99bcacbb-0bc3-4cac-a6ac-980b849166a4.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/94d99bff-5c69-4239-a145-6795dd3916e4.png" width="453" height="354"&gt;&lt;/a&gt; Clicking on the “coverage results” link opens the results page:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/e710bde6-a4bc-492b-a1df-d287ef0328b7.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/033ce68c-1531-47b8-8241-cc884562de5f.png" width="644" height="296"&gt;&lt;/a&gt; As a next project, I want to see if I can incorporate the coverage results into the build warehouse so that there’s metrics not only on .NET coverage over time, but also for JavaScript tests.&lt;/p&gt;
+&lt;p&gt;Happy testing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="5af3355d-4cbf-42eb-9b1b-a25610a8b9a3">
+      <author>Richard</author>
+      <email>RichardDalziel@Outlook.com</email>
+      <website></website>
+      <ip>81.145.137.230</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.124 Safari/537.36</userAgent>
+      <date>2014-10-10 15:51:03</date>
+      <content>This is great! Exactly what i&amp;#39;ve been looking for!&lt;br /&gt;&lt;br /&gt;Only one small blip though, the HTML file does not seem to be found when clicking on the coverage results link. Looking at the build server, it&amp;#39;s copied the coverage file to the /src/ directory. How can i reference this?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="84a0f30c-86a5-456f-bbe3-aa478ccc34ea">
+      <author>Richard Dalziel</author>
+      <email>RichardDalziel@Outlook.com</email>
+      <website>http://www.google.com/</website>
+      <ip>81.145.137.230</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-13 10:26:24</date>
+      <content>Hi!&lt;br /&gt;&lt;br /&gt;This script is fantastic and is (almost) exactly what I&amp;#39;ve been looking for.&lt;br /&gt;&lt;br /&gt;There&amp;#39;s one part of the script which I cannot seem to get working at the moment. And that&amp;#39;s the final link to the coverage html file. It doesn&amp;#39;t seem to be able to display the file both on the web browser and from the build information in Visual Studio.&lt;br /&gt;&lt;br /&gt;Are you aware of what is required to get around this?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="09ffa963-8df7-4a7b-84c1-a12822782bb9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>27.254.21.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-22 01:53:07</date>
+      <content>Hi @Richard&lt;br /&gt;&lt;br /&gt;The Chutzpah coverage file does live in the /src folder on the build server - but line 13 of the script copies the file to the drop folder. Line 26 then references this location in the link. Can you make sure that when you run this script the coverage file is indeed copied?&lt;br /&gt;&lt;br /&gt;As to your 2nd comment - I&amp;#39;m not sure what you mean about &amp;quot;doesn&amp;#39;t seem to be able to display the file&amp;quot; - can you be more specific?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="866dd3cf-fd52-4d3e-8d96-ef48ee499716">
+      <author>Brad</author>
+      <email>bdarnes@gmail.com</email>
+      <website></website>
+      <ip>108.78.142.66</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36</userAgent>
+      <date>2014-10-24 01:48:23</date>
+      <content>I&amp;#39;m having a similar issue to Richard.  The link to the coverage html file works great in the build summary in Visual Studio, however when you go to the build summary in TFS web access the link doesn&amp;#39;t work.   Any ideas?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="4888173a-ae2b-413b-a2da-570423dd20f0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>49.230.138.44</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-24 07:21:32</date>
+      <content>Hi @Brad&lt;br /&gt;&lt;br /&gt;Can you tell me what &amp;quot;doesn&amp;#39;t work&amp;quot; means? Can you check what the url of the link is (in the build report in Web Access) and see if you can open that link yourself?</content>
+    </comment>
+  </comments>
+  <viewCount>5811</viewCount>
+  <id>c00f0ff0-2629-4a06-8e88-b2763448ab04</id>
+</post>

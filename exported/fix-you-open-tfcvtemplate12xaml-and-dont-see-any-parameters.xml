@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>01cae2ee-780a-45d6-8929-e111983abdca</id>
+  <title>Fix: You Open TfcvTemplate.12.xaml and Don’t See Any Parameters</title>
+  <slug>fix-you-open-tfcvtemplate12xaml-and-dont-see-any-parameters</slug>
+  <shortUrl>http://bit.ly/1mZqUW3</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-09-13 17:23:00</pubDate>
+  <lastModified>2020-03-27 22:10:40</lastModified>
+  <content>&lt;p&gt;I upgraded my demo environment from 2013 Preview to 2013 RC. Everything looked good until I got to the builds. I had configured a couple of default builds – the 2013 default template is actually stored in the TFS database (not in source control like the old Default xaml files) unless you actually download it for customizing.&lt;/p&gt; &lt;p&gt;However, when I opened the build definition, the parameters section of the Process tab was empty:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh4.ggpht.com/-xpu4oH2llnU/UjMt5Ek83oI/AAAAAAAABFA/zBq_rr_Uj0Q/s1600-h/clip_image001%25255B4%25255D.jpg"&gt;&lt;img title="clip_image001" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="clip_image001" src="http://lh4.ggpht.com/-wZkhv8yNy_w/UjMt6Hy0ZpI/AAAAAAAABFI/a6TAabG9fXI/clip_image001_thumb%25255B1%25255D.jpg?imgmax=800" width="578" height="236"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;All the other tabs worked just fine, and all the other (XAML from source control) templates worked just fine too.&lt;/p&gt; &lt;p&gt;I quickly mailed the Champs List, and got some great assistance from Jason Prickett of the product team. I attached a debugger to VS and opened the template, and I got some “could not load assembly” errors for Newtonsoft.Json.dll.&lt;/p&gt; &lt;p&gt;Jason then told me the solution was simple: copy the dll. So I copied&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;C:\Program Files\Microsoft Team Foundation Server 12.0\Tools\Newtonsoft.Json.dll&lt;/font&gt; &lt;/p&gt; &lt;p&gt;to&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;C:\Program Files (x86)\Microsoft Visual Studio 12.0\Common7\IDE\PrivateAssemblies\&lt;/font&gt;&lt;/p&gt; &lt;p&gt;and that resolved the problem.&lt;/p&gt; &lt;p&gt;Now I can create, edit and run builds again. And I’m loving the &lt;a href="http://nakedalm.com/whats-new-in-visual-studio-2013-rc-with-team-foundation-server/" target="_blank"&gt;new RC features&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Happy building!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments></comments>
+  <viewCount>3483</viewCount>
+</post>

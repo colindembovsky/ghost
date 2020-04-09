@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Branch Is Not Equal to Environment: CODE-PROD Branching Strategy</title>
+  <slug>branch-is-not-equal-to-environment</slug>
+  <shortUrl>http://bit.ly/1qxdJvX</shortUrl>
+  <author></author>
+  <pubDate>2014-08-27 16:34:05</pubDate>
+  <lastModified>2015-07-21 11:58:30</lastModified>
+  <content>&lt;p&gt;Over the last couple of months I’ve done several implementations and upgrades of TFS 2013. Most organizations I work with are not developing boxed software – they’re developing websites or apps for business. The major difference is that boxed software often has more than one version of a product “in production” – some customers will be on version 1.0 while others will be on version 2.0 and so on. In this model, branches for each major version, with hot-fix branches where necessary – are a good way to keep these code bases separate while still being able to merge bug fixes across versions. However, I generally find that this is overkill for a “product” that only ever has one version in production at any one time – like internal applications or websites.&lt;/p&gt; &lt;p&gt;In this case, a well-established branching model is Dev-Main-Live.&lt;/p&gt; &lt;h2&gt;Dev-Main-Live&lt;/h2&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d69693b1-37e9-4174-8398-156cf40bd367.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/c1c98eb0-32c0-4f38-ba58-0c1f0c8aade8.png" width="380" height="164"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;Dev-Main-Live (or sometimes Dev-Integration-Prod or other variants) is a fairly common branching model – new development is performed on the Dev branch (with multiple developers coding simultaneously). When changes are to be tested, they are merged to Main. There code is tested in a test or UAT environment, and when testing is complete the changes are merged to Live before being deployed to production. This means that if there are production issues (what? we have bugs?!?) those can be fixed on the Live branch – thus they can be tested and deployed independently from the Dev code which may not be production ready.&lt;/p&gt; &lt;p&gt;There are some issues with this approach:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;You shouldn’t be taking so long to test that you need a separate Main branch. I only advise this for extensive test cycles – but you should be aiming to shorten your test cycles anyway. This makes the Main branch fairly obsolete – I’ve seen teams who always “merge through” Main to get changes from Dev to Live – so I’ve started advising getting rid of the Main branch altogether. &lt;li&gt;If you build code from Main, deploy it to Test and sign-off, you have to merge to Live before doing a build from the Live branch. This means that what you’re deploying isn’t what you tested (since you tested pre-merge). I’ve seen some teams deploy from the Main branch build, wait for several days, and then merge to the Live branch. Also a big no-no!  &lt;li&gt;Usually bug fixes that are checked in on the Live branch don’t make it back to the Dev branch since you have to merge through Main – so the merge of new dev and bug fixes on the Live branch get done when Dev gets merged onto Live (through Main). This is too late in the cycle and can introduce merge bugs or rework.&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;This model &lt;em&gt;seems&lt;/em&gt; to work nicely since the branches “represent” the environments – what I have in Dev is in my dev environment, what’s on Main is in my Test environment and what’s in Live is in production, right? This “branch equals environment” mindset is actually hard to manage, so I’m starting to recommend a new approach.&lt;/p&gt; &lt;h2&gt;The Solution: Code-Prod with Builds&lt;/h2&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/461eec0f-dc9e-4e5b-afc3-f5040958df71.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/dadadd62-0806-4d08-ac1b-f7411074874c.png" width="243" height="192"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;So how should you manage code separation as well as know what code is in which environment at any time? The answer is to simplify the branching model and make use of builds.&lt;/p&gt; &lt;p&gt;In this scenario new development is done on the CODE branch (the name is to consciously separate the idea of the branch from the environment). When you’re ready to go to production, merge into PROD and do a build. The TFS build will (by default) label the code that is used to build the binaries. You’ll be able to tie the binary version to the build label if you use my &lt;a href="http://colinsalmcorner.com/post/matching-binary-version-to-build-number-version-in-tfs-2013-builds" target="_blank"&gt;versioning script you can always match binaries to builds&lt;/a&gt;. So you’ll be able to recreate a build, even if you lose the binaries somehow.&lt;/p&gt; &lt;p&gt;So now you have built “the bits” – notice how there is no mention of environment yet. You should be thinking of build and deploy as separate activities. Why? Because then you’ll be able to build a single package that can be deployed (and tested) in a number of environments. Of course you’re going to have to somehow manage configuration files for your different environments – for web projects you can refer to &lt;a href="http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way" target="_blank"&gt;my post&lt;/a&gt; about how to parameterize the web.config so that you can deploy to any environment (the post is specific to Release Management, but the principles are the same for other deployment mechanisms and for any type of application that needs different configurations for different environments).&lt;/p&gt; &lt;h3&gt;Deployment – To Lab or To Release?&lt;/h3&gt; &lt;p&gt;Let’s start off considering the “happy path” – you’ve done some coding in CODE, merged to PROD and produced a “production build”. It needs to be tested (of course you’ve already &lt;a href="http://colinsalmcorner.com/post/why-you-absolutely-need-to-unit-test" target="_blank"&gt;unit tested&lt;/a&gt; as part of your build). Now you have two choices – Lab Management or Release Management. I like using a combination of Lab and Release, since each has a some good benefits. You can release to test using Lab Management (including automated deploy and test) so that your testers have an environment to test against – Lab Management allows rich data diagnostic collection during both automated and manual testing. You then use Release Management to get the bits into the release pipeline for deployment to UAT and Production environments, including automated deployment workflows and sign-offs. This way you only get builds into the release pipeline that have passed several quality gates (unit testing, automated UI testing and even manual testing) before getting into UAT. Irrespective of what approach you take, make sure you can take one build output and deploy it to multiple environments.&lt;/p&gt; &lt;h2&gt;But What About Bugs in Production?&lt;/h2&gt; &lt;p&gt;If you get bugs in production &lt;strong&gt;before&lt;/strong&gt; you do the merge, the solution is simple – fix the bug on the PROD branch, then build, test and release back to production. No messy untested dev CODE anywhere.&lt;/p&gt; &lt;p&gt;But what do you do if you have bugs after your merge, but before you’ve actually deployed to production? Hopefully you’re moving towards shorter release / test cycles, so this window should be short (and rare). But even if you do hit this scenario, there is a way to do the bug fix and keep untested code out. It’s a bit complicated (so you should be trying to avoid this scenario), but let me walk you through the scenario.&lt;/p&gt; &lt;p&gt;Let’s say we have a file in a web project called “Forecast.cs” that looks like this:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class Forecast
+{
+    public int ID { get; set; }
+
+    public DateTime Date { get; set; }
+    public DayOfWeek Day 
+    {
+        get { return Date.DayOfWeek; } 
+    }
+
+    public int Min { get; set; }
+
+    public int Max { get; set; }
+}
+&lt;/pre&gt;
+&lt;p&gt;We’ve got a PROD build (1.0.0.4) and the label for 1.0.0.4 shows this file to be on version 51.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/0084ce46-7e76-48bf-9028-35997b93628b.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/27816db5-0d10-4914-8a49-cdd85f993639.png" width="644" height="291"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;We now make a change and add a property called “CODEProperty” (line 15) on the CODE branch:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class Forecast
+{
+    public int ID { get; set; }
+
+    public DateTime Date { get; set; }
+    public DayOfWeek Day 
+    {
+        get { return Date.DayOfWeek; } 
+    }
+
+    public int Min { get; set; }
+
+    public int Max { get; set; }
+
+    public int CODEProperty { get; set; }
+}
+&lt;/pre&gt;
+&lt;p&gt;We then check-in, merge to PROD and do another build (1.0.0.5). This version is then deployed out for testing in our UAT environment. Forecast.cs is now on version 53 in the 1.0.0.5 label, while all other files are on 51.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/a10581e9-c553-4ce8-8e88-0fc7bc5a0a1b.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/863f6109-a563-4bf5-9b16-b7dd5075e30e.png" width="644" height="298"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Suddenly, the proverbial paw-paw hits the fan and there’s an urgent business-stopping bug in our currently deployed production version (1.0.0.4). So we go to source control, search for the 1.0.0.4 label in the PROD branch that the build created and select “Get This Version” to get the 1.0.0.4 version locally.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/6242b8a1-2b86-4389-9d3f-b8c29459ba8a.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/e7589b8f-bcb9-422c-9b9e-d730412407ae.png" width="571" height="329"&gt;&lt;/a&gt;We fix the bug (by adding a property called “HotfixProperty” – line 15 below). Note how there is no “CODEProperty” since this version of Forecast is before the CODEProperty checkin.&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class Forecast
+{
+    public int ID { get; set; }
+
+    public DateTime Date { get; set; }
+    public DayOfWeek Day 
+    {
+        get { return Date.DayOfWeek; } 
+    }
+
+    public int Min { get; set; }
+
+    public int Max { get; set; }
+
+    public int HotfixProperty { get; set; }
+}
+&lt;/pre&gt;
+&lt;p&gt;Since we’re not on the latest version (we did a “Get-label”) we won’t be able to check in. So we shelve the change (calling the shelveset “1.0.0.4 Hotfix”). We then open the build template and edit the Get Version property and tell the build to get 1.0.0.4 too by specifying L followed by the label name – so the full “Get version” value is LPROD_1.0.0.4:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b247201f-a7d1-4e6b-8f99-3e3b312c86be.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ef8dd46d-ca85-4627-9f52-bf30daa455e4.png" width="644" height="164"&gt;&lt;/a&gt;Next we queue the build, telling the build to apply the Shelveset too:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b91d162a-7920-4289-96f6-2d77f9f76596.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/bee670af-da10-4178-8c78-19073e35ead5.png" width="435" height="484"&gt;&lt;/a&gt; We won’t be able to “Check in changes after successful build” since the build won’t be building with the Latest version. We’ll have to do that ourselves later. The build completes – we now have build 1.0.0.6 which can be deployed straight to production to “handle” the business-stopping bug.&lt;/p&gt;
+&lt;p&gt;Finally we do a Get Latest of the solution in PROD, unshelve the changeset to merge the Hotfix with the development code, clear the Get version property on the build and queue the next build that includes both the changes from CODE as well as the hotfix from PROD. This build is now 1.0.0.7. Meanwhile, testing is completed on 1.0.0.5, and so we can then fast-track the testing for 1.0.0.7 to release the new CODEProperty feature, including the hotfix from build 1.0.0.6.&lt;/p&gt;
+&lt;p&gt;Here’s a summary of what code is in what build:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;1.0.0.4 – baseline PROD code&lt;/li&gt;
+&lt;li&gt;1.0.0.5 – CODEProperty change coming from a merge from CODE branch into PROD branch&lt;/li&gt;
+&lt;li&gt;1.0.0.6 – baseline PROD plus the hotfix shelveset (no CodeProperty at all) which includes the HotfixProperty&lt;/li&gt;
+&lt;li&gt;1.0.0.7 – CODEProperty merged with HotfixProperty&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s the 1.0.0.7 version of Forecast.cs (see lines 15 and 17):&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class Forecast
+{
+    public int ID { get; set; }
+
+    public DateTime Date { get; set; }
+    public DayOfWeek Day 
+    {
+        get { return Date.DayOfWeek; } 
+    }
+
+    public int Min { get; set; }
+
+    public int Max { get; set; }
+
+    public int CODEProperty { get; set; }
+
+    public int HotfixProperty { get; set; }
+}
+&lt;/pre&gt;
+&lt;p&gt;If we turn on Annotation, you’ll see that CODEProperty is changeset 52 (in green below), and HotfixProperty is changeset 54 (in red below):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/417517e7-1f8f-42fa-ba21-ae63060ec5e7.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/5a65e063-be49-4938-81c8-5ec5b3f9b6df.png" width="545" height="450"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Yes, it’s a little convoluted, but it’ll work – the point is that this is possible without a 3rd branch in Source Control. Also, you should be aiming to shorten your test / release cycles so that this situation is very rare. If you hit this scenario often, you could introduce the 3rd branch (call it INTEGRATION or MAIN or something) that can be used to isolate bug-fixes in PROD from new development in CODE that isn’t ready to go out to production.&lt;/p&gt;
+&lt;p&gt;Here’s a summary of the steps if there is a bug in current production when you haven’t deployed the PROD code (after a merge from CODE) to production yet:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;PROD code is built (1.0.0.4) and released to production.&lt;/li&gt;
+&lt;li&gt;CODE is merged to PROD and build 1.0.0.5 is created, but not deployed to production yet&lt;/li&gt;
+&lt;li&gt;Get by Label – the current PROD label (1.0.0.4)&lt;/li&gt;
+&lt;li&gt;Fix the bug and shelve your changes&lt;/li&gt;
+&lt;li&gt;Edit the build to change the Get version to the current PROD label (1.0.0.4)&lt;/li&gt;
+&lt;li&gt;Queue the build with your hotfix shelveset (this will be build 1.0.0.6)&lt;/li&gt;
+&lt;li&gt;Test and deploy the hotfix version (1.0.0.6) to production&lt;/li&gt;
+&lt;li&gt;Get Latest and unshelve to merge the CODE code and the hotfix&lt;/li&gt;
+&lt;li&gt;Clear the Get version field of the build and queue the new build (1.0.0.7)&lt;/li&gt;
+&lt;li&gt;Test and deploy to production&lt;/li&gt;&lt;/ol&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;The key to good separation of work streams is to not mistake the branch for the environment, nor confuse build with deploy. Using the CODE-PROD branching scenario, builds with versioning and labels, parameterized configs and Lab/Release management you can:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Isolate development code from production code, so that you can do new features while still fixing bugs in production and not have untested development pollute the hotfixes&lt;/li&gt;
+&lt;li&gt;Track which code is deployed where (using binary versions and labels)&lt;/li&gt;
+&lt;li&gt;Recreate builds from labels&lt;/li&gt;
+&lt;li&gt;Deploy a single build to multiple environments, so that what you test in UAT is what you deploy to production&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Happy building and deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>DevOps</category>
+    <category>development</category>
+    <category>Release Management</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="08338b25-a050-4dc9-9c08-4349fc45d42c">
+      <author>Giulio Vian</author>
+      <email>giuliovdev@gmail.com</email>
+      <website></website>
+      <ip>217.5.158.82</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0</userAgent>
+      <date>2014-09-03 16:35:46</date>
+      <content>I see some value in a three branch structure like this:&lt;br /&gt;&lt;br /&gt;DEV --&amp;gt; LIVE --&amp;gt; LAST-MIN-FIXES&lt;br /&gt;or&lt;br /&gt;CODE --&amp;gt; PROD --&amp;gt; HOTFIX&lt;br /&gt;&lt;br /&gt;the fixing branch is forcibly merged from production, choosing the changeset corresponding to a build label (=release), just before working on a fix.&lt;br /&gt;Build definitions are in place (Clone and tweak the mapping), and you can have the build mark the binaries for hotfix.&lt;br /&gt;Less fuss and less chances of human errors, except for moving the fix back.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="3f805d0c-4d92-40f0-b2aa-5d4a4d611f7d">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.228.56.194</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36</userAgent>
+      <date>2014-09-17 06:37:55</date>
+      <content>@Guilio Yes that&amp;#39;s certainly a scenario that you could use. I wanted to prove that you could do a &amp;quot;hotfix&amp;quot; without actually requiring another branch, since branches in Tfvc are &amp;quot;long-lived&amp;quot;. However, if you don&amp;#39;t mind having a 3rd &amp;quot;hotfix&amp;quot; branch that is rarely used it can simplify the hotfix scenario.&lt;br /&gt;&lt;br /&gt;Thanks for the input!</content>
+    </comment>
+  </comments>
+  <viewCount>6238</viewCount>
+  <id>2baae65d-d243-4a40-b6ae-aa9a7b12e2ef</id>
+</post>

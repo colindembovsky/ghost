@@ -1,0 +1,212 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>cd3e099c-da22-42cb-8bec-9d6143822f0e</id>
+  <title>WebDeploy and Release Management – The Proper Way</title>
+  <slug>webdeploy-and-release-management--the-proper-way</slug>
+  <shortUrl>http://bit.ly/1fxVYKd</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-11-29 15:50:00</pubDate>
+  <lastModified>2020-04-08 02:42:11</lastModified>
+  <content>&lt;p&gt;I’ve just completed recording a Release Management webcast (more on Imaginet’s Visual Studio webcasts &lt;a href="http://www.imaginet.com/events" target="_blank"&gt;here&lt;/a&gt;). While doing the webcast, I wanted to show how you can use tokens which Release Management can substitute during the Release Workflow. Brian Keller suggests a .token file (basically an exact copy of your web.config file except that you use tokens instead of values) in his &lt;a href="http://download.microsoft.com/download/B/C/8/BC8558E1-192E-4286-B3B0-320A8B7CE49D/Embracing%20Continuous%20Delivery%20with%20Release%20Management%20for%20Visual%20Studio%202013.docx" target="_blank"&gt;Release Management hands on lab&lt;/a&gt;, but I hate having to keep 2 copies of the same file around.&lt;/p&gt; &lt;p&gt;Of course, being a huge fan of Web Deploy, I could use config transforms. The problem with mixing config transforms and Release Management is that you’d have to have a configuration per environment in your solution, and you’d end up having to create &lt;em&gt;n&lt;/em&gt; number of web deploy packages where &lt;em&gt;n&lt;/em&gt; is the number of Release Management stages you have. So if you had Dev, QA and Prod stages, you’d have to add at least one configuration to your solution so that you’d have Debug (for Dev), QA (for the QA environment) and Release (for Prod). Technically you wouldn’t be deploying the same package to each environment, even though they could be built at the same time from the same source files.&lt;/p&gt; &lt;p&gt;I bingled a bit and found two posts that looked useful. The &lt;a href="http://support.inreleasesoftware.com/entries/21448302-Tokenization-of-configuration-files" target="_blank"&gt;first was about tokenization&lt;/a&gt;, and had the downside is that you’re still doing an xcopy deployment rather than a web deploy package deployment, and you have to do some rather nasty gymnastics with the build parameters in order get it to work. The &lt;a href="http://support.inreleasesoftware.com/entries/21487316-InRelease-with-Web-Deploy" target="_blank"&gt;second&lt;/a&gt; was a lot cleaner, except for the fact that you have to know the folder on the server where the website ends up after the web deploy command, since the token replacement is done &lt;em&gt;after&lt;/em&gt; the invocation of the web deploy Tool.&lt;/p&gt; &lt;p&gt;I was convinced there was a cleaner solution, and I managed to come up with one. Basically, we use Web Deploy Parameters to tokenize the web.config file, and then do the token replacement before invoking Web Deploy.&lt;/p&gt; &lt;h2&gt;Parameters.xml&lt;/h2&gt; &lt;p&gt;Web Deploy lets you define parameters in a file called Parameters.xml. If there isn’t one in your project (alongside the web.config) then it creates a default one during publishing, so normally you don’t see it at all.&lt;/p&gt; &lt;p&gt;Let’s imagine that you have the following web.config snippet:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&lt;connectionStrings&gt;
+  &lt;add name="FabrikamFiber-Express" connectionString="somestring" providerName="System.Data.SqlClient" /&gt;
+&lt;/connectionStrings&gt;
+&lt;appSettings&gt;
+  &lt;add key="webpages:Version" value="2.0.0.0" /&gt;
+  &lt;add key="PreserveLoginUrl" value="true" /&gt;
+  &lt;add key="ClientValidationEnabled" value="true" /&gt;
+  &lt;add key="UnobtrusiveJavaScriptEnabled" value="true" /&gt;
+  &lt;add key="DemoEnv" value="Development"/&gt;
+&lt;/appSettings&gt;
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;There’s a connection string and an appSetting key that we want to tokenize. Right click the project and add a new xml file called “Parameters.xml”. Right click the file, select Properties and set the “Build Action” to None to make sure this file doesn’t end up deployed to your website. Now we add the following xml:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&lt;?xml version="1.0" encoding="utf-8" ?&gt;
+&lt;parameters &gt;
+  &lt;parameter name="DemoEnv" description="Please enter the name of the Environment" defaultValue="__EnvironmentName__" tags=""&gt;
+    &lt;parameterEntry kind="XmlFile" scope="\\web.config$" match="/configuration/appSettings/add[@key='DemoEnv']/@value" /&gt;
+  &lt;/parameter&gt;
+&lt;/parameters&gt;
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;We create a parameter with a name, description and default value. The format of the default value is important – it needs to be pre- and post-fixed with double underscore “__” since this is the token format for Release Management. We then specify a “kind” of XmlFile, set web.config as the scope and specify an XPath to find the parameter in the web.config file.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;(You’ll notice that we don’t need to specify any parameter for the connection string, since that will be tokenized in the publish profile)&lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Publish Profile&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;Right-click your web project and select “Publish” to create (or edit) a publish profile. Expand the dropdown and select &lt;New Profile…&gt; to create a new profile. I named mine “Release”. Click Next.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh6.ggpht.com/-BKy-yRAbHXk/UpibT9ZeS_I/AAAAAAAABHQ/-fIW3W4iOOI/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-L2-25D-E9Zs/UpibUzdojhI/AAAAAAAABHY/djCwst29Ao4/image_thumb%25255B1%25255D.png?imgmax=800" width="316" height="253"&gt;&lt;/a&gt; On the Connection page, select “Web Deploy Package” as the publish method and enter a name for the package location. Typically this is (name of your project).zip. For Site name, enter “__SiteName__” to create a Release Management token for your site name. Click Next.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-dr2kUo3r4qk/UpibVv_h09I/AAAAAAAABHg/0-XrR3y2Y6c/s1600-h/image%25255B7%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-ky2u8_fgRjg/UpibWc3G-eI/AAAAAAAABHo/9fKAZ66AJ6I/image_thumb%25255B3%25255D.png?imgmax=800" width="344" height="275"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;On the Settings page, select your configuration (I selected Release, which applies and config transforms in the Web.Release.config file in my solution, such as removing the Debug attribute from the &lt;compilation&gt; element). For each connection string you have, instead of entering in a real connection, again enter a Release Management token – I entered “__FabrikamFiber-Express-Connection__”.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh5.ggpht.com/-bLD-gkoVE7w/UpibXVfLJdI/AAAAAAAABHw/H7y4q5xfpr8/s1600-h/image%25255B11%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-n6Dy-Hh0AP0/UpibYFHx2sI/AAAAAAAABH4/5LgEgrjYwNU/image_thumb%25255B5%25255D.png?imgmax=800" width="374" height="300"&gt;&lt;/a&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Click Close and save the profile. The profile appears under the Properties\PublishProfiles folder of your web project.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-7m6izo5bi-Q/UpibYY9SZUI/AAAAAAAABIA/zxRvh9PaPKQ/s1600-h/image%25255B15%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh3.ggpht.com/-4X-gvNm-JSU/UpibZD86GgI/AAAAAAAABII/twPi65DvaUQ/image_thumb%25255B7%25255D.png?imgmax=800" width="326" height="106"&gt;&lt;/a&gt; Now check your solution into source control.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;If you do actually publish, you’ll see a SetParameters.xml file alongside the web deploy zip file. The contents of the file should be something like this:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;parameters&gt;
+  &lt;setParameter name="IIS Web Application Name" value="__SiteName__" /&gt;
+  &lt;setParameter name="DemoEnv" value="__EnvironmentName__" /&gt;
+  &lt;setParameter name="FabrikamFiber-Express-Web.config Connection String" value="__FabrikamFiber-Express-Connection__" /&gt;
+  &lt;setParameter name="FabrikamFiber.DAL.Data.FabrikamFiberWebContext-Web.config Connection String" value="FabrikamFiber.DAL.Data.FabrikamFiberWebContext_ConnectionString" /&gt;
+&lt;/parameters&gt;
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;You can see that there are 3 Release Management tokens – SiteName, EnvironmentName and FabrikamFiber-Express-Connection. These are the tokens we’ll replace when creating a release component for this website.&lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Building the Package&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;You can now create a build – make sure you use the ReleaseDefaultTemplate11.1.xaml (from the Release Management bin folder). Specify any arguments you want to as usual, but make sure you have this in the MSBuild arguments:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;font size="3" face="Courier New"&gt;/p:DeployOnBuild=true;PublishProfile=Release&lt;/font&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;That will instruct web deploy to create the package when we build using the settings of the Release profile. I recommend that you set “Release to Build” to false just to make sure your build is producing the correct artifacts.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh5.ggpht.com/-uKhtFlTnzyo/UpibZ4qFJxI/AAAAAAAABIQ/y2ZsO6HSoQM/s1600-h/image%25255B19%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-X8uDXRV0rCU/UpibaqIWiiI/AAAAAAAABIY/Uxpr3yprHQ4/image_thumb%25255B9%25255D.png?imgmax=800" width="388" height="126"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;After running the build, you should see the following in the _PublishedWebSites folder of your drop:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-gHn2eC9W3fg/UpibbeduqMI/AAAAAAAABIg/zItSLhdGzqQ/s1600-h/image%25255B23%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh3.ggpht.com/-kUwemv74Z64/UpibcBVq8oI/AAAAAAAABIo/U21i-1S2HTU/image_thumb%25255B11%25255D.png?imgmax=800" width="344" height="153"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;If you open the SetParameters.xml file (the one highlighted above) then you should see your Release Management tokens.&lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Create a Web Deploy Tool in Release Management&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;Download the InRelease MS Deploy wrapper from &lt;a href="http://support.inreleasesoftware.com/attachments/token/kfvabql0jv4omje/?name=irmsdeploy.exe" target="_blank"&gt;here&lt;/a&gt;. This is a simple exe that wraps the call to Web deploy so that any errors are reported in a way that Release Management understands. Let’s then go to Release Management-&gt;Inventory-&gt;Tools and click on New to create a new Tool:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Enter the following parameters:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh5.ggpht.com/-clawD7s-38g/UpibcsqSGNI/AAAAAAAABIw/OZr35qPHyEg/s1600-h/image%25255B27%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-27wu5FbvcGg/UpibdWVY3OI/AAAAAAAABI4/B4GX9Y_xoh8/image_thumb%25255B13%25255D.png?imgmax=800" width="351" height="252"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;You can see that I made a new parameter called “WebAppName” to make this a generic tool.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;At the bottom under Resources, click the “Add” button and import the irmsdeploy.exe that you downloaded. &lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;strong&gt;&lt;u&gt;Update: 2013-12-02&lt;/u&gt;&lt;/strong&gt; When running through this “demo” again on my VM checkpoint, the WebDeploy custom tool kept failing with an “Unable to find file” exception. After trying this several times and tearing my hair out in chunks, I thought I would make sure this wasn’t a security issue – turns out, it was exactly that. Once you’ve downloaded the irmsdeploy.exe file, make sure you right-click it, select properties and “Unblock” it (see the below screenshot).&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-DUYVtKdFZlE/UpzbinXEAbI/AAAAAAAABK8/NPaqH1fm-lQ/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://lh3.ggpht.com/-ZtXq92R57no/UpzblJm-d8I/AAAAAAAABLE/qWOijdmN0sQ/image_thumb.png?imgmax=800" width="179" height="244"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Create a Component&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;Once you’ve set up your Release Path, you’ll be able to define the release workflow for each stage. You’re going to need to create a component for your website in order to deploy it. Navigate to “Configure Apps-&gt;Components” and click New. Enter a name (and optional description) and then enter the following on the Source tab:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh6.ggpht.com/-cuRJ-5r4AMQ/UpibeaE8hdI/AAAAAAAABJA/ODMZaTPHUN8/s1600-h/image%25255B31%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/--wVySNRIExI/UpibfIyZfVI/AAAAAAAABJI/kGVuQ0pxJxs/image_thumb%25255B15%25255D.png?imgmax=800" width="346" height="254"&gt;&lt;/a&gt; The “Path to Package” is the path that contains the web deploy package.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Now click on the “Deployment” tab:.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-OvMisXbj-Ig/UpibfiIJmOI/AAAAAAAABJQ/sYX_w3m0kJ0/s1600-h/image%25255B35%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-5JOJUUe-Mzg/Upibgen3uCI/AAAAAAAABJY/Ceo8wP7RWqs/image_thumb%25255B17%25255D.png?imgmax=800" width="345" height="140"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Select WebDeploy from the Tool dropdown – that will automatically create the WebAppName parameter for this component.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Finally, move to the “Configuration Variables” tab:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh6.ggpht.com/-9HZdDKHIzNc/UpibhDM1GsI/AAAAAAAABJg/866sYFe6DEk/s1600-h/image%25255B48%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-Z3Bb_yMFpFo/UpibhtVqlMI/AAAAAAAABJo/juQ1WIBOCrs/image_thumb%25255B26%25255D.png?imgmax=800" width="404" height="109"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;br /&gt;&lt;p&gt;Change the “Variable Replacement Mode” to “Before Installation” and set the “File Extension Filter” to “*.SetParameters.xml”. Now add all of your parameters (these are the tokens that are in your SetParameters.xml file after the build). You can type descriptions too.&lt;/p&gt;&lt;br /&gt;&lt;h2&gt;Specifying Values in a Release Template&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;We’re finally ready to use the component inside a Release Template. Create a new template for a release path, and inside a Server activity drop your component. When you expand it, you’ll see that you can specify values for the parameters. Here are screenshots of my Dev and QA components:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-UD7iPt1-3H0/UpibiAJaFvI/AAAAAAAABJs/TzD6LX0QVOs/s1600-h/image%25255B65%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-RnR2KZA1OeA/Upibi_mtMeI/AAAAAAAABJ4/SAtDRZ6pM7E/image_thumb%25255B39%25255D.png?imgmax=800" width="345" height="167"&gt;&lt;/a&gt; &lt;a href="http://lh6.ggpht.com/-0T4pIX50Wak/UpibjUMIWVI/AAAAAAAABJ8/F5FZ2DGVBVA/s1600-h/image%25255B68%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-rBhwrP4AaGQ/Upibj5XAWUI/AAAAAAAABKI/c7xsUGtqZZ0/image_thumb%25255B42%25255D.png?imgmax=800" width="368" height="159"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;The best part is, not only can you use these parameters in Release Management, but if you import this web deploy package directly in IIS, you get prompted to supply values for the parameters too:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-itWALleab10/UpiblWgZXqI/AAAAAAAABKQ/okA7XG__Uuk/s1600-h/image%25255B72%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-YhinJ2iGZwI/UpibmqkG-eI/AAAAAAAABKY/AzlHE2rYj9I/image_thumb%25255B44%25255D.png?imgmax=800" width="392" height="304"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Happy Releasing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="31d86827-dafe-4a2f-9938-f1eeb42a0534">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-02-10 14:12:48</date>
+      <content>Hello, we are looking for something similar, is there an alternative? &lt;br /&gt;Something that works with ms web deploy packages and web services but without TFS?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ac29dfb8-1007-418f-8dd7-f4930713a13a">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-04-08 23:27:32</date>
+      <content>Great Post !!!&lt;br /&gt;Under "Create a Web Deploy Tool in Release Management" the link to the InRelease MS Deploy wrapper is broken, Can you please fix it or just give us an alternative? Thanks</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="b42fd836-64b7-43f8-95e1-c73669f19b17">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-04-11 13:38:24</date>
+      <content>It seems the InRelease website is no longer available (that's what Release Management was before MS bought it). You can get the irmsdeploy.exe file here: http://1drv.ms/1erhy2D</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="b38cf178-bdc5-4564-b6b3-09f8a3428038">
+      <author>Unknown</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02605051089003931346</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-04-19 07:50:06</date>
+      <content>Hi Colin, &lt;br /&gt;you can update your link with the following ones:&lt;br /&gt;http://incyclesoftware.zendesk.com/entries/21448302&lt;br /&gt;http://incyclesoftware.zendesk.com/entries/21487316&lt;br /&gt;&lt;br /&gt;BTW, thanks for your post! And thanks to InCycle Software to continue hosting the site.&lt;br /&gt;&lt;br /&gt;Jonathan</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5d6cfcf6-5d34-4cc5-bda4-29bf43e1d341">
+      <author>Darwin</author>
+      <email>dhsass@gmail.com</email>
+      <website></website>
+      <ip>67.110.116.150</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.116 Safari/537.36</userAgent>
+      <date>2014-05-01 19:23:28</date>
+      <content>I&amp;#39;m new to creating Web deployment packages. This post was really helpful right up this poing: &amp;quot;You can now create a build – make sure you use the ReleaseDefaultTemplate11.1.xaml&amp;quot;.  I didn&amp;#39;t know what you were referring to.  A quick Google search showed that I need to retrieve the file from a different build server.  Perhaps it would be helpful for you to indicate how to find the file and what the purpose of that file is.  Also, being new to MSBuild, this part of the post assumes people know how to use MSBuild.  Perhaps fleshing that part of the post out would be helpful too.&lt;br /&gt;&lt;br /&gt;Thanks.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="cccd987a-4a44-4cee-a245-c237372d6dd1">
+      <author>Sreekanth Mohan</author>
+      <email>moha.sreekanth@gmail.com</email>
+      <website>http://www.msdevtips.com/</website>
+      <ip>111.92.65.241</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36</userAgent>
+      <date>2014-06-12 17:59:11</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Thank you very much for this article...!!&lt;br /&gt;&lt;br /&gt;I have tried a release as you described in this article. But it is keep on showing &amp;quot;Pending&amp;quot; under the status column of the log, in the detail log view as well. I suspect the release is blocked somewhere.&lt;br /&gt;Could you please help me to identify the issue? We have provided a log file name while creating the web deploy tool, how to view the log file content?&lt;br /&gt;&lt;br /&gt;Please help....</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="92252ff8-d3f2-4075-9cb7-c2502daa78a7">
+      <author>Jason Capriotti</author>
+      <email>jason.capriotti@gmail.com</email>
+      <website></website>
+      <ip>74.202.96.5</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36</userAgent>
+      <date>2014-08-11 20:24:06</date>
+      <content>What is the advantage of using a publish profile and &amp;quot;Before Installation&amp;quot; variable replacement to transform your connection strings, vs a config transform to get the tokenized web.config and then an &amp;quot;After Installation&amp;quot; variable replacement?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="bc152e01-6611-4b67-a967-623c978a73b8">
+      <author>Christophe Frey</author>
+      <email>cfrey@investpsp.ca</email>
+      <website></website>
+      <ip>67.69.225.69</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-21 18:22:02</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;I&amp;#39;m looking to use a combination of web deploy and Release manager to build our ALM.&lt;br /&gt;&lt;br /&gt;It works fine but It&amp;#39;s not as robust as I need. If for example, the webDeploy failed (My web site &lt;br /&gt;is not created or whatever reason ...), the deployment of the component finish successfully even if something got wrong and there is an error in the log file generate by web deploy :&lt;br /&gt;&lt;br /&gt;Info: Using ID &amp;#39;499b141e-2ac8-4a01-8e6e-29774188377d&amp;#39; for connections to the remote server.&lt;br /&gt;Error Code: ERROR_DESTINATION_NOT_REACHABLE&lt;br /&gt;More Information: Could not connect to the remote computer (&amp;quot;swebmtl02&amp;quot;). On the remote computer, make sure that Web Deploy is installed and that the required process (&amp;quot;Web Deployment Agent Service&amp;quot;) is started.  Learn more at: http://go.microsoft.com/fwlink/?LinkId=221672#ERROR_DESTINATION_NOT_REACHABLE.&lt;br /&gt;Error: The remote server returned an error: (404) Not Found.&lt;br /&gt;Error count: 1.&lt;br /&gt;&lt;br /&gt;What would be the best way to handle this ? How can I make the deployment of a component fail if it&amp;#39;s deploy with a cmd in Release manager.&lt;br /&gt;&lt;br /&gt;Thnks &lt;br /&gt;&lt;br /&gt;Christophe</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="3a4aae97-6a52-498b-8ca4-785ddc313bad">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 17:36:46</date>
+      <content>Hi Christophe&lt;br /&gt;&lt;br /&gt;Not sure what to suggest - my deployment fails if the Webdeploy command fails...</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5ed956a3-6010-44d5-b4cb-e7cfc938ef3c">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 17:40:12</date>
+      <content>@Jason - there&amp;#39;s no difference - I like doing the &amp;quot;Before Installation&amp;quot; substitution since I know exactly where the SetParameters.xml file is - if you do an &amp;quot;After Installation&amp;quot; substitution you have to know where the web.config file ends up, and it could be anywhere (depending on what your webdeploy settings are). Just personal preference at the end of the day.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="da1def42-0a2e-4b79-a488-a7da68c2555e">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-27 15:6:21</date>
+      <content>@SreeKanth - I&amp;#39;ve seen this when the agent itself gets stuck, or if the command that the agent issues is waiting for user prompt. Can you execute the command yourself and check that it isn&amp;#39;t waiting for input? Also, can your agent do other tasks?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="13ebf981-31bb-4d0a-8cca-128dfbbcafa5">
+      <author>Graham Smith</author>
+      <email>graham.david.smith@gmail.com</email>
+      <website>http://pleasereleaseme.net/</website>
+      <ip>80.229.15.180</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36</userAgent>
+      <date>2015-01-14 23:44:32</date>
+      <content>A nice way of handling web.config if you are using TFS for your build is to use transforms to create a tokenised version of web.config in your drops folder by using the /p:UseWPP_CopyWebApplication=true /p:PipelineDependsOnBuild=false switch in the build template. RM then just picks up the tokenised version and swaps in whatever parameters are needed for that environment. See my blog post http://pleasereleaseme.net/continuous-delivery-tfs-preparing-deployment-pipeline for more details.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="53785c95-a909-4df7-8086-d335f9db1654">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:57:45</date>
+      <content>Hi @Graham&lt;br /&gt;&lt;br /&gt;Thanks for the post about the tokenized web.config - elegant alternative!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="d54e034c-7331-4be8-8885-1223590fc252">
+      <author>Adam Arrington</author>
+      <email>adam.arrington@ihs.com</email>
+      <website></website>
+      <ip>207.235.112.66</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36</userAgent>
+      <date>2015-04-06 12:34:19</date>
+      <content>Hello Colin,&lt;br /&gt;&lt;br /&gt;The InRelease MS Deploy wrapper link appears to no longer be active.  I have tried this solution just using the msdeploy.exe in place of the irmsdeploy.exe.  I&amp;#39;m able to generate the *.deploy.cmd, *.deploy-readme.txt, *.SetParameters.xml, *.SourceManifest.xml, *.zip from my TeamBuild.  Release Management can detect the build drop location and pick up the files, but when it tries to run my component, it gives me the following error: &lt;br /&gt;&lt;br /&gt;Error: Unrecognized argument &amp;#39;WebBuildDeploy.deploy.cmd&amp;#39;. All arguments must begin with &amp;quot;-&amp;quot;.&lt;br /&gt;Error count: 1.&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve researched this error and have tried the many different work arounds to no avail.  Any suggestions on how to get past this error?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b538cede-4155-462e-ab8a-d7a839d32fff">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.229.33.11</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-09 20:29:40</date>
+      <content>Hi @Adam - seems like the InRelease website is finally dead! Fortunately I still have a copy of the irmsdeploy.exe wrapper - here it is: http://1drv.ms/1HWjwlf&lt;br /&gt;&lt;br /&gt;Try that first to see if you get any further on your deployments.&lt;br /&gt;&lt;br /&gt;The PowerShell issue you&amp;#39;re having looks like an escaping issue - make sure that you escape all the arguments you&amp;#39;re passing in quotes (around the whole command). You should have something like this in the script:&lt;br /&gt;&lt;br /&gt;cmd /c &amp;quot;WebBuildDeploy.deploy.cmd -arg1 -arg2&amp;quot; where the args are whatever args you need.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5037260f-7cd8-4f9c-84c1-055a8361eb21">
+      <author>Skyler</author>
+      <email>Skyler.todd@flipswitch.com</email>
+      <website></website>
+      <ip>64.128.204.82</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36</userAgent>
+      <date>2015-04-17 17:37:37</date>
+      <content>Great walk through,  Took a bunch of concepts and applied them perfectly to get a great result.&lt;br /&gt;&lt;br /&gt;Thank You!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="8e12eb17-3f5c-403e-bcda-2cfb2215c15d">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>196.23.22.4</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-30 11:28:40</date>
+      <content>Thanks @Skyler - glad it helped!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6d6a9b47-de48-4fab-9d06-346ca23ba60a">
+      <author>jose</author>
+      <email>jgga16@hotmail.com</email>
+      <website></website>
+      <ip>200.6.8.4</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.94 Safari/537.36</userAgent>
+      <date>2016-05-12 19:6:19</date>
+      <content>I can&amp;#39;t find the &amp;quot;InRelease MS Deploy&amp;quot; in the url specified.  Where I can download this tool.&lt;br /&gt;Thanks</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="fea7dd18-751a-44f6-95ea-19ac3eb94aa3">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:38:31</date>
+      <content>Hi @Jose&lt;br /&gt;&lt;br /&gt;Yes, I see the link is dead. I&amp;#39;m afraid I can&amp;#39;t help :-(</content>
+    </comment>
+  </comments>
+  <viewCount>27758</viewCount>
+</post>

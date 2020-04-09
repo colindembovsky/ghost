@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>63319a5b-a0d2-42a5-a06b-ade5a1081cc7</id>
+  <title>Test Result Traceability Matrix Tool</title>
+  <slug>test-result-traceability-matrix-tool</slug>
+  <shortUrl>http://bit.ly/1BTt5PN</shortUrl>
+  <author></author>
+  <pubDate>2014-09-19 12:28:22</pubDate>
+  <lastModified>2017-05-16 07:43:11</lastModified>
+  <content>&lt;p&gt;I am often asked if there is a way to see a “traceability matrix” in TFS. Different people define a “traceability matrix” in different ways. If you want to see how many tests there are for a set of requirements, then you can use &lt;a href="http://www.modernrequirements.com/smartexcel4tfs/" target="_blank"&gt;SmartExcel4TFS&lt;/a&gt;. However, this doesn’t tell you what state the current tests are in – so you can’t see how many tests are passing / failing etc.&lt;/p&gt; &lt;h2&gt;Test Points&lt;/h2&gt; &lt;p&gt;Of course this is because there is a difference between a test case and a test point in TFS. A test point is the combination of Test Case, Test Suite and Test Configuration. So let’s say you have Test ABC in Suite 1 and Suite 2 and have it for 2 configurations (Win7 and Win8, for example). Then you’ll really have 1 test case and 4 test points (2 suites x 2 configurations). So if you want to know “is this test case passing?” you really have to ask, “Is this test case passing in this suite and for this configuration?”.&lt;/p&gt; &lt;p&gt;However, you can do a bit of a “cheat” by making an assumption: if the most recent result is Pass/Fail/Not Run/Blocked, then assume the “result of the test” is Pass/Fail/Not Run/Blocked. Of course if the “last result” is failed, you’d have to find exactly which suite/configuration the failure relates to in order to get any detail. Anyway, for most situations this assumption isn’t too bad.&lt;/p&gt; &lt;h2&gt;Test Result Traceability Matrix Tool&lt;/h2&gt; &lt;p&gt;Given the assumption that the most recent test point result is the “result” of the Test Case, it’s possible to create a “test result traceability matrix”. If you plot Requirement vs Test Case in a grid, and then color the intersecting cells with the appropriate “result”, you can get a good idea of what state tests are in in relation to your requirements. So I’ve written a utility that will generate this matrix for you (see the bottom of this post for the link).&lt;/p&gt; &lt;p&gt;Here’s the output of a run:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/54f8b5ce-b27c-44c6-8930-0e9f6b02ffee.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/0239fdda-4c98-4efc-a156-db27d9ca9646.png" width="766" height="304"&gt;&lt;/a&gt; The first 3 columns are:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Requirement ID&lt;/li&gt; &lt;li&gt;Requirement Title&lt;/li&gt; &lt;li&gt;Requirement State&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Then I sum the total of the test case results per category for that requirement – you can see that Requirement 30 has 2 Passed Tests and 1 Failed test (also 0 blocked and 0 not run). If you move along the same row, you’ll see the green and red blocks where the tests cases intersect with their requirements. The colors are as follows:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Green = Passed&lt;/li&gt; &lt;li&gt;Red = Failed&lt;/li&gt; &lt;li&gt;Orange = Blocked&lt;/li&gt; &lt;li&gt;Blue = Not Run&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;You can see I’ve turned on conditional formatting for the 4 totals columns. I’ve also added filtering to the header, so you can sort / filter the requirements on id, title or state.&lt;/p&gt; &lt;h2&gt;Some Notes&lt;/h2&gt; &lt;p&gt;This tool requires the following arguments:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;TpcUrl – the URL to the team project collection&lt;/li&gt; &lt;li&gt;ProjectName – the name of the Team Project you’re creating the matrix for&lt;/li&gt; &lt;li&gt;(Optional) RequirementQueryName – if you don’t specify this, you’ll get the matrix for all requirements in the team project. Alternatively, you can create a flat-list query to return only requirements you want to see (for example all Stories in a particular area path) and the matrix will only show those requirements.&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;I speak of “requirements” – the tool essentially gets all the work items in the “requirements category” as a top-level query and then fetches all work items in the “test case category” that are linked to the top-level items. So this will work as long as your process template has a Requirements / Test Case category.&lt;/p&gt; &lt;p&gt;The tool isn’t particularly efficient – so if you have large numbers of requirements, test cases and test plans the tool could take a while to run. Also, the tool selects the first “requirementsQuery” that matches the name you pass in – so make sure the name of your requirements query is unique. The tool doesn’t support one-hop or tree queries for this query either.&lt;/p&gt; &lt;p&gt;Let me know what you think!&lt;/p&gt; &lt;h2&gt;Download&lt;/h2&gt; &lt;p&gt;Here’s a &lt;a href="http://1drv.ms/1AUErAE" target="_blank"&gt;link to the executable&lt;/a&gt;: you’ll need Team Explorer 2013 and Excel to be installed on the machine you run this tool from. To run it, download and extract the zip. The open up a console and run TestResultMatrix.exe.&lt;/p&gt; &lt;p&gt;Happy matrix generating!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Testing</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="bf78c487-da1a-40ea-bdfe-ea53ae01fbe4">
+      <author>Gerardo Chadid</author>
+      <email>gchadid@deloim.com</email>
+      <website></website>
+      <ip>200.13.243.186</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36</userAgent>
+      <date>2014-10-30 20:25:34</date>
+      <content>Hi, &lt;br /&gt;&lt;br /&gt;Thank you for posting a great tool, it would be lovely if we could choose the category for columns and row ;). &lt;br /&gt;&lt;br /&gt;But the way, when i try to generate the excel i am getting the following exception, the excel file it is generate but the &amp;quot;style process&amp;quot; fails.&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;TestResultMatrix.exe http://localhost:8080/tfs/IpsUniversitaria/ Asistencial MatrizTrazabilidad&lt;br /&gt;System.Reflection.TargetParameterCountException: Error al invocar Style.&lt;br /&gt;   en System.Dynamic.ComRuntimeHelpers.CheckThrowException(Int32 hresult, ExcepI&lt;br /&gt;nfo</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="3795c35b-647b-4a35-9d0d-4c39a28983e7">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.143.214</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2014-12-17 21:28:04</date>
+      <content>@Gerardo - when I get a chance I&amp;#39;ll publish the code on Github or something. I didn&amp;#39;t do any locale engineering - I think that could be the cause of your error. When I post the code you&amp;#39;ll be able to fix the bug :-)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="392d17ca-539c-4470-b491-ed9de013b036">
+      <author>Parnell</author>
+      <email>eklund.par@gmail.com</email>
+      <website></website>
+      <ip>138.221.250.6</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-02-09 15:29:05</date>
+      <content>Great tool!&lt;br /&gt;As you said: If there are many requirements (we have 4790 of them) and many tests (appr. 3600 test cases) the result is a bit hard to overview. I&amp;#39;m primarily interested in finding requirements that are not covered by any test, and not the latest results. Maybe using queries would be better for me...</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="27b1f3ec-adee-4930-9a5a-a897b1633b6d">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:32:09</date>
+      <content>Hi @Parnell&lt;br /&gt;&lt;br /&gt;You can create a query for &amp;quot;requirements without test cases&amp;quot; using the Direct Links query type. They wouldn&amp;#39;t show up in this tool because there would be no test results - but you&amp;#39;ll see the list of &amp;quot;uncovered requirements&amp;quot; in Team Explorer or VS or Excel.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="868ea13a-5847-4c8e-bf1a-ec1b1a071c15">
+      <author>Peter</author>
+      <email>peter.kiesel@posteo.de</email>
+      <website></website>
+      <ip>192.35.17.12</ip>
+      <userAgent>Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)</userAgent>
+      <date>2015-06-02 15:50:48</date>
+      <content>Hi Colin, would it be possible to get the source code of the &amp;quot;Traceability Matrix Tool&amp;quot;?&lt;br /&gt;Peter.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="67c60c95-8296-4b4b-8c7c-523221a5a644">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:39:04</date>
+      <content>@Peter - I&amp;#39;m going to push it up to GitHub soon. I&amp;#39;ll post the link back here when I do.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9a2a0204-cc0a-43c9-acd2-47954de04b86">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.58.11</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-10 14:5:27</date>
+      <content>I have open-sourced the source code in this GitHub repo: https://github.com/colindembovsky/TFSReqMatrix&lt;br /&gt;&lt;br /&gt;Have fun!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8d226691-e398-4885-ba29-a4018bf92a5d">
+      <author>John</author>
+      <email>jnavarra@gmail.com</email>
+      <website></website>
+      <ip>104.129.196.105</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.155 Safari/537.36</userAgent>
+      <date>2015-08-20 13:10:33</date>
+      <content>Thank you so much!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="afafbf7f-496c-4c6a-b0d9-e369d95ca774">
+      <author>John</author>
+      <email>jnavarra@gmail.com</email>
+      <website></website>
+      <ip>104.129.196.105</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.155 Safari/537.36</userAgent>
+      <date>2015-08-20 13:14:59</date>
+      <content>My project has a space in it, can I use the teamProjectName encapsulated by quotes?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="736e4177-e3ad-4d5a-ad51-8614e3daf7f8">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.94.153</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-09-21 07:33:36</date>
+      <content>Hi @John&lt;br /&gt;&lt;br /&gt;I&amp;#39;m not sure about the space in the team project name - but the source code is on GitHub, so you can just clone the repo. Also, I&amp;#39;d recommend that you use Team Project Rename and get rid of the space in the TP name - it&amp;#39;s always pesky.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="b3c0e20e-bcd7-41c5-969d-e47795b6b781">
+      <author>Laxmi</author>
+      <email>lakshmi_mbr@yahoo.com</email>
+      <website></website>
+      <ip>202.89.106.200</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.96 Safari/537.36</userAgent>
+      <date>2017-05-16 07:43:11</date>
+      <content>@Colin&lt;br /&gt;Can you please let me know, How to use it. I am new to TFS.</content>
+    </comment>
+  </comments>
+  <viewCount>6297</viewCount>
+</post>

@@ -1,0 +1,401 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>a26bb194-f177-46f5-83da-facf5894e8e2</id>
+  <title>Parallel Testing in a Selenium Grid with VSTS</title>
+  <slug>parallel-testing-in-a-selenium-grid-with-vsts</slug>
+  <shortUrl>http://bit.ly/2ahboSc</shortUrl>
+  <author></author>
+  <pubDate>2016-07-28 18:24:24</pubDate>
+  <lastModified>2019-04-17 06:17:49</lastModified>
+  <content>&lt;p&gt;There are several different types of test – unit tests, functional test, load tests and so on. Generally, unit tests are the easiest to implement and have a high return on investment. Conversely, UI automation tests tend to be incredibly fragile, hard to maintain and don’t always deliver a huge amount of value. However, if you carefully design a good UI automation framework (especially for web testing) you can get some good mileage.&lt;/p&gt; &lt;p&gt;Even if you get a good framework going, you’re going to want to find ways of executing the tests in parallel, since they can take a while. Enter &lt;a href="https://github.com/SeleniumHQ/selenium/wiki/Grid2" target="_blank"&gt;Selenium Grid&lt;/a&gt;.&amp;nbsp; &lt;a href="http://www.seleniumhq.org/" target="_blank"&gt;Selenium&lt;/a&gt; is a “web automation framework”. Under the hood, Selenium actually runs as a server which accepts ReST commands – those commands are wrapped in the Selenium client, so you usually see these HTTP commands. However, since the server is capable of driving a browser via HTTP, you can run tests &lt;em&gt;remotely&lt;/em&gt; – that is, have tests run on one machine that execute over the wire to a browser on another machine. This allows you to scale your test infrastructure (by adding more machines). This is exactly what Selenium Grid does for you.&lt;/p&gt; &lt;p&gt;My intention with this post isn’t to show how you can create Selenium tests. Rather, I’ll show you some ins and outs of running Selenium tests in parallel in a Grid in a VSTS build/release pipeline.&lt;/p&gt; &lt;h2&gt;Components for Testing in a Grid&lt;/h2&gt; &lt;p&gt;There are a few moving parts we’ll need to keep track of in order for this to work:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;The target site  &lt;li&gt;The tests  &lt;li&gt;The Selenium Hub (the master that coordinates the Grid)  &lt;li&gt;The Selenium Nodes (the machines that are going to be executing the tests)  &lt;li&gt;Selenium drivers  &lt;li&gt;VSTS Build  &lt;li&gt;VSTS Release&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;The cool thing about a Selenium grid is that, from a test perspective, you only need to know about the Selenium Grid hub. The nodes register with the hub and await commands to execute (i.e. run tests). The tests themselves just target the hub: “Hey Hub, I’ve got this test I want you to run for me on a browser with these capabilities…”. The hub then finds a node that meets the required capabilities and executes the tests remotely (via HTTP) on the node. Pretty sweet. This means you can scale the grid out without having to modify the tests at all.&lt;/p&gt; &lt;p&gt;Again lifting Selenium’s skirts we’ll see that a Selenium Node receives an instruction (like “use Chrome and navigate to google.com”). The node uses a driver for each browser (Firefox doesn’t have a driver, since Selenium knows how to drive it “natively”) to drive the browser. So when you configure a grid, you need to configure the Selenium drivers for each browser you want to test with on the grid (and by configure I mean copy to a folder).&lt;/p&gt; &lt;h2&gt;Setting Up a Selenium Grid&lt;/h2&gt; &lt;p&gt;In experimenting with the grid, I decided to set up a two-machine Grid in Azure. Selenium Server (used to run the Hub and the Nodes) is a java application, so it’ll run wherever you can run Java. So I spun up a Resource Group with two VMs (Windows 2012 R2) and installed Java (and added the bin folder to the Path), Chrome and Firefox. I then downloaded the &lt;a href="http://goo.gl/EoH85x" target="_blank"&gt;Selenium Server jar file&lt;/a&gt;, the &lt;a href="http://selenium-release.storage.googleapis.com/2.53/IEDriverServer_Win32_2.53.1.zip" target="_blank"&gt;IE driver&lt;/a&gt; and the &lt;a href="http://chromedriver.storage.googleapis.com/index.html?path=2.22/" target="_blank"&gt;Chrome driver&lt;/a&gt; (you can see the instructions on installing &lt;a href="http://docs.seleniumhq.org/download/" target="_blank"&gt;here&lt;/a&gt;). I put the IE and Chrome drivers into c:\selenium\drivers on both machines.&lt;/p&gt; &lt;p&gt;I wanted one machine to be the Hub and run Chrome/Firefox tests, and have the other machine run IE/Firefox tests (yes, Nodes can run happily on the same machine or even on the same machine as the Hub). There are a myriad of options you can specify when you start a Hub or Node, so I scripted a general config that I thought would work as a default case.&lt;/p&gt; &lt;p&gt;To start the Hub, I created a one-line bat file in c:\selenium\server folder (where I put the server jar file):&lt;/p&gt;&lt;pre&gt;java -jar selenium-server-standalone-2.53.1.jar -role hub
+
+&lt;/pre&gt;
+&lt;p&gt;This command starts up the Hub using port 4444 (the default) on the machine. Don’t forget to open the firewall for this port!&lt;/p&gt;
+&lt;p&gt;Configuring the nodes took a little longer to work out. The documentation is a bit all over the place (and ambiguous) so I eventually settled on putting some config in a JSON file and some I pass in to the startup command. Here’s the config JSON I have for the IE node:&lt;/p&gt;&lt;pre class="brush: js;"&gt;{
+  "capabilities":
+  [
+    {
+      "browserName": "firefox",
+      "platform": "WINDOWS",
+      "maxInstances": 1
+    },
+    {
+      "browserName": "internet explorer",
+      "platform": "WINDOWS",
+      "maxInstances": 1
+    }
+  ],
+  "configuration":
+  {
+    "nodeTimeout": 120,
+    "nodePolling": 2000,
+    "timeout": 30000
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;This is only the bare minimum of config that you can specify – there are tons of other options that I didn’t need to bother with. All I wanted was for the Node to be able to run Firefox and IE tests. In a similar vein I specify the config for the Chrome node:&lt;/p&gt;&lt;pre class="brush: js;"&gt;{
+  "capabilities": [
+    {
+      "browserName": "firefox",
+      "platform": "WINDOWS",
+      "maxInstances": 1
+    },
+    {
+      "browserName": "chrome",
+      "platform": "WINDOWS"
+    }
+  ],
+  "configuration":
+  {
+    "nodeTimeout": 120,
+    "nodePolling": 2000,
+    "timeout": 30000
+  }
+}
+&lt;/pre&gt;
+&lt;p&gt;You can see this is almost identical to the config of the IE node, except for the second browser type.&lt;/p&gt;
+&lt;p&gt;I saved these files as ieNode.json and chromeNode.json in c:\selenium\server\configs respectively.&lt;/p&gt;
+&lt;p&gt;Then I created a simple PowerShell script that would let me start a node:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;param(
+    $port,
+    [string]$hubHost,
+    $hubPort = 4444,
+
+    [ValidateSet('ie', 'chrome')]
+    [string]$browser,
+
+    [string]$driverPath = "configs/drivers"
+)
+
+$hubUrl = "http://{0}:{1}/grid/register" -f $hubHost, $hubPort
+$configFile = "./configs/{0}Node.json" -f $browser
+
+java -jar selenium-server-standalone-2.53.1.jar -role node -port $port -nodeConfig $configFile -hub $hubUrl -D"webdriver.chrome.driver=$driverPath/chromedriver.exe" -D"webdriver.ie.driver=$driverPath/IEDriverServer.exe"
+&lt;/pre&gt;
+&lt;p&gt;So now I can run the following command on the Hub machine to start a node:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;.\startNode.ps1 -port 5555 -hubHost localhost -browser chrome -driverPath c:\selenium\drivers
+&lt;/pre&gt;
+&lt;p&gt;This will start a node that can run Chrome/Firefox tests using drivers in the c:\selenium\server\drivers path running on port 5555. On the other machine, I copied the same files and just ran this command:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;.\startNode.ps1 -port 5556 -hubHost 10.4.0.4 -browser ie -driverPath c:\selenium\drivers
+&lt;/pre&gt;
+&lt;p&gt;This time the node isn’t on the same machine as the Hub, so I used the Azure vNet internal IP address of the Hub – I also specified I want IE/Firefox tests to run on this node.&lt;/p&gt;
+&lt;p&gt;Of course I made sure that all these files are in source control!&lt;/p&gt;
+&lt;p&gt;Again I had to make sure that the ports I specify were allowed in the Firewall. I just created a single Firewall rule to allow TCP traffic on ports 4444, 5550-5559 on both machines.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/09a7359e-58df-4a0f-b501-907537859632.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4d65dca6-6287-43ba-ac99-6cfe5cd52fe8.png" width="279" height="367"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I also opened those ports in the Azure network security group that both machines’ network cards are connected to:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/3f834cfa-c5f4-48a1-bd23-e42694af2908.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/53001826-09d1-4183-b66b-f2131679a6a0.png" width="622" height="202"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now I can browse to the Selenium console of my Grid:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/e80d0617-72c8-438e-a721-d0ec678def6b.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/0d1c0780-b0a2-4fcf-86fe-c34910f9aa5f.png" width="573" height="206"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now my hub is ready to run tests!&lt;/p&gt;
+&lt;h2&gt;Writing Tests for Grid Execution&lt;/h2&gt;
+&lt;p&gt;The Selenium Grid is capable of running tests in parallel, spreading tests across the grid. Spoiler alert: it doesn’t run tests in parallel. I can hear you now thinking, “What?!? You just said it can run tests in parallel, and now you say it can’t!”. Well, the grid can spread as many tests as you throw at it – but you have to parallelize the tests yourself!&lt;/p&gt;
+&lt;p&gt;It turns out that you can do this in Visual Studio 2015 and VSTS – but it’s not pretty. If you open up the Test Explorer Window, you’ll see an option to “Run Tests In Parallel” in the toolbar (next to the Group By button):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c9160528-daef-461f-8142-dae11f2c9dd0.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/36350e23-fa8f-4ea4-b66e-aa0dcf8bd973.png" width="420" height="174"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Again I hear you thinking: “Just flip the switch! Easy!” Whoa, slow down, Dear Reader – it’s not that easy. You have to consider the &lt;em&gt;unit&lt;/em&gt; of parallelization. In other words – what does it mean to “Run Tests In Parallel”? Well, Visual Studio runs different &lt;em&gt;assemblies&lt;/em&gt; in parallel. Which means that you have to have at least two test projects (assemblies) in order to get any benefit.&lt;/p&gt;
+&lt;p&gt;In my case I had two tests that I wanted to run against three browsers – IE, Chrome and Firefox. Of course if you have several hundred tests, you probably have them in different assemblies already – hopefully grouped by something meaningful. In my case I chose to group the tests by browser. Here’s what I ended up doing:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Create a base (abstract) class that contains the Selenium test methods (the actual test code) 
+&lt;li&gt;Create three additional projects – one for each browser type – that contains a class that derives from the base class 
+&lt;li&gt;Run in parallel&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;It’s a pity really – since the Selenium libraries abstract the test away from the actual browser. That means you can run the same test against any browser that you have a driver for! However, since we’re going to run tests in a Hub, we need to use a special driver called a RemoteWebDriver. This driver is going to connect the test to the hub using “capabilities” that we define (like what browser to run in).&lt;/p&gt;
+&lt;p&gt;Let’s consider an example test. Here’s a test I created to check the Search functionality of my website:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;protected void SearchTest()
+{
+    driver.Navigate().GoToUrl(baseUrl + "/");
+    driver.FindElement(By.Id("search-box")).Clear();
+    driver.FindElement(By.Id("search-box")).SendKeys("tire");
+
+    driver.FindElement(By.Id("search-link")).Click();
+
+    // check that there are 3 results
+    Assert.AreEqual(3, driver.FindElements(By.ClassName("list-item-part")).Count);
+}
+&lt;/pre&gt;
+&lt;p&gt;This is a pretty simple test – and as I mentioned before, this post isn’t about the Selenium tests themselves as much as it is about &lt;em&gt;running&lt;/em&gt; the tests in a build/release pipeline – so excuse the simple nature of the test code. However, I have to show you some code in order to show you how I got the tests running successfully in the grid.&lt;/p&gt;
+&lt;p&gt;You can see how the code assumes that there is a “driver” object and that it is instantiated? There’s also a “baseUrl” object. Both of these are essential to running tests in the grid: the driver is an instantiated RemoteWebDriver object that connects us to the Hub, while baseUrl is the base URL of the site we’re testing.&lt;/p&gt;
+&lt;p&gt;The base class is going to instantiate a RemoteWebDriver for each test (in the test initializer). Each child (test) class is going to specify what capabilities the driver should be instantiated with. The driver constructor needs to know the URL of the grid hub as well as the capabilities required for the test. Here’s the constructor and test initializer in the base class:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public abstract class PartsTests
+{
+    private const string defaultBaseUrl = "http://localhost:5001";
+    private const string defaultGridUrl = "http://10.0.75.1:4444/wd/hub";
+
+    protected string baseUrl;
+    protected string gridUrl;
+
+    protected IWebDriver driver;
+    private StringBuilder verificationErrors;
+    protected ICapabilities capabilities;
+    public TestContext TestContext { get; set; }
+
+    public PartsTests(ICapabilities capabilities)
+    {
+        this.capabilities = capabilities;
+    }
+
+    [TestInitialize]
+    public void SetupTest()
+    {
+        if (TestContext.Properties["baseUrl"] != null) //Set URL from a build
+        {
+            baseUrl = TestContext.Properties["baseUrl"].ToString();
+        }
+        else
+        {
+            baseUrl = defaultBaseUrl;
+        }
+        Trace.WriteLine($"BaseUrl: {baseUrl}");
+
+        if (TestContext.Properties["gridUrl"] != null) //Set URL from a build
+        {
+            gridUrl = TestContext.Properties["gridUrl"].ToString();
+        }
+        else
+        {
+            gridUrl = defaultGridUrl;
+        }
+        Trace.WriteLine($"GridUrl: {gridUrl}");
+
+        driver = new RemoteWebDriver(new Uri(gridUrl), capabilities);
+        verificationErrors = new StringBuilder();
+    }
+
+    [TestCleanup]
+    public void Teardown()
+    {
+        try
+        {
+            driver.Quit();
+        }
+        catch (Exception)
+        {
+            // Ignore errors if unable to close the browser
+        }
+        Assert.AreEqual("", verificationErrors.ToString());
+    }
+
+    ...
+}
+&lt;/pre&gt;
+&lt;p&gt;The constructor takes an ICapabilities object which will allow us to specify how we want the test run (or at least which browser to run against). We hold on to these capabilities. The SetupTest() method then reads the “gridUrl” and the “baseUrl” from the TestContext properties (defaulting values if none are present). Finally it created a new RemoteWebDriver using the gridUrl and capabilities. The Teardown() method calls the driver Quit() method, which closes the browser (ignoring errors) and checks that there are no verification errors. Pretty standard stuff.&lt;/p&gt;
+&lt;p&gt;So how do we pass in the gridUrl and baseUrl? To do that we need a runsettings file – this sets the value of the parameters in the TestContext object.&lt;/p&gt;
+&lt;p&gt;I added a new XML file to the base project called “selenium.runsettings” with the following contents:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;?xml version="1.0" encoding="utf-8"?&amp;gt;
+&amp;lt;RunSettings&amp;gt;
+  &amp;lt;TestRunParameters&amp;gt;
+    &amp;lt;Parameter name="baseUrl" value="http://localhost:5001" /&amp;gt;
+    &amp;lt;Parameter name="gridUrl" value="http://localhost:4444/wd/hub" /&amp;gt;
+  &amp;lt;/TestRunParameters&amp;gt;
+&amp;lt;/RunSettings&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Again I’m using default values for the values of the parameters – this is how I debug locally. Note the “/wd/hub” on the end of the grid hub URL.&lt;/p&gt;
+&lt;p&gt;Now I can set the runsettings file in the Test menu:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/7fe06d56-1a53-484f-af74-eba2c1bec765.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/809864a8-cb6f-4f92-b957-2673e43eaa91.png" width="531" height="226"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;So what about the child test classes? Here’s what I have for the Firefox tests:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;[TestClass]
+public class FFTests : PartsTests
+{
+    public FFTests()
+        : base(DesiredCapabilities.Firefox())
+    {
+    }
+
+    [TestMethod]
+    [TestCategory("Firefox")]
+    public void Firefox_AddToCartTest()
+    {
+        AddToCartTest();
+    }
+
+    [TestMethod]
+    [TestCategory("Firefox")]
+    public void Firefox_SearchTest()
+    {
+        SearchTest();
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;I’ve prepended the test name with Firefox_ (you’ll see why when we run the tests in the release pipeline). I’ve also added the [TestClass] and [TestMethod] attributes as well as [TestCategory]. This is using the MSTest framework, but the same will work with nUnit or xUnit too. Unfortunately the non-MSTest frameworks don’t have the TestContext, so you’re going to have to figure out another method of providing the baseUrl and gridUrl to the test. The constructor is using a vanilla Firefox capability for this test – you can instantiate more complex capabilities if you need them here.&lt;/p&gt;
+&lt;p&gt;Just for comparison, here’s my code for the ChromeTests file:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;[TestClass]
+public class ChromeTests : PartsTests
+{
+    public ChromeTests()
+        : base(DesiredCapabilities.Chrome())
+    {
+    }
+
+    [TestMethod]
+    [TestCategory("Chrome")]
+    public void Chrome_AddToCartTest()
+    {
+        AddToCartTest();
+    }
+
+    [TestMethod]
+    [TestCategory("Chrome")]
+    public void Chrome_SearchTest()
+    {
+        SearchTest();
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;You can see it’s almost identical except for the class name prefix, the [TestCategory] and the capabilities in the constructor.&lt;/p&gt;
+&lt;p&gt;Here’s my project layout:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/063848b9-a77a-4d82-9599-5f0f1a93e6fd.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a91a95b8-e92d-4169-be8c-a2d36841ae4e.png" width="197" height="384"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;At this point I can run tests (in parallel) against my “local” grid (I started a hub and two nodes locally to test). Next we need to put all of this into a build/release pipeline.&lt;/p&gt;
+&lt;h2&gt;Creating a Build&lt;/h2&gt;
+&lt;p&gt;You could run the tests during the build, but I wanted my UI tests to be run against a test site that I deploy to, so I felt it more appropriate to run the tests in the release. Before we get to that, we have to build the application (and test code) so that it’s available in the release.&lt;/p&gt;
+&lt;p&gt;I committed all the code to source control in VSTS and created a build definition. Here’s what the tasks look like:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/063e7832-6a22-4301-82d8-ffd0a5500848.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4c174b99-e3a1-4338-bd68-d31330d9c685.png" width="438" height="413"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The first three steps are for building the application and the solution – I won’t bore you with the details. Let’s look at the next five steps though:&lt;/p&gt;
+&lt;p&gt;The first three “Copy Files” steps copy the binaries for the three test projects I want (one for IE, for Chrome and Firefox):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/62310234-41c7-43d3-a605-e93e7305d975.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/5b12a2c2-31a3-4021-a3aa-2c4954bd1f8e.png" width="484" height="150"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;In each case I’m copying the compiled assemblies of the test project (from say test/PartsUnlimitedSelenium.Chrome\bin\$(BuildConfiguration) to $(Build.ArtifactStagingDirectory)\SeleniumTests.&lt;/p&gt;
+&lt;p&gt;The fourth copy task copies the runsettings file:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/0cdad628-a3c8-441f-a3c4-792b083876c0.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4787dfc5-12c6-4e58-b622-4b341faa045b.png" width="483" height="164"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The final task publishes the $(Build.ArtifactStagingDirectory) to the server:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/b6291e37-1f26-4a65-95df-157ebdd9e331.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a6fbc201-467d-4245-861b-6f2587ca0442.png" width="395" height="134"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;After running the build, I have the following drop:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/d071ed68-ff2f-40bd-a2ab-fa0546d06384.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/b61298b8-5bcb-4b90-807c-c7359980dac9.png" width="296" height="393"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The “site” folder contains the webdeploy package for my site – but the important bit here is that all the test assemblies (and the runsettings file) are in the SeleniumTests folder.&lt;/p&gt;
+&lt;h2&gt;Running Tests in the Release&lt;/h2&gt;
+&lt;p&gt;Now that we have the app code (the site) and the test assemblies in a drop location, we’re ready to define a Release. In the release for Dev I have the following steps:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c9ece48f-a63a-4456-8425-6f6b97568a6f.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/3bb098b4-bff9-4e95-9827-41a41ef2cbb5.png" width="473" height="184"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I have all the steps that I need to deploy the application (in this case I’m deploying to Azure). Again, that’s not the focus of this post. The Test Assemblies task is the important step to look at here:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/19d774e5-cff0-4176-b6c0-e82345d97710.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/b5a7c052-4c80-443d-80c4-b1be4d03bb29.png" width="811" height="215"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;It turns out to be pretty straightforward. I just make sure that “Test Assembly” includes all the assemblies I want to execute – remember you need at least two in order for “Run In Parallel” to have any effect. For Filter Criteria I’ve excluded IE tests – IE tests seem to fail for all sorts of arbitrary reasons that I couldn’t work out – you can leave this empty (or put in a positive expression) if you want to only run certain tests. I specify the path to the runsettings file, and then in “Override TestRun Parameters” I specify the gridUrl and baseUrl that I want to test in this particular environment. I’ve used variables that I define on the environment so that I can clone this for other environments if I need to.&lt;/p&gt;
+&lt;p&gt;Now when I release, I see that the tests run as part of the release. Clicking on the Tests tab I see the test results. I changed the Outcome filter to show Passed tests and configured the columns to show the “Date started” and “Date completed”. Sure enough I can see that the tests are running in parallel:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/5c5aab1b-4cfe-43ea-8307-70ede93b4d82.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/26ceccc9-a9b0-456e-b261-fcbd44831f82.png" width="653" height="323"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now you can see why I wanted to add the prefix to the test names – this lets me see exactly which browsers are behaving and which aren’t (ahem, IE).&lt;/p&gt;
+&lt;h2&gt;Final Thoughts&lt;/h2&gt;
+&lt;p&gt;Running Selenium Tests in a Grid in VSTS is possible –&amp;nbsp; there are a few hacks required though. You need to create multiple assemblies in order to take advantage of the grid scalability, and this can lead to lots of duplicated and error-prone code (for example when I initially created the Firefox tests, I copied the Chrome class and forgot to change the prefix and [TestCategory] which lead to interesting results). There are probably other ways of dividing your tests into multiple assemblies, and then you could pass the browser in as a Test Parameter and have multiple runs – but then the runs wouldn’t be simultaneous across browsers. A final gotcha is that the runsettings only work for MSTest – if you’re using another framework, chances are you’ll end up creating a json file that you read when the tests start.&lt;/p&gt;
+&lt;p&gt;You can see that there are challenges whichever way you slice it up. Hopefully the work the test team is doing in VSTS/TFS will improve this story at some stage.&lt;/p&gt;
+&lt;p&gt;For now, happy Grid testing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Testing</category>
+    <category>DevOps</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="9da13ce8-a38b-4ab2-923c-a49a1b9c54c9">
+      <author>Selenium Training</author>
+      <email>saradhainchennai1@gmail.com</email>
+      <website>http://www.credosystemz.com/training-in-chennai/best-software-testing-training-in-chennai/best-selenium-training-in-chennai/</website>
+      <ip>182.65.199.152</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36</userAgent>
+      <date>2016-12-24 10:35:46</date>
+      <content>great blog thanks for sharing</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e229a6aa-5d7c-421e-8238-ec08ed17c59f">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:46:30</date>
+      <content>Thanks @Selenium Training! Love the tools!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="e7d13b53-9daf-4a7a-9239-3dbef8f079ec">
+      <author>Data Science Online Training</author>
+      <email>vignesjoseph@gmail.com</email>
+      <website>http://goo.gl/cZuAGi</website>
+      <ip>122.174.151.61</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36</userAgent>
+      <date>2017-04-03 09:19:36</date>
+      <content>This is extremely helpful info!! Very good work. It is very interesting to learn and easy to understood. Thank you for giving information. Please let us know and more information get a post to link.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="b7fb915e-f3d5-4428-9c37-0b480bf49b90">
+      <author>Sean</author>
+      <email>smgerlich@gmail.com</email>
+      <website>http://na.com/</website>
+      <ip>216.27.225.34</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36</userAgent>
+      <date>2017-06-13 18:4:30</date>
+      <content>Ever tried NUnit Visual Studio Adapter as your test runner instead of MTM (or whatever the default VSTS test runner is called these days)? Judging from this, looks like you should be able to run tests within the same class in parallel via a VSTS release step: http://www.alteridem.net/2016/10/20/nunit-visual-studio-adapter/</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="7dd71b83-20c0-4557-ac72-51788d8c5ef2">
+      <author>Bilal Khan</author>
+      <email>bilalkhan199@hotmail.com</email>
+      <website></website>
+      <ip>65.51.41.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36</userAgent>
+      <date>2017-12-08 14:31:13</date>
+      <content>Very helpful, thank you!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="bae8d831-941d-438e-9708-0d37719eb3bc">
+      <author>chaitanya</author>
+      <email>chaitanya.vuppula@gmail.com</email>
+      <website></website>
+      <ip>42.99.164.104</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36</userAgent>
+      <date>2017-12-27 05:45:31</date>
+      <content>Hey, this was useful information. But in my project i&amp;#39;m using SpecFlow as unit test framework. Could you please let me know how to configure Grid in Visual Studio using SpecFlow. Thank you in advance.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="94c1d25b-3837-4fda-84de-6e29de61ed58">
+      <author>balaD</author>
+      <email>ctbala1996@gmail.com</email>
+      <website>https://www.besanttechnologies.com/training-courses/software-testing-training/selenium-training-institute-in-chennai</website>
+      <ip>27.5.220.249</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-20 07:23:16</date>
+      <content>Hi,&lt;br /&gt;this parallel testing was very useful to run a program. Thanks for your article it is very informative.&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/training-courses/software-testing-training/selenium-training-institute-in-chennai&amp;quot;&amp;gt;Selenium Training in Chennai&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="2460c38b-07db-41bd-9ec7-971b77095583">
+      <author>saijohn</author>
+      <email>queenmerlin24@gmail.com</email>
+      <website>http://www.trainingintambaram.in/angularjs-training-in-chennai.html#</website>
+      <ip>106.51.1.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36</userAgent>
+      <date>2018-08-27 12:46:52</date>
+      <content>I enjoy what you guys are usually up too. This sort of clever work and coverage! Keep up the wonderful works guys I’ve added you guys to my blogroll.&lt;br /&gt;Click here:&lt;br /&gt;&amp;lt;a title=&amp;quot;angularjs training in tambaram&amp;quot; href=&amp;quot;http://www.trainingintambaram.in/angularjs-training-in-chennai&amp;quot;angularjs training in tambaram&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="f251f150-9d1b-4ade-a273-d8cad4add993">
+      <author>queen</author>
+      <email>queenmerlin24@gmail.com</email>
+      <website>http://www.trainingintambaram.in/windows-azure-training-in-chennai.html</website>
+      <ip>106.51.1.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36</userAgent>
+      <date>2018-08-27 13:33:45</date>
+      <content>Please let me know if you’re looking for an author for your site. You have some great posts, and I think I would be a good asset. If you ever want to take some of the load off, I’d like to write some material for your blog in exchange for a link back to mine. Please shoot me an email if interested. Thanks.&lt;br /&gt;Click here:&lt;br /&gt;&amp;lt;a title=&amp;quot;Microsoft Azure training in online&amp;quot; href=&amp;quot;https://www.gangboard.com/microsoft/windows-azure-training&amp;quot;&amp;gt;Microsoft Azure training in online&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="54f13a2a-ab8f-415a-bc1c-8cf2ff916cdc">
+      <author>poojasaravanan</author>
+      <email>pooja4.besant@gmail.com</email>
+      <website>http://www.besanttechnologies.com/</website>
+      <ip>106.51.1.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36</userAgent>
+      <date>2018-09-07 06:14:41</date>
+      <content>Very nice post here and thanks for it .I always like and such a super contents of these post.Excellent and very cool idea and great content of different kinds of the valuable information&amp;#39;s.&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/blue-prism-training-in-chennai&amp;quot;&amp;gt;Blueprism training in Chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/blue-prism-training-bangalore&amp;quot;&amp;gt;Blueprism training in Bangalore&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/blue-prism-training-in-pune&amp;quot;&amp;gt;Blueprism training in Pune&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.trainingintambaram.in/blue-prism-training-in-chennai.html&amp;quot;&amp;gt;Blueprism training in tambaram&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginannanagar.in/blue-prism-training-in-chennai.html&amp;quot;&amp;gt;Blueprism training in annanagar&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginvelachery.in/blue-prism-training-in-chennai.html&amp;quot;&amp;gt;Blueprism training in velachery&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginmarathahalli.in/blue-prism-training-bangalore/&amp;quot;&amp;gt;Blueprism training in marathahalli&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/training-courses/cloud-computing-training/amazon-web-services-training-institute-in-chennai&amp;quot;&amp;gt;AWS Training in chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/training-courses/amazon-web-services-training-in-bangalore&amp;quot;&amp;gt;AWS Training in bangalore&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="6fa6adb4-318a-42ce-b4fb-8c44f69c269f">
+      <author>nilashri</author>
+      <email>nilasrir.1995@gmail.com</email>
+      <website></website>
+      <ip>60.243.28.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36</userAgent>
+      <date>2018-09-14 13:5:46</date>
+      <content>Read all the information that i&amp;#39;ve given in above article. It&amp;#39;ll give u the whole idea about it.&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginmarathahalli.in/datascience-training-in-bangalore/&amp;quot;&amp;gt;Data Science training in marathahalli&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginbtm.in/datascience-training-in-bangalore&amp;quot;&amp;gt;Data Science training in btm&amp;lt;/a&amp;gt; &lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginrajajinagar.in/data-science-training-in-rajajinagar&amp;quot;&amp;gt;Data Science training in rajaji nagar&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.besanttech.com/data-science-training-in-chennai.php&amp;quot;&amp;gt;Data Science training in chennai&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.besanttechnologies.in/data-science-training-in-electronic-city.html&amp;quot;&amp;gt;Data Science training in electronic city&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.traininginusa.com/data-science-online-training.html&amp;quot;&amp;gt;Data Science training in USA&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;http://www.trainingpune.in/data-science-training-in-pune.html&amp;quot;&amp;gt;Data science training in pune&amp;lt;/a&amp;gt;&lt;br /&gt;&amp;lt;a href=&amp;quot;https://www.besanttechnologies.com/data-science-training-in-kalyan-nagar&amp;quot;&amp;gt;Data science training in kalyan nagar&amp;lt;/a&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="c7b09b48-6198-4ed4-b227-9695c9e8e2d1">
+      <author>Sumantra Ghosh</author>
+      <email>ghosh_sumantra@yahoo.co.in</email>
+      <website></website>
+      <ip>183.83.174.203</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0</userAgent>
+      <date>2018-10-28 15:54:29</date>
+      <content>Excellent job!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="b9eb5b2f-1bc1-4c84-a0c1-52f57b2ae9f5">
+      <author>Rajeev bhaskar</author>
+      <email>rkbhaskar21.bits@gmail.com</email>
+      <website></website>
+      <ip>165.225.106.140</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36</userAgent>
+      <date>2019-02-28 09:31:28</date>
+      <content>Nice article. Can you please share the code..As i couldn&amp;#39;t see base class.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="9cc6d88b-c356-4c89-afe4-15e9519fdfa6">
+      <author>Chris Hemsworth</author>
+      <email>chris15hemsworth@gmail.com</email>
+      <website>https://www.zuaneducation.com/selenium-training-chennai</website>
+      <ip>122.164.4.129</ip>
+      <userAgent>Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:54.0) Gecko/20100101 Firefox/54.0</userAgent>
+      <date>2019-04-17 06:17:49</date>
+      <content>The above article seems so informative. This helps people like us to understand the concept of selenium for our Selenium training in Chennai. Please do share more information and thanks a lot.</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

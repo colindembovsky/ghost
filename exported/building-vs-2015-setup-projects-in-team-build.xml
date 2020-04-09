@@ -1,0 +1,135 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2b2a6a00-ab03-400e-a4e5-e95b7bc63d95</id>
+  <title>Building VS 2015 Setup Projects in Team Build</title>
+  <slug>building-vs-2015-setup-projects-in-team-build</slug>
+  <shortUrl>http://bit.ly/1nggLH4</shortUrl>
+  <author></author>
+  <pubDate>2016-01-12 21:13:20</pubDate>
+  <lastModified>2018-09-25 07:22:09</lastModified>
+  <content>&lt;p&gt;Remember when Visual Studio had a setup project template? And then it was removed? Then you moved to &lt;a href="http://wixtoolset.org/" target="_blank"&gt;WiX&lt;/a&gt; and after learning it for 3 months and still being confused, you just moved to Web Apps?&lt;/p&gt; &lt;p&gt;Well everyone complained about the missing setup project templates and MS finally added it back in as an &lt;a href="https://visualstudiogallery.msdn.microsoft.com/f1cc3f3e-c300-40a7-8797-c509fb8933b9" target="_blank"&gt;extension&lt;/a&gt;. Which works great if you build out of Visual Studio – but what about automated builds? Turns out they don’t understand the setup project, so you have to do some tweaking to get it to work.&lt;/p&gt; &lt;h2&gt;Setup Project Options&lt;/h2&gt; &lt;p&gt;There are a couple of options if you’re going to use setup projects.&lt;/p&gt; &lt;ol&gt; &lt;li&gt;&lt;a href="https://msdn.microsoft.com/en-us/library/t71a733d.aspx" target="_blank"&gt;ClickOnce&lt;/a&gt;. This is a good option if you don’t have a deployment solution that can deploy new versions of your application (like System Center or the like). It requires fudging on the builds to get versioning to work in some automated fashion. At least it’s free.&lt;/li&gt; &lt;li&gt;&lt;a href="http://wixtoolset.org/" target="_blank"&gt;WiX&lt;/a&gt;. Free and very powerful, but really hard to learn and you end up programming in XML – which is a pain. However, if you need your installer to do “extra” stuff (like create a database during install) then this is a good option. Automation is also complicated because you have to invoke Candle.exe and Light.exe to “build” the WiX project.&lt;/li&gt; &lt;li&gt;VS Setup Projects. Now that they’re back in VS, you can use these projects to create installers. You can’t do too much crazy stuff – this just lays down the exe’s and gets you going. It’s easy to maintain, but you need to tweak the build process to build these projects. Also free.&lt;/li&gt; &lt;li&gt;&lt;a href="http://www.flexerasoftware.com/producer/products/software-installation/installshield-software-installer/" target="_blank"&gt;InstallShield&lt;/a&gt; and other 3rd party paid installer products. These are typically powerful, but expensive. Perhaps the support you get is worth the price, but you’ll have to decide if the price is worth the support and other features you don’t get from the other free solutions.&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;Tweaking Your Build Agent&lt;/h2&gt; &lt;p&gt;You unfortunately won’t be able to build setup projects on the Hosted build agent because of these tweaks. So if you’ve got a build agent, here’s what you have to do:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Install Visual Studio 2015 on the build machine.&lt;/li&gt; &lt;li&gt;Install the &lt;a href="https://visualstudiogallery.msdn.microsoft.com/f1cc3f3e-c300-40a7-8797-c509fb8933b9" target="_blank"&gt;extension&lt;/a&gt; onto your build machine.&lt;/li&gt; &lt;li&gt;Configure the build agent service to run under a known user account (not local service, but some user account on the machine).&lt;/li&gt; &lt;li&gt;Apply a registry hack – you have to edit HKCU\SOFTWARE\Microsoft\VisualStudio\14.0_Config\MSBuild\EnableOutOfProcBuild to have a DWORD of 0 (I didn’t have the key, so I just added it). If you don’t do this step, then you’ll probably get an obscure error like this: “&lt;font size="2" face="Courier New"&gt;ERROR: An error occurred while validating.&amp;nbsp; HRESULT = '8000000A'&lt;/font&gt;”&lt;/li&gt; &lt;li&gt;Customize the build template (which I’ll show below).&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;It’s fairly nasty, but once you’ve done it, your builds will work without users having to edit the project file or anything crazy.&lt;/p&gt; &lt;h2&gt;Customizing the Build Definition&lt;/h2&gt; &lt;p&gt;You’ll need to configure the build to compile the entire solution first, and then invoke Visual Studio to create the setup package.&lt;/p&gt; &lt;p&gt;Let’s walk through creating a simple build definition to build a vdproj.&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Log in to VSTS or your TFS server and go to the build hub. Create a new build definition and select the Visual Studio template. Select the source repo and set the default queue to the queue that your build agent is connected to.&lt;/li&gt; &lt;li&gt;Just after the Visual Studio Build task, add a step and select the “Command Line” task from the Utility section.&lt;/li&gt; &lt;li&gt;Enter the path to devenv.com for the Tool parameter (this is typically “C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\devenv.com”).&lt;/li&gt; &lt;li&gt;The arguments have the following format: &lt;em&gt;solutionPath&lt;/em&gt; /build &lt;em&gt;configuration&lt;/em&gt; &lt;em&gt;projectPath&lt;/em&gt;&lt;/li&gt; &lt;ol&gt; &lt;li&gt;solutionPath is the path to the solution file&lt;/li&gt; &lt;li&gt;configuration is the config (debug, release etc.)&lt;/li&gt; &lt;li&gt;projectPath is the path to the vdproj file&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;Finally, expand the “Advanced” group and set the working folder to the path of the sln file and check the “Fail on Standard Error” checkbox.&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Here’s an example:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/34c056cc-67e1-43dd-99b7-3271105b883c.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4ceb0068-6af9-4b28-947a-21de05cc1a69.png" width="752" height="244"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;For reference, here’s how my source is structured:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/fcd94210-91dd-43e5-8209-6237066cd7d6.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4375ef99-63ed-4533-ad01-3bf743d77616.png" width="308" height="353"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;&amp;nbsp;&lt;/p&gt; &lt;p&gt;You can then publish the setup exe or msi if you need to. You can run tests or scripts or anything else during the build (for ease I delete the unit test task in the above example).&lt;/p&gt; &lt;p&gt;I now have a successful build:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/d9f53d62-d230-442e-b917-7bd29dbf2e0b.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a35d538f-a743-487b-a9c4-aca62c8549f5.png" width="453" height="300"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;And the msi is in my drop, ready to be deployed in Release Management:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a1613f42-5c56-4643-8f8a-32bc4fdd3cde.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/2ad1710a-8b51-47ad-b25f-3f837c2177dc.png" width="483" height="116"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Happy setup building!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="ea4aa069-64fc-4ea6-8de2-c66bb0c49550">
+      <author>Dafna</author>
+      <email>dafna.frank@gmail.com</email>
+      <website></website>
+      <ip>82.166.117.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10240</userAgent>
+      <date>2016-06-09 07:5:38</date>
+      <content>Thanks for the detailed explanation. &lt;br /&gt;Is there a way to fix the problem without installing VS on the build machine...?&lt;br /&gt;Thanks</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6a19fce8-62f3-47c6-9346-eee95b510718">
+      <author>jafuentes</author>
+      <email>jafs1983@gmail.com</email>
+      <website>http://www.jafuentes.net/</website>
+      <ip>83.54.229.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; rv:47.0) Gecko/20100101 Firefox/47.0</userAgent>
+      <date>2016-06-21 13:19:58</date>
+      <content>Great post! &lt;br /&gt;&lt;br /&gt;You help me a lot! I wrote a post asked about this problem here [ https://social.msdn.microsoft.com/Forums/en-US/75cb4128-a1e6-4b8f-bdb1-4e4bb29fffba/problems-building-setup-project-in-visual-studio-team-services?forum=TFService ]. &lt;br /&gt;&lt;br /&gt;Your approach is clear and simple. I followed the steps but I got an error during the compilation process. This is my log:&lt;br /&gt;&lt;br /&gt;2016-06-21T13:02:37.6466919Z Creating directory C:\a\1\s\src&lt;br /&gt;2016-06-21T13:02:37.6476927Z Executing the following command-line. (workingFolder = C:\a\1\s\src)&lt;br /&gt;2016-06-21T13:02:37.6476927Z &amp;quot;C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\devenv.com&amp;quot; /Rebuild release &amp;quot;C:\a\1\s\Source\CameraView.sln&amp;quot; /Project &amp;quot;C:\a\1\s\Source\EasyView-Installer\CameraView-Installer.vdproj&amp;quot;&lt;br /&gt;2016-06-21T13:02:37.6486928Z Error message highlight pattern: &lt;br /&gt;2016-06-21T13:02:37.6486928Z Warning message highlight pattern: &lt;br /&gt;2016-06-21T13:03:41.5701254Z Microsoft Visual Studio 2015 Version 14.0.25123.0.&lt;br /&gt;2016-06-21T13:03:41.5701254Z Copyright (C) Microsoft Corp. All rights reserved.&lt;br /&gt;2016-06-21T13:03:41.5711249Z Some errors occurred during migration. For more information, see the migration report:&lt;br /&gt;2016-06-21T13:03:41.5711249Z C:\a\1\s\Source\UpgradeLog.htm&lt;br /&gt;2016-06-21T13:03:42.7821256Z ========== Rebuild All: 0 succeeded, 0 failed, 0 skipped ==========&lt;br /&gt;&lt;br /&gt;As a wrote in my question, I have five projects in my solution. Main project is a WPF application, three external libraries and an installer project. &lt;br /&gt;&lt;br /&gt;I do not know what is happening.&lt;br /&gt;&lt;br /&gt;Thank you!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="88aa6fbf-a5c2-45e1-a828-02d4ade040f6">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 06:47:43</date>
+      <content>Hi @Dafna - you should always install VS on the build machine. As far as I understand licensing, you can install the &amp;quot;highest&amp;quot; SKU you have licenses to on the build machine, and as long as no user uses that VS (other than the build agent) you don&amp;#39;t actually pay for a license. So there&amp;#39;s really no reason not to install VS on the build machine.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="492480a8-2ea1-4349-8e19-0d33553a4823">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 06:50:59</date>
+      <content>Hi @jafuentes - looks like you&amp;#39;re source-controlling an older version of the solution - say VS 2010, and then you have a newer version of VS on the build server, say VS 2015. Something is failing to upgrade to the newer version of VS (perhaps a VS component isn&amp;#39;t installed) so try to upgrade the solution on your desktop to the same version of VS that is on your build machine.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ae8a34c3-9442-40d8-bf74-57bdf7ea62c0">
+      <author>Neslihan ÇALIŞKANEL</author>
+      <email>neslihan.caliskanel@univera.com.tr</email>
+      <website></website>
+      <ip>213.14.120.130</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-08-03 13:24:48</date>
+      <content>Hi,&lt;br /&gt;Thanks for this post. I apply VS Setup process steps. But I get an ERROR: An error occurred while validating.  HRESULT = &amp;#39;8000000A&amp;#39;&lt;br /&gt;&lt;br /&gt;I check my agent service user(my user name is TFSReport) . I connect to server with this user and add key to the specified registry address.  &lt;br /&gt;First try to build my setup project .vdproj from visual studio 2015. It is OK. It works. &lt;br /&gt;Then I try to build vdproj with command prompt.  ERROR: An error occurred while validating.  HRESULT = &amp;#39;8000000A&amp;#39;&lt;br /&gt;&lt;br /&gt;I also get this error from TFSBuild ... :(&lt;br /&gt;&lt;br /&gt;How can I fix it? &lt;br /&gt;Thanks.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="7cae9441-6ebc-4dc7-99d2-e77226f06ea1">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.184.79.27</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-08-08 07:53:36</date>
+      <content>Hi @Neslihan&lt;br /&gt;&lt;br /&gt;The only thing I can think of is that the command line VS you are using isn&amp;#39;t matching the GUI that you&amp;#39;re successfully building from. You&amp;#39;ll have to get it working from the command line first, otherwise the build will never work. Make sure you&amp;#39;re calling the correct devenv.com to build the solution.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="3ad2cdb6-a184-4468-afab-63329123294b">
+      <author>Fahad Idrees</author>
+      <email>fahadidrees@hotmail.com</email>
+      <website></website>
+      <ip>46.226.49.230</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36</userAgent>
+      <date>2016-10-07 15:59:41</date>
+      <content>Hi I am having trouble building the solution that when I run it on command line this is what I get &lt;br /&gt;&lt;br /&gt;Deserializing the project state for project &amp;#39;Database.sqlproj&amp;#39;...&lt;br /&gt;Detecting file changes for project &amp;#39;Database.sqlproj&amp;#39;...&lt;br /&gt;Deserialization has been completed for project &amp;#39;Database.sqlproj&amp;#39;.&lt;br /&gt;The project &amp;#39;Database.sqlproj&amp;#39; will close once model building has paused.&lt;br /&gt;Serializing the project state for project &amp;#39;Database.sqlproj&amp;#39;...&lt;br /&gt;Project &amp;#39;Database.sqlproj&amp;#39; was successfully serialized to file &amp;#39;C:\Builds\1\Cast&lt;br /&gt;le\Castle StatLight Test\src\Castle\Database\Database.dbmdl&amp;#39;.&lt;br /&gt;&lt;br /&gt;The operation could not be completed&lt;br /&gt;&lt;br /&gt;can you think of anything that can have such issue</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e4768367-f527-4761-b48d-9777ffac71d6">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>98.189.39.157</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36</userAgent>
+      <date>2016-10-27 20:36:22</date>
+      <content>Hi @Fahad - seems like there&amp;#39;s an issue with a database project. You&amp;#39;ll have to dig into that project to see what &amp;quot;operation&amp;quot; could not be completed.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c22ec868-2a56-4d0d-89c0-03c2b0225a49">
+      <author>devMania</author>
+      <email>aldikiste@gmail.com</email>
+      <website></website>
+      <ip>85.97.202.229</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36</userAgent>
+      <date>2016-11-17 15:18:00</date>
+      <content>Thanks for post, but MS fix it on VS 2017. http://link.tl/SXr6</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="8ba1f918-2d85-4225-86f2-582d110e86a7">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>208.91.239.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36</userAgent>
+      <date>2016-11-18 15:26:49</date>
+      <content>Thanks @devMania - glad that it&amp;#39;s sorted out of the box!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="5f3fcb8f-5b02-4407-85b5-16111703efe2">
+      <author>Kayo</author>
+      <email>kayokatsuragi@outlook.com</email>
+      <website></website>
+      <ip>211.15.200.202</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; rv:53.0) Gecko/20100101 Firefox/53.0</userAgent>
+      <date>2017-05-10 14:42:35</date>
+      <content>I&amp;#39;m trying that with VS 2017 onpremise build agent and got stuck.&lt;br /&gt;&lt;br /&gt;@debMania &amp;#39;s link leads to some other resources (music shareing?)&lt;br /&gt;&lt;br /&gt;-------------------------------&lt;br /&gt;Apply a registry hack – you have to edit HKCU\SOFTWARE\Microsoft\VisualStudio\14.0_Config\MSBuild\EnableOutOfProcBuild &lt;br /&gt;--------------------------------&lt;br /&gt;this reg path is largely different from VS2017&amp;#39;s  registory tree.&lt;br /&gt;Any ideas?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="8b41b175-ebc5-4847-bb78-b40c001d8aa4">
+      <author>Naveen</author>
+      <email>mrfurious.verma9@gmail.com</email>
+      <website></website>
+      <ip>43.229.27.251</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36</userAgent>
+      <date>2018-09-23 09:34:35</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;I tried the steps you mentioned in the build definition but still it is not generating the &amp;#39;msi&amp;#39; file. Can you help me with that?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="45626f5a-a618-4473-be84-a4f40dc37381">
+      <author>Anjali</author>
+      <email>anjali.iyengarmys@gmail.com</email>
+      <website></website>
+      <ip>213.125.9.3</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36</userAgent>
+      <date>2018-09-25 07:22:09</date>
+      <content>I have followed the above steps to build my installer. It went well. I have a power shell script before vsbuild task, so that all the files are versioned after solution is built. &lt;br /&gt;&lt;br /&gt;How do I version my installer?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

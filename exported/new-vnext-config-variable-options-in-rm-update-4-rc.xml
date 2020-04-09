@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>New vNext Config Variable Options in RM Update 4 RC</title>
+  <slug>new-vnext-config-variable-options-in-rm-update-4-rc</slug>
+  <shortUrl>http://bit.ly/1yfJ34v</shortUrl>
+  <author></author>
+  <pubDate>2014-10-21 15:59:47</pubDate>
+  <lastModified>2015-07-21 11:58:30</lastModified>
+  <content>&lt;p&gt;&lt;a href="http://www.microsoft.com/en-us/download/details.aspx?id=44555&amp;amp;WT.mc_id=rss_alldownloads_all" target="_blank"&gt;Update 4 RC for Release Management&lt;/a&gt; was released a few days ago. There are some &lt;a href="http://support.microsoft.com/kb/2994375" target="_blank"&gt;good improvements&lt;/a&gt; – some are minor, like the introduction of “Agent-based” labels improves readability for viewing agent-based vs non-agent based templates and components. Others are quite significant – like being able to use the Manual Intervention activity and tags in vNext templates, being able to use server-drops as release source and others. By far my favorite new feature of the update is the new variable capabilities.&lt;/p&gt; &lt;h2&gt;Variables: System, Global, Server, Component and Action&lt;/h2&gt; &lt;p&gt;Be aware that, unfortunately, these capabilities are &lt;strong&gt;only&lt;/strong&gt; for vNext components (so they won’t work with regular agent-based components or workflows). It’s also unlikely that agent-based components will ever get these capabilities. I’ve mentioned before that I think PowerShell DSC is the deployment mechanism of the future, so you should be investing in it now already. If you’re currently using agent-based components, they do have variables that can be specified at design-time (in the deployment workflow surface) – just as they’ve always had.&lt;/p&gt; &lt;p&gt;The new vNext variable capabilities allow you to use variables inside your PowerShell scripts without having to pass them or hard-code them. For example, if you define a global variable called “MyGlobalVar” you can just use it by accessing $MyGlobalVar in your PowerShell script.&lt;/p&gt; &lt;h3&gt;Global Variables&lt;/h3&gt; &lt;p&gt;Global variables are defined under “Administration-&amp;gt;Settings-&amp;gt;Configuration Variables”. Here you can defined variables, giving them a name, type, default value and description.&lt;/p&gt; &lt;h3&gt;&lt;a href="http://colinsalmcorner.com/posts/files/33abda31-63d2-4440-8d2f-2faf5348e1fe.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b03d629d-6ae1-4c0b-9481-d447a868158d.png" width="644" height="108"&gt;&lt;/a&gt; Server Variables&lt;/h3&gt; &lt;p&gt;Server variables can be defined on vNext servers under “Configure Paths-&amp;gt;Servers”. Same format as System variables.&lt;/p&gt; &lt;h3&gt;&lt;a href="http://colinsalmcorner.com/posts/files/e6106605-d0cc-4ec8-91c1-f1ed36a93f88.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/c8f6bff0-ed17-4b2d-bf22-35c00de2bd18.png" width="644" height="203"&gt;&lt;/a&gt; Component Variables&lt;/h3&gt; &lt;p&gt;vNext components can now have configuration variables defined on them “at design time”.&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/976326bb-0e2f-4fa9-9e79-84e2d7577fa2.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ff9bea76-6a78-4897-97c2-4aa42759d64b.png" width="644" height="170"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;You can also override values and event specify additional configuration variables when you add the “DSC” component onto the design surface:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/64fe1bb0-fc6e-4bba-bd68-748b02644429.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/02367d62-9d20-4e97-b57f-7b42e63c5ec9.png" width="644" height="446"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;Another cool new feature is the fact that ComponentName and ServerName are now dropdown lists on the “Deploy using DSC/PS” and “Deploy using Chef” activities, so you don’t have to type them manually:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/4ccfae7c-03d1-4137-8253-8d5ac906eecd.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/82da646b-95e0-4066-9dc0-eee359120e3d.png" width="440" height="235"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;All these variables are available inside the script by simple using $&lt;em&gt;variableName.&lt;/em&gt; You may event get to the point where you no longer need a PSConfiguration file at all!&lt;/p&gt; &lt;p&gt;You can also see all your variables by opening the “Resource Variables” tab:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/516ad343-1284-4999-b7ab-0581329dc5f0.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/a1fc6126-479c-4194-8336-b0537a954ac7.png" width="644" height="400"&gt;&lt;/a&gt; &lt;/p&gt; &lt;h3&gt;System Variables&lt;/h3&gt; &lt;p&gt;RM now exposes a number of system variables for your scripts. These are as follows:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Build directory  &lt;li&gt;Build number (for component in the release)  &lt;li&gt;Build definition (for component)  &lt;li&gt;TFS URL (for component)  &lt;li&gt;Team project (for component)  &lt;li&gt;Tag (for server which is running the action)  &lt;li&gt;Application path (destination path where component is copied)  &lt;li&gt;Environment (for stage)  &lt;li&gt;Stage&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;You can access these variable easily by simply using $&lt;em&gt;name&lt;/em&gt; (for example: $BuildDirectory or $Stage). If you mouse over the “?” icon on right of the Component or Server screens, the tooltip will tell you what variables you have access to.&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/c11f8658-3b9d-4d10-82bb-a7817e5c646e.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ed79f014-2b7f-4919-a1ba-e5994537b0d2.png" width="644" height="289"&gt;&lt;/a&gt; &lt;/p&gt; &lt;h3&gt;Release Candidate&lt;/h3&gt; &lt;p&gt;Finally, remember that this Release Candidate (as opposed to CTPs) is “go-live” so you can install it on your production TFS servers and updating to the RTM is supported. There may be minor glitches with the RC, but you’ll get full support from MS if you encounter any.&lt;/p&gt; &lt;p&gt;Happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="680c06c2-7673-44a3-b6a0-5d82d91f45cb">
+      <author>BigFan</author>
+      <email>smcfay@gmail.com</email>
+      <website></website>
+      <ip>205.143.205.198</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.104 Safari/537.36</userAgent>
+      <date>2014-10-21 17:20:39</date>
+      <content>Have you used the vNext to deploy webdeploy packages yet? How you would accomplish this via DSC with also passing in setparameters?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="0def8848-e164-4f43-bdc6-90e4e32342c0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>27.254.21.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-22 01:44:28</date>
+      <content>Hi @BigFan&lt;br /&gt;&lt;br /&gt;Yes - I have done webdeploy with RM! You can read the post here: http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way&lt;br /&gt;&lt;br /&gt;The post doesn&amp;#39;t use the new Update 4 parameters (they parameters are hardcoded) but the same principles will apply.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="535ff373-9d3f-44a0-933a-4430fcd412b2">
+      <author>BigFan</author>
+      <email>smcfay@gmail.com</email>
+      <website></website>
+      <ip>205.143.205.198</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-23 12:10:31</date>
+      <content>@Colin&lt;br /&gt;&lt;br /&gt;That post is excellent but it uses the Agent-based components that specifically calls the built in irmsdeploy.exe to publish the webdeploy packages. I was really hoping for a quick how to on how you would accomplish the same thing with the vNext pipeline and Powershell DSC.  I haven&amp;#39;t come across any best practices yet on deploying web applications using DSC for different environments similar to what was possible with the setparameters.xml file.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="686fdc07-75b7-4401-b0d8-a4502c396681">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>49.230.138.44</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-24 07:16:05</date>
+      <content>Hi @BigFan&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve done this in my demo environments and my &amp;quot;series&amp;quot; of DSC posts was building up to this. Watch this space for my next DSC post where I&amp;#39;ll cover DSC and WebDeploy!&lt;br /&gt;&lt;br /&gt;Thanks for reading!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0fe9e06c-6309-4aea-b28f-20b1f43e2c1f">
+      <author>BigFan</author>
+      <email>smcfay@gmail.com</email>
+      <website></website>
+      <ip>205.143.205.198</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-24 14:56:25</date>
+      <content>@Colin &lt;br /&gt;&lt;br /&gt;Great! I&amp;#39;m looking forward to it.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="50623f07-7625-4730-b9e1-a66a7c1fd76f">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.49.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-27 08:47:09</date>
+      <content>@BigFan&lt;br /&gt;&lt;br /&gt;I just posted about how to use WebDeploy with vNext templates: http://bit.ly/1nIQOiB&lt;br /&gt;&lt;br /&gt;Hope you enjoy it!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="7b22b35d-cfdb-4c9c-bbce-c898d44b0162">
+      <author>Reynaldo Zabala</author>
+      <email>rzabala@razoredge.com</email>
+      <website>http://www.razoredge.com/</website>
+      <ip>50.202.249.130</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.115 Safari/537.36</userAgent>
+      <date>2015-02-23 04:4:42</date>
+      <content>Colin,&lt;br /&gt;&lt;br /&gt;I don&amp;#39;t have the option to use Vnext templates on my project, agent only. Is there nothing that can be done to pass the drop directory of the component to a script? My script needs an absolute path (its a sharepoint wsp file) and I was hoping to use $applicationPath but apparently that is unavailable in an agent based template. Any recommendations on how to access TFS/MSBuild variables so i can pass them from my component deployer settings in RM into my custom powershell script?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="026d230c-fc55-4d1e-be33-11da0a1697ad">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:22:12</date>
+      <content>Hi @Reynaldo Zabala&lt;br /&gt;&lt;br /&gt;You can use $(PackageLocation) for agent-based deployments. See this post: http://incyclesoftware.zendesk.com/entries/24422737-Deployment-Metadata&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+  </comments>
+  <viewCount>5869</viewCount>
+  <id>cbf153fd-bdaa-4831-b9ce-ad13fd99536a</id>
+</post>

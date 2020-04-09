@@ -1,0 +1,224 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>fa6f24cc-c3eb-4880-bf7f-77e8fc93b968</id>
+  <title>Config Per Environment vs Tokenization in Release Management</title>
+  <slug>config-per-environment-vs-tokenization-in-release-management</slug>
+  <shortUrl>http://bit.ly/1OqSGU8</shortUrl>
+  <author></author>
+  <pubDate>2015-12-15 08:37:49</pubDate>
+  <lastModified>2017-11-09 03:34:40</lastModified>
+  <content>&lt;p&gt;In my &lt;a href="http://colinsalmcorner.com/post/webdeploy-configs-and-web-release-management"&gt;previous post&lt;/a&gt; I experimented with WebDeploy to Azure websites. My issue with the out-of-the-box &lt;a href="https://github.com/Microsoft/vso-agent-tasks/tree/master/Tasks/AzureWebPowerShellDeployment"&gt;Azure Web App Deploy task&lt;/a&gt; is that you can specify the WebDeploy zip file, but you can’t specify any environment variables other than connection strings. I showed you how to tokenize your configuration and then use some PowerShell to get values defined in the Release to replace the tokens at deploy time. However, the solution still felt like it needed some more work.&lt;/p&gt; &lt;p&gt;At the same time that I was experimenting with Release Management in VSTS, I was also writing a &lt;a href="https://github.com/Microsoft/PartsUnlimited/blob/hands-on-labs/docs/HOL_PartsUnlimited_WebSite_Continuous_Deployment/HOL_Continuous_Deployment_Release_Management.md" target="_blank"&gt;Hands On Lab for Release Management&lt;/a&gt; using the &lt;a href="http://github.com/microsoft/partsunlimited"&gt;PartsUnlimited repo&lt;/a&gt;. While writing the HOL, I had some debate with the Microsoft team about how to manage environment variables. I like a clean separation between &lt;em&gt;build&lt;/em&gt; and &lt;em&gt;deploy&lt;/em&gt;. To achieve that, I recommend tokenizing configuration, as I showed in my previous post. That way the build produces a single logical package (this could be a number of files, but logically it’s a single output) that has tokens instead of values for environment config. The deployment process then fills in the values at deployment time. The Microsoft team were advocating hard-coding environment variables and checking them into source control – &lt;em&gt;a la&lt;/em&gt; “infrastructure as code”. The debate, while friendly, quickly seemed to take on the the feel of an unwinnable debate like “Git merge vs rebase”. I think having both techniques in your tool belt is good, allowing you to select the one which makes sense for any release.&lt;/p&gt; &lt;h2&gt;Config Per Environment vs Tokenization&lt;/h2&gt; &lt;p&gt;There are then (at least) two techniques for handling configuration. I’ll call them “config per environment” and “tokenization”.&lt;/p&gt; &lt;p&gt;In “config per environment”, you essentially hard-code a config file per environment. At deploy time, you overwrite the target environment config with the config from source control. This could be an xcopy operation, but hopefully something a bit more intelligent – like an &lt;a href="https://azure.microsoft.com/en-us/documentation/articles/resource-group-authoring-templates/"&gt;ARM Template&lt;/a&gt; param.json file. When you define an ARM template, you define parameters that are passed to the template when it is executed. You can also then define a param.json file that supplies the parameters. For example, look at the FullEnvironmentSetup.json and FullEnvironmentSetup.param.json file in &lt;a href="https://github.com/Microsoft/PartsUnlimited/tree/master/env/PartsUnlimited.Environment/PartsUnlimited.Environment/Templates"&gt;this folder&lt;/a&gt; of the PartsUnlimited repo. Here’s the param.json file:&lt;/p&gt;&lt;pre class="brush: js;"&gt;{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "WebsiteName": {
+            "value": ""
+        },
+        "PartsUnlimitedServerName": {
+            "value": ""
+        },
+        "PartsUnlimitedHostingPlanName": {
+            "value": ""
+        },
+        "CdnStorageAccountName": {
+            "value": ""
+        },
+        "CdnStorageContainerName": {
+            "value": ""
+        },
+        "CdnStorageAccountNameForDev": {
+            "value": ""
+        },
+        "CdnStorageContainerNameForDev": {
+            "value": ""
+        },
+        "CdnStorageAccountNameForStaging": {
+            "value": ""
+        },
+        "CdnStorageContainerNameForStaging": {
+            "value": ""
+        }
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;You can see how the parameters match the parameters defined in the template json file. In this case, since the repo is public, the values are just empty strings – but you can imagine how you could define “dev.param.json” and “staging.param.json” and so on – each environment gets its own param.json file. Then at deploy time, you specify to the release which param.json file to use for that environment in the &lt;a href="https://github.com/Microsoft/vso-agent-tasks/tree/master/Tasks/DeployAzureResourceGroup"&gt;Deploy Azure Resource Group&lt;/a&gt; task.&lt;/p&gt;
+&lt;p&gt;I’m still not sure I like hard-coding values and committing them to source control. The Microsoft team argued that this is “config as code” – but I still think that defining values in Release Management constitutes config as code, even if the code isn’t committed into source control. I’m willing to concede if you’re deploying to Azure using ARM – but I don’t think too many people are at present. Also, there’s the issue of sensitive information going to source control – in this case, the template actually requires a password field (not defined in the param file) – are you going to hardcode usernames/passwords into source control? And even if you do, if you just want to change a value, you need to create a new build since there’s no way to use the existing build – which is probably not what you want!&lt;/p&gt;
+&lt;p&gt;Let’s imagine you’re deploying your web app to IIS instead of Azure. How do you manage your configuration in that case? “Use config transformations!” you cry. The problem – as I pointed out in my previous post – is that if you have a config transform for each environment, you have to build a package for each environment, since the transformation occurs at &lt;em&gt;build&lt;/em&gt; time, not at &lt;em&gt;deploy&lt;/em&gt; time. Hence my preference for a single transform that inserts tokens into the WebDeploy package at build time that can be filled in with actual values at deploy time. This is what I call “tokenization”.&lt;/p&gt;
+&lt;p&gt;So when do you use config-per-environment and when do you use tokenization? I think that if you’ve got ARM templates, use config-per-environment. It’s powerful and elegant. However, even if you’re using ARM, if you have numerous environments, and environment configs change frequently, you may want to opt for tokenization. When you use config-per-environment, you’ll have to queue a new build to get the new config files into the drop that the release is deploying – while tokenization lets you change the value in Release Management and re-deploy an existing package. So if you prefer not to rebuild your binaries just to change an environment variable, then use tokenization. Also, if you don’t want to store usernames/passwords or other sensitive data in source control, then tokenization is better – sensitive information can be masked in Release Management. Of course you could do a combination – storing some config in source code and then just using Release Management for defining sensitive values.&lt;/p&gt;
+&lt;h3&gt;Docker Environment Variables&lt;/h3&gt;
+&lt;p&gt;As an aside, I think that Docker encourages tokenization. Think about how you wouldn’t hard-code config into the Dockerfile – you’d “assume” that certain environment variables are set. Then when you run an instance of the image, you would specify the environment variable values as part of the run command. This is (conceptually anyway) tokenization – the image has “placeholders” for the config that are “filled in” at deploy time. Of course, nothing stops you from specifying a Dockerfile per environment, but it would seem a bit strange to do so in the context of Docker.&lt;/p&gt;
+&lt;p&gt;You, dear reader, will have to decide which is better for yourself!&lt;/p&gt;
+&lt;h2&gt;New Custom Build Tasks – Replace Tokens and Azure WebDeploy&lt;/h2&gt;
+&lt;p&gt;So I still like WebDeploy with tokenization – but the PowerShell-based solution I hacked out in my previous post still felt like it could use some work. I set about seeing if I could wrap the PowerShell scripts into custom Tasks. I also felt that I could improve on the arguments passed to the WebDeploy cmd file – specifically for Azure Web Apps. Why should you download the Web App publishing profile manually if you can specify credentials to the Azure subscription as a Service Endpoint? Surely it would be possible to suck down the publishing profile of the website automatically? So I’ve created two new build tasks – &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/ReplaceTokens"&gt;Replace Tokens&lt;/a&gt; and &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/AzureWebDeploy"&gt;Azure WebDeploy&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;Replace Tokens Task&lt;/h3&gt;
+&lt;p&gt;I love how &lt;a href="https://octopus.com/"&gt;Octopus Deploy&lt;/a&gt; automatically replaces web.config keys if you specify matching environment variables in a deployment project. I did something similar in my previous post with some PowerShell. The &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/ReplaceTokens"&gt;Replace Tokens task&lt;/a&gt; does exactly that – using some Regex, it will replace any matching token with the environment variable (if defined) in Release Management. It will work nicely on the WebDeploy SetParams.xml file, but could be used to replace tokens on any file you want. Just specify the path to the file (and optionally configure the Regex) and you’re done. This task is implemented in node, so it’ll work on any platform that the VSTS agent can run on.&lt;/p&gt;
+&lt;h3&gt;Azure WebDeploy Task&lt;/h3&gt;
+&lt;p&gt;I did indeed manage to work out how to get the publishing username and password of an Azure website from the context of an Azure subscription. So now you drop a “Replace Tokens” task to replace tokens in the SetParams.xml file, and then drop an &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/AzureWebDeploy"&gt;Azure WebDeploy task&lt;/a&gt; into the Release. This looks almost identical to the out-of-the-box “Azure Web App Deployment” task except that it will execute the WebDeploy command using the SetParams.xml file to override environment variables.&lt;/p&gt;
+&lt;h2&gt;Using the Tasks&lt;/h2&gt;
+&lt;p&gt;I tried the same hypothetical deployment scenario I used in my previous post – I have a website that needs to be deployed to IIS for Dev, to a staging deployment slot in Azure for staging, and to the production slot for Production. I wanted to use the same tokenized build that I produced last time, so I didn’t change the build at all. Using my two new tasks, however, made the Release a snap.&lt;/p&gt;
+&lt;h3&gt;Dev Environment&lt;/h3&gt;
+&lt;p&gt;Here’s the definition in the Dev environment:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/aa60a661-c377-4ffa-8db6-ccff14e51c38.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4ae9d98a-cb72-430c-ba46-59d5b7c0a367.png" width="725" height="256"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;You can see the “Replace Tokens” task – I just specified the path to the SetParams.xml file as the “Target File”. The environment variables look like this:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/1a9b2619-525f-49c9-9033-781e183fadb9.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a359a967-b5f7-48fd-8bbf-442ef8624828.png" width="612" height="235"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Note how I define the app setting (CoolKey), the connection string (EntityDB) and the site name (the IIS virtual directory name of the website). The “Replace Tokens” path finds the corresponding tokens and replaces them with the values I’ve defined.&lt;/p&gt;
+&lt;p&gt;To publish to IIS, I can just use the “Batch Script” task:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/28c3cfb6-c24f-4e50-b4a9-d6255443e10d.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/456da677-1025-40e2-81d3-1487394b8db0.png" width="690" height="224"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I specify the path to the cmd file (produced by the build) and then add the arguments “/Y” to do the deployment (as opposed to a what-if) and use the “/M” argument to specify the IIS server I’m deploying to. Very clean!&lt;/p&gt;
+&lt;h3&gt;Staging and Production Environments&lt;/h3&gt;
+&lt;p&gt;For the staging environment, I use the same “Replace Tokens” task. The variables, however, look as follows:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c8de9fec-749a-48ef-9066-5e5ec90827d6.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/7f716985-f73f-430b-861a-9b107ed084e4.png" width="681" height="224"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;The SiteName variable has been removed. This is because the “Azure WebDeploy” task will work out the site name internally before invoking WebDeploy.&lt;/p&gt;
+&lt;p&gt;Here’s what the Azure WebDeploy task looks like in Staging:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/fc295a17-a03a-4802-a4eb-23f7f79e95f5.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/44ff7e2a-2917-48d3-a9fd-9293c63bf063.png" width="636" height="288"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;The parameters are as follows:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Azure Subscription – the Azure subscription Service Endpoint – this sets the context for the execution of this task 
+&lt;li&gt;Web App Name – the name of the Web App in Azure 
+&lt;li&gt;Web App Location – the Azure region that the site is in 
+&lt;li&gt;Slot – the deployment slot (leave empty for production slot) 
+&lt;li&gt;Web Deploy Package Path – the path to the webdeploy zip, SetParams.xml and cmd files&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Internally, the task connects to the Azure subscription using the Endpoint credentials. It then gets the web app object (via the name) and extracts the publishing username/password and site name, taking the slot into account (the site name is different for each slot). It then replaces the SiteName variable in the SetParametes.xml file before calling WebDeploy via the cmd (which uses the zip and the SetParameters.xml file). Again, this looks really clean.&lt;/p&gt;
+&lt;p&gt;The production environment is the same, except that the Slot is empty, and the variables have production values.&lt;/p&gt;
+&lt;h3&gt;IIS Web Application Deployment Task&lt;/h3&gt;
+&lt;p&gt;After my last post, a reader tweeted me to ask why I don’t use the out-of-the-box &lt;a href="https://github.com/Microsoft/vso-agent-tasks/tree/master/Tasks/IISWebAppDeployment"&gt;IIS Web Application Deployment task&lt;/a&gt;. The biggest issue I have with this task is that it uses WinRM to remote to the target machine and then invokes WebDeploy “locally” in the WinRM session. That means you have to install and configure WinRM on the target machine before deploying. On the plus side, it does allow you to specify the SetParameters.xml file and even override values at deploy time. It can work against Azure Web Apps too. You can use it if you wish – just remember to use the “Replace Tokens” task before to get environment variables into your SetParameters.xml file!&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Whichever method you prefer – config per environment or tokenization – Release Management makes your choice a purely philosophical debate. Due to its customizable architecture, there’s not too much technical difference between the methods when it comes to defining the Release Definition. That, to my mind, assures me that Release Management in VSTS is a fantastic tool. &lt;/p&gt;
+&lt;p&gt;So make your choice and happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>DevOps</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="e8d3c003-897c-4f92-9fe3-b61ca91dfba8">
+      <author>sandy</author>
+      <email>santu_live@live.com</email>
+      <website></website>
+      <ip>131.107.147.31</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Safari/537.36 Edge/13.10586</userAgent>
+      <date>2016-02-03 22:7:39</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;Great Blog and Information .Is there any way we can see end to end scenario with the token replacement . We have this debate from long time and really want to demo my team.&lt;br /&gt;Looking to save some time. Any GitHub link with demo would be super helpful&lt;br /&gt;&lt;br /&gt;Sandy</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="36c67ca1-5284-4beb-a579-1ba568308580">
+      <author>Jim Michael</author>
+      <email>jmichael@cxloyalty.com</email>
+      <website></website>
+      <ip>204.228.221.131</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2016-02-11 21:54:14</date>
+      <content>I have to say that I agree 100% on tokenization over hard-coded configurations.  Right of the top, the hard-coded configurations are only good for the web code itself.  They can&amp;#39;t handle environment specific SQL, or any other configuration item that might be different from one environment to the next, or even server to server within the same environment.&lt;br /&gt;&lt;br /&gt;I would love to talk more about this with you,  I&amp;#39;ve seen a little bit of the new RM feature, and I can&amp;#39;t say I&amp;#39;m impressed.   I think MS is taking the wrong approach.&lt;br /&gt;&lt;br /&gt;Jim Michael</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2f818ad5-e56e-496e-a4bc-99dc5f8b6b81">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:39:09</date>
+      <content>Hi @Sandy&lt;br /&gt;&lt;br /&gt;I thought I was showing an end to end scenario - what more would you like to see? Don&amp;#39;t have any code on GitHub, but you can follow my post from a &amp;quot;File-&amp;gt;New Project&amp;quot; and just add some fake keys into the web.config and parameters.xml files.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="08968bb0-878a-4599-8894-4c2c508ef3ce">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:40:17</date>
+      <content>Hi @Jim&lt;br /&gt;&lt;br /&gt;The RM tools are great - though not perfect for everyone&amp;#39;s scenario. If you think they&amp;#39;re going in the wrong direction, then what do you think the right direction is?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e520d214-d6c1-4c9c-9b94-3677e7adfa37">
+      <author>Keith</author>
+      <email>keithdavidson@hotmail.com</email>
+      <website></website>
+      <ip>86.176.75.157</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36</userAgent>
+      <date>2016-04-29 11:37:36</date>
+      <content>I&amp;#39;m trying to set up RM just now and am taking the tokenisation route but it&amp;#39;s not as straight forward as I&amp;#39;d hoped.  I&amp;#39;m working through it but a couple points which I thought worth a mention:&lt;br /&gt;&lt;br /&gt;a) the Replace-SetParameters.ps1 (from your earlier post on 02/12/2015 ) doesn&amp;#39;t play nice with multiple tokens on the same line, like in a connection string;  the first token is replaced with the correct value but the subsequent tokens are replaced the with the same value&lt;br /&gt;&lt;br /&gt;b) if you run the Replace-SetParameters.ps1 before copying the files, doesn&amp;#39;t that preclude using the same file again in the next environment and / or subsequent deployments?  You have overwritten the tokens with values for a one of given environment, no?&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;&lt;br /&gt;Keith.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b15ca6db-b2ee-4d16-b3ed-2820c71b3853">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:27:32</date>
+      <content>Hi @Keith&lt;br /&gt;&lt;br /&gt;a) Rather get my ReplaceTokens task from the marketplace: https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks&lt;br /&gt;&lt;br /&gt;b) For this I normally copy the files a tmp folder (using Copy Files), then ReplaceTokens, then whatever next.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="d60167a9-de0f-4c6c-88ef-2ca3ff8c4d52">
+      <author>Forest</author>
+      <email>forest.marie@gmail.com</email>
+      <website></website>
+      <ip>66.242.228.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-22 19:32:43</date>
+      <content>Will your ReplaceTokens unzip a zip file, tokenize the matching files and re-zip it back?  We&amp;#39;re using Team Services but pushing to environments using on-prem build agents and web deploy (ie. zip files).</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="1b5d63e5-b6da-45d5-87c7-cd05788530fa">
+      <author>Forest</author>
+      <email>forest.marie@gmail.com</email>
+      <website></website>
+      <ip>66.242.228.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-22 21:5:43</date>
+      <content>What are you doing for local development Colin?  I like the entire parameters.xml approach and using tokenization but when we run the app locally our web.config has nothing but __SomeToken__ everywhere?  Are you maintaining a separate web.dev.config or do you have any Powershell that you fire on a pre-build task to update your web.config?  I&amp;#39;m just trying to avoid duplicate work.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5f106008-9d99-4ccf-9857-41c7ec3113c3">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 08:35:14</date>
+      <content>Hi @Forest&lt;br /&gt;&lt;br /&gt;My ReplaceTokens task won&amp;#39;t work on zip files. However, if you&amp;#39;re using webdeploy, then the replaceTokens task works on the SetParameters.xml file which lives alongside the zip file, so you don&amp;#39;t need to unzip or zip at all.&lt;br /&gt;&lt;br /&gt;As for local dev, I normally have my development settings in my web.config. Then I have a single transform file (web.release.config) that has the tokens in it (__ConStr__ for example). Then in my build I apply the transform through the pubxml file - this then produces a webdeploy zip file with a parameterized SetParameters.xml file.&lt;br /&gt;&lt;br /&gt;Let me know if that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="1ca2b9c3-cb87-4d95-91d5-e94bbc343144">
+      <author>Timor</author>
+      <email>timor1986@gmail.com</email>
+      <website></website>
+      <ip>91.216.252.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-08-02 12:0:37</date>
+      <content>Hello, I have this issue and I wonder if how can I use &amp;quot;Tokenization&amp;quot; with it. I have a component (A service with binary files) which I would like to deploy using continues deployment.&lt;br /&gt;This component relies on a configuration file AppSettings.config which has different parameters per environment like (Connection Strings, Timeout properties, etc).&lt;br /&gt;The thing is that if I would like to manually add/remove a parameter from this file I need to tell the developers to release a new version with the correct tokens and also to change their actual values in the &amp;quot;Environment Variables&amp;quot; in the VSTS so on the deploy it will actually place the right configuration instead of the tokens. This is somehow overwhelming because before I could only change it in the file as I wished and just restart the service to take effect.&lt;br /&gt;Do you think there is a simpler way to do it?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="c5c05d64-8886-41e4-8855-30aaaa5b0e4e">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.184.79.27</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-08-08 07:50:13</date>
+      <content>Hi @Timor&lt;br /&gt;&lt;br /&gt;Keeping tabs of your configuration in source control (a la configuration as code) sometimes requires more effort than the &amp;quot;uncontrolled alternative&amp;quot;. Normally you shouldn&amp;#39;t be changing the actual keys for your configurations very often, so my method won&amp;#39;t be too much of a burden. The values are kept in the Release so are easy to change. If you&amp;#39;re constantly changing the keys that are in your config, there&amp;#39;s a deeper issue.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c46fb97d-989f-46ba-95a0-95463adef585">
+      <author>sudalai muthu</author>
+      <email>sudalai.muthukumar@aspiresys.com</email>
+      <website>http://replacetoken/</website>
+      <ip>61.12.35.115</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36</userAgent>
+      <date>2016-08-18 07:47:00</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;This session is very useful for me. For change the Azure RM deployment. Am successfully configured. its was working fine. Thank you so much..&lt;br /&gt;&lt;br /&gt;Thanks&lt;br /&gt;Sudalai</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="53c444a6-5948-4256-a727-b828f5c550e5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>66.192.178.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36</userAgent>
+      <date>2016-09-06 15:34:11</date>
+      <content>Thanks @Sudalai - happy to help!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="1a5167bc-6e68-4a65-98ca-5ba23a707955">
+      <author>Sam</author>
+      <email>sameerkumar.k@gmail.com</email>
+      <website></website>
+      <ip>104.129.194.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36</userAgent>
+      <date>2017-11-09 03:34:40</date>
+      <content>Great post indeed!&lt;br /&gt;I&amp;#39;m trying to wrap my head around how you tokenized SetParameters.xml. Though it&amp;#39;s mentioned that &amp;quot;Replace Tokens&amp;quot; task can work with Web deploy parameters XML file. &lt;br /&gt;I&amp;#39;m using TFS 2017 and MSBuild.&lt;br /&gt;Thanks for your help!</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

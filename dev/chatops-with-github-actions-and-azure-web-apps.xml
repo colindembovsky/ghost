@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>48f3b238-4891-44b2-a906-124629b664cc</id>
+  <title>ChatOps with GitHub Actions and Azure Web Apps</title>
+  <slug>chatops-with-github-actions-and-azure-web-apps</slug>
+  <shortUrl>https://colinsalmcorner.com/post/chatops-with-github-actions-and-azure-web-apps</shortUrl>
+  <author></author>
+  <pubDate>2020-03-30 23:15:38</pubDate>
+  <lastModified>2020-03-30 23:15:38</lastModified>
+  <content>&lt;p&gt;Over this weekend, I ported a task from Azure Pipelines to &lt;a href="https://github.com/colindembovsky/azure-webapp-route-traffic"&gt;GitHub Actions&lt;/a&gt;. It was a fun project, and while I was busy I realized that I could now do some ChatOps. I decided to create a quick video which is below.&lt;/p&gt;&lt;p&gt;Code is in GitHub &lt;a href="https://github.com/colindembovsky/web-app-actions-deploy-sample/"&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;p style="text-align: center;"&gt;&lt;iframe width="560" height="315" src="https://www.youtube.com/embed/Yo6O55OQSIA" frameborder="0" allowfullscreen="" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"&gt;&lt;/iframe&gt;&lt;/p&gt;&lt;p&gt;Happy chat-opsing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories></categories>
+  <comments></comments>
+  <viewCount>0</viewCount>
+</post>

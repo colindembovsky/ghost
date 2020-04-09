@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>PowerShell DSC: Remotely Configuring a Node to “RebootNodeIfNeeded”</title>
+  <slug>powershell-dsc-remotely-configuring-a-node-to-rebootnodeifneeded</slug>
+  <shortUrl>http://bit.ly/1jlObeZ</shortUrl>
+  <author></author>
+  <pubDate>2014-06-26 09:35:19</pubDate>
+  <lastModified>2015-07-21 11:58:52</lastModified>
+  <content>&lt;p&gt;I’ve started to experiment a bit with some &lt;a href="http://blogs.technet.com/b/privatecloud/archive/2013/08/30/introducing-powershell-desired-state-configuration-dsc.aspx" target="_blank"&gt;PowerShell DSC&lt;/a&gt; – mostly because it’s now &lt;a href="http://blogs.msdn.com/b/visualstudioalm/archive/2014/05/22/release-management-for-microsoft-visual-studio-2013-with-update-3-ctp1-is-live.aspx" target="_blank"&gt;supported in Release Management&lt;/a&gt; (in Update 3 CTP at least).&lt;/p&gt; &lt;p&gt;Sometimes when you apply a configuration to a node (machine), the node requires a reboot (for example adding .NET4.5 requires the node to reboot). You can configure the node to reboot immediately (instead of just telling you “a reboot is required”) by changing a setting in the node’s LocalConfigurationManager. Of course, since this is configuration, it’s tempting to try to do this in a DSC script – for example:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration SomeConfig
+{
+   Node someMachine
+   {
+      LocalConfigurationManager
+      {
+         RebootNodeIfNeeded = $true
+      }
+   }
+}
+&lt;/pre&gt;
+&lt;p&gt;This configuration “compiles” to a mof file and you can apply it successfully. However, it doesn’t actually do anything.&lt;/p&gt;
+&lt;h2&gt;Set-DscLocalConfigurationManager on a Remote Node&lt;/h2&gt;
+&lt;p&gt;Fortunately, there is a way to change the settings on the LocalConfigurationManager remotely – you use the cmdlet Set-DscLocalConfigurationManager with a CimSession object (i.e. you invoke it remotely). I stumbled across this when looking at the documentation for &lt;a href="http://technet.microsoft.com/en-us/library/dn249922.aspx" target="_blank"&gt;DSC Local Configuration Manager&lt;/a&gt; where the very last sentence says “To see the current Local Configuration Manager settings, you can use the Get-DscLocalConfigurationManager cmdlet. If you invoke this cmdlet with no parameters, by default it will get the Local Configuration Manager settings for the node on which you run it. To specify another node, use the CimSession parameter with this cmdlet.”&lt;/p&gt;
+&lt;p&gt;Here’s a script that you can modify to set “RebootNodeIfNeeded” on any node:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration ConfigureRebootOnNode
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $NodeName
+    )
+
+    Node $NodeName
+    {
+        LocalConfigurationManager
+        {
+            RebootNodeIfNeeded = $true
+        }
+    }
+}
+
+Write-Host "Creating mofs"
+ConfigureRebootOnNode -NodeName fabfiberserver -OutputPath .\rebootMofs
+
+Write-Host "Starting CimSession"
+$pass = ConvertTo-SecureString "P2ssw0rd" -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ("administrator", $pass)
+$cim = New-CimSession -ComputerName fabfiberserver -Credential $cred
+
+Write-Host "Writing config"
+Set-DscLocalConfigurationManager -CimSession $cim -Path .\rebootMofs -Verbose
+
+# read the config settings back to confirm
+Get-DscLocalConfigurationManager -CimSession $cim
+&lt;/pre&gt;
+&lt;p&gt;Just replace “fabfiberserver” with your node name and .\ the script. The last line of the script reads back the LocalConfigurationManager settings on the remote node, so you should see the RebootNodeIfNeeded setting is true.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/be427703-7d74-4ad9-9ccf-949db8db04fd.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/f7e44cac-1732-4bbc-ac1c-8405fa8a1d06.png" width="644" height="342"&gt;&lt;/a&gt; Happy configuring!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="c05800ad-6cfb-4c6d-b64e-f7c2f3513c1d">
+      <author>mgr</author>
+      <email>marcin.grzywa@gmail.com</email>
+      <website></website>
+      <ip>85.14.112.72</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; rv:33.0) Gecko/20100101 Firefox/33.0</userAgent>
+      <date>2014-11-04 12:53:30</date>
+      <content>Thank you, this saved me some frustration :)</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="c5081900-c668-4f30-a100-f98c76dfd900">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.143.214</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2014-12-17 21:28:39</date>
+      <content>@mgr - Glad it was useful!</content>
+    </comment>
+  </comments>
+  <viewCount>49942</viewCount>
+  <id>f1f1aa7d-fb02-4b54-bece-9aab22d7b797</id>
+</post>

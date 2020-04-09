@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>332495e1-19e0-454f-b59e-59d205183221</id>
+  <title>VS 2012 RC – Fakes Bugs Fixed</title>
+  <slug>vs-2012-rc--fakes-bugs-fixed</slug>
+  <shortUrl>http://bit.ly/1kxqYJf</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2012-06-20 12:27:00</pubDate>
+  <lastModified>2020-04-07 03:21:36</lastModified>
+  <content>&lt;p&gt;In a &lt;a href="http://colinsalmcorner.blogspot.com/2012/04/more-on-fakes-beta-has-issues.html"&gt;previous post&lt;/a&gt; about the MS Fakes framework, I made mention of some bugs that appeared in the Beta. I finally had some time to test out the same code in the RC, and I am pleased to tell you that the bugs have been fixed (well, the ones I found anyway!).&lt;/p&gt; &lt;h2&gt;Upgrading Gotcha&lt;/h2&gt; &lt;p&gt;The only gotcha I came across appears to be a snag when you open in the RC a test project that was created in the Beta. I initially simply opened up the code that I had from the Beta, updated references to TeamFoundation dlls from version 10 to version 11, regenerated the fakes and tried to run the tests. FAIL – the tests were failing with “ShimNotSupportedExceptions”. After trying various things, I noticed some text in the Output window from the “Tests” section (the Show output from dropdown):&lt;/p&gt;&lt;font size="3" face="Courier New"&gt; &lt;p&gt;&lt;pre&gt;Failed to configure settings for runsettings plugin ‘Fakes’ as it threw following exception:&lt;br /&gt;‘Object reference not set to an instance of an object’&lt;br /&gt;Please contact the plugin author.&lt;br /&gt;&lt;/pre&gt;&lt;/font&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-1MVUGWXy5D0/T-GlfdEgggI/AAAAAAAAAYw/S_ebiSuuo2U/s1600-h/image%25255B3%25255D.png"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; margin-left: auto; border-left-width: 0px; margin-right: auto; padding-top: 0px" title="image" border="0" alt="image" src="http://lh4.ggpht.com/-XX9_uZrD4ZA/T-GlgTnpT-I/AAAAAAAAAY4/dFyQv0M3kuY/image_thumb%25255B1%25255D.png?imgmax=800" width="466" height="141"&gt;&lt;/a&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;For some reason, the Fakes framework wasn’t generating fakes for the v 11 assemblies correctly. I eventually created a new Test project in VS 2012 RC, copied across the code and re-added references and fakes, and voila, everything is working great!&lt;/p&gt;&lt;br /&gt;&lt;p&gt;I’m not sure if this is a bug or not, so if you’re getting this error, my suggestion is to just create a new Test project in the RC and copy the code across.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Now back to (fake) testing…&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments></comments>
+  <viewCount>42795</viewCount>
+</post>

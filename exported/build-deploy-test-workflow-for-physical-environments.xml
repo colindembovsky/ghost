@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>1051dd8a-6bc8-423e-98d9-6cc6993d476d</id>
+  <title>Build-Deploy-Test Workflow for Physical Environments</title>
+  <slug>build-deploy-test-workflow-for-physical-environments</slug>
+  <shortUrl>http://bit.ly/R7POoM</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-02-19 13:12:00</pubDate>
+  <lastModified>2020-04-07 05:59:53</lastModified>
+  <content>&lt;p&gt;This week, Darshan Desai published a &lt;a href="http://blogs.msdn.com/b/lab_management/archive/2011/02/16/running-build-deploy-test-workflow-on-physical-environments.aspx" target="_blank"&gt;post&lt;/a&gt; about a build-deploy-test workflow for Physical environments. The solution is entirely XAML based – you don’t need any custom assemblies. However, the design-time experience is not as rich as the wizard that you get when you do a Lab workflow for build-deploy-test using the LabDefault.xaml template.&lt;/p&gt; &lt;p&gt;I’ve been working on building a workflow that includes a wizard similar to that of the Lab workflow. Seeing Darshan’s solution allowed me to iron out a few kinks in my solution, as well as overcome some of his solution’s limitations. Obviously, since this is a scenario for a Physical environment, there is no ability to do snapshots or restores - you'll have to make sure you have some clean up scripts to run pre-deployment to get to a "clean-ish" state.&lt;/p&gt; &lt;h2&gt;Notions Physical Build-Deploy-Test Solution&lt;/h2&gt; &lt;p&gt;Setting up the environment is the same for my solution as it is for Darshan – you need to install and configure both a Build agent (or workflow agent, as it’s called in the Lab scenario) as well as a Test agent. Both agents need to be connected to controllers in your TFS environment. The name of the Build agent is important, since this is the way that you configure where deployment scripts are run.&lt;/p&gt; &lt;p&gt;If you’re going to test, you need to create a test plan with a test suite that contains tests that have automation associate with them. Also, you’ll need a “regular” build that can compile (and optionally unit test) the code as well as the dll’s that contain the automated tests (call this the “Source build”). Then you’ll need to create some automated test settings for your test plan. This test setup is exactly the same setup you’d need if you’re using the Lab workflow or Darshan’s workflow.&lt;/p&gt; &lt;p&gt;To use our workflow, you need the PhysicalDefaultWorkflow in source control somewhere, as well as a custom assembly. You’re controller needs to be configured to point to the folder in source control that contains this custom assembly. In contrast, Darshan’s workflow doesn’t require a custom assembly.&lt;br&gt;Here’s a walkthrough of what my workflow looks like once you’ve configured the physical environment, the Source build and the test plan.&lt;/p&gt; &lt;p&gt;1. Create a new Build Definition and set the workspace, drop location, trigger and retention policy just as you would for any other build.&lt;/p&gt; &lt;p&gt;2. Change the Build Process Template on the Process tab to the PhysicalDefaultTemplate.xaml.&lt;/p&gt; &lt;p&gt;3. You’ll see the familiar “Click here to edit details…” for the Workflow Process Details argument. Clicking the button with the ellipsis will launch the Physical Workflow Parameters wizard. You’ll see a welcome screen – click next to start configuring the build.&lt;/p&gt; &lt;p&gt;4. On the “Select Environment” screen, select the Physical environment that you want to deploy to &lt;br&gt;&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/_d41Ixos7YsM/TV-i61iKBAI/AAAAAAAAAO0/1qpy3bbu7dM/s1600-h/clip_image0024.jpg"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; border-left-width: 0px; padding-top: 0px" title="clip_image002" border="0" alt="clip_image002" src="http://lh5.ggpht.com/_d41Ixos7YsM/TV-jKpq_ovI/AAAAAAAAAO4/jPWG461VXno/clip_image002_thumb1.jpg?imgmax=800" width="322" height="155"&gt;&lt;/a&gt; 5. On the “Configure Build” screen, configure the Source build. Here I overcome some of Darshan’s build’s limitations – you can choose a custom drop location, queue a new build or select the latest available build for your build definition.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh4.ggpht.com/_d41Ixos7YsM/TV-jLX3HqiI/AAAAAAAAAO8/CbkTW5gTAjs/s1600-h/clip_image0044.jpg"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; border-left-width: 0px; padding-top: 0px" title="clip_image004" border="0" alt="clip_image004" src="http://lh5.ggpht.com/_d41Ixos7YsM/TV-jbahYV7I/AAAAAAAAAPA/xHHPJHDut5c/clip_image004_thumb1.jpg?imgmax=800" width="301" height="216"&gt;&lt;/a&gt; &lt;br&gt;6. The next screen is “Deployment Scripts”. Here you can configure scripts for the deployment. This screen is slightly different from the same screen in the Lab Workflow. Instead of “Role” for the deployment script, you need to target the Build (Workflow) agent to run the script on (you may see agents that are not part of the environment in this list, so make sure you select the correct agents). You can use $(BuildLocation) as a parameter for the build drop folder of the Source build. I’ve also created a Machine_ parameter that’s similar to the Computer_ (and InternalComputer_) parameters of the Lab workflow. You use $(Machine_AgentName) as a variable for the physical machine name that the agent with name AgentName resides on. For example, if you have an agent called “MyAgent” on a machine called “MyMachine”, then you can use $(Machine_MyAgent) as the variable and when the build runs, this variable will be expanded to “MyMachine”.&lt;/p&gt; &lt;p&gt;7. You’ll need to configure an account to perform the deployment under. In the Lab Workflow, this is the account that the Lab Agent is configured with. This can be any account as long as it has permissions to execute the script and to the Source build drop folder. Warning: the password is not stored securely!&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/_d41Ixos7YsM/TV-jcDplFCI/AAAAAAAAAPE/zYzRUWjp9K8/s1600-h/clip_image0065.jpg"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; border-left-width: 0px; padding-top: 0px" title="clip_image006" border="0" alt="clip_image006" src="http://lh3.ggpht.com/_d41Ixos7YsM/TV-kZbR-nXI/AAAAAAAAAPI/r7dv1pGfTcU/clip_image006_thumb2.jpg?imgmax=800" width="373" height="310"&gt;&lt;/a&gt;8. Finally, configure testing on the “Configure Testing” screen. This screen is exactly the same as the “Configure Testing” screen in the Lab Workflow.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh6.ggpht.com/_d41Ixos7YsM/TV-kaL4-vsI/AAAAAAAAAPM/x9OruRIC55Q/s1600-h/clip_image0084.jpg"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; border-left-width: 0px; padding-top: 0px" title="clip_image008" border="0" alt="clip_image008" src="http://lh5.ggpht.com/_d41Ixos7YsM/TV-lXJ71PdI/AAAAAAAAAPQ/rbg-w9udgJ8/clip_image008_thumb1.jpg?imgmax=800" width="346" height="238"&gt;&lt;/a&gt; Now you can run your build! Here’s the output of one of my builds: &lt;/p&gt; &lt;p&gt;&lt;a href="http://lh6.ggpht.com/_d41Ixos7YsM/TV-lYRQRLPI/AAAAAAAAAPU/bApVU7dtPvI/s1600-h/image3.png"&gt;&lt;img style="background-image: none; border-right-width: 0px; padding-left: 0px; padding-right: 0px; display: block; float: none; border-top-width: 0px; border-bottom-width: 0px; border-left-width: 0px; padding-top: 0px" title="image" border="0" alt="image" src="http://lh5.ggpht.com/_d41Ixos7YsM/TV-loSQIP4I/AAAAAAAAAPY/BTXWG9Tlxbc/image_thumb1.png?imgmax=800" width="389" height="325"&gt;&lt;/a&gt;&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="79a274dd-81f9-48e8-8820-9466d7db27e7">
+      <author>Guillaume Rouchon</author>
+      <email>noreply@blogger.com</email>
+      <website>http://blog.qetza.net/en/</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-02-20 21:24:35</date>
+      <content>Hi Colin,&lt;br /&gt;This is great, I was thinking of doing the same after reading Darshan's blog. Is there anyway to have access to your workflow and custom activity assembly?&lt;br /&gt;&lt;br /&gt;Guillaume</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="4b7f118b-2139-4640-a304-c84917e2a784">
+      <author>Rory Primrose</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.neovolve.com</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-02-23 07:30:55</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;This looks great. Could you please post your xaml and assembly. I would like to use this in my testing.&lt;br /&gt;&lt;br /&gt;Cheers,&lt;br /&gt;&lt;br /&gt;Rory</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="bfce6ef0-e57a-4348-b293-bc5fd037f3eb">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-02-23 17:26:24</date>
+      <content>Unfortunately I'm not able to post the code publicly - we use this solution at our clients...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="4f257c18-5e0d-4430-b3ca-3cda8ad53a3d">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-09-26 20:36:29</date>
+      <content>I'd like to see some info on how we can go about creating our own custom wizard like Lab uses...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="3425a265-0c3e-40b9-aa19-1bb7e158beaa">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-09-26 21:1:28</date>
+      <content>In theory it's quite simple - most of the building blocks already exist in the Lab Management build tasks. You'll need to implement the Microsoft.Wizard pages to get the same look and feel. Then you'll need to enumerate the (physical) environments, save some build details and deployment details as well as the test settings. Then it's a matter of customizing the DefaultLabTemplate.xaml to use the saved info and execute the build. I used Reflector to see what the Default Lab Management workflow was doing to help guide me!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0bc5f09d-fcd0-4d49-bc35-de2e4590c151">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2011-09-29 00:8:52</date>
+      <content>I guess I should have been a bit more verbose, you've obviously figured out how to go about this, and I applaud your technical skills. It might shock you to know that the company I work for has been in touch with Microsoft (we have a support agreement) over a period of time and they have told us what you've done is impossible.  So to say its simple is a gigantic understatement if the folks at MS can't even figure out how to do it. What I was hoping for was maybe an outline of the steps and some sample code on how to create a template that uses a custom wizard with only the "Build Tab" or something.  I wouldn't think that would violate any terms with your client, but still give those of us out here trying to do the same thing a jump start on how to begin creating our own wizards.</content>
+    </comment>
+  </comments>
+  <viewCount>2233</viewCount>
+</post>

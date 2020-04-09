@@ -1,0 +1,304 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>35e3b882-cfa5-4de3-a9e1-368c30c8876d</id>
+  <title>Tips and Tricks for Complex IaaS Deployments Using VSTS Deployment Groups</title>
+  <slug>tips-and-tricks-for-complex-iaas-deployments-using-vsts-deployment-groups</slug>
+  <shortUrl>http://bit.ly/2DD55X8</shortUrl>
+  <author></author>
+  <pubDate>2017-12-31 05:55:50</pubDate>
+  <lastModified>2018-11-15 04:32:09</lastModified>
+  <content>&lt;p&gt;Recently I was working with a customer that was struggling with test environments. Their environments are complex and take many weeks to provision and configure - so they are generally kept around even though some of them are not frequently used. Besides a laborious, error-prone manual install and configuration process that usually takes over 10 business days, the team has to maintain all the clones of this environment. This means that at least two senior team members are required just to maintain existing dev and test environments as well as create new ones.&lt;/p&gt;&lt;p&gt;Using &lt;a href="https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-group-authoring-templates" target="_blank"&gt;Azure ARM templates&lt;/a&gt; and VSTS &lt;a href="https://docs.microsoft.com/en-us/vsts/build-release/concepts/definitions/release/what-is-release-management" target="_blank"&gt;Release Management&lt;/a&gt; with &lt;a href="https://docs.microsoft.com/en-us/vsts/build-release/concepts/definitions/release/deployment-groups/" target="_blank"&gt;Deployment Groups&lt;/a&gt;, we were able to show how we could spin up the entire environment in just under two hours. That's a 50x improvement in lead time! And it's more consistent since the entire process is automated and the scripts are all source controlled so there's auditability. This is a huge win for the team. Not only can they spin up an environment in a fraction of the time they are used to, they can now decommission environments that are not frequently used (some environments were only used twice a year). That means they have less maintenance to worry about. When they need an environment for a short time, they spin it up, used it and then throw it away. They've also disseminated "tribal knowledge" from a few team members' heads to a button click - meaning anyone can create a new environment now.&lt;/p&gt;&lt;p&gt;This was my first time working with a larger scale provisioning and configuration project that uses Deployment Groups - and this post documents some of the lessons that we learned along the way.&lt;/p&gt;&lt;h3&gt;A Brief Glossary&lt;/h3&gt;&lt;p&gt;Before we jump into the tips, I need to get some definitions out of the way. In VSTS, a Release Definition is made up of multiple Environments. Typically you see DEV, STAGE and PROD but you can have multiple "environments" that target the same set of machines.&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d7bd08ff-5b27-47b4-b0f8-4aeb94295793.png" target="_blank"&gt;&lt;img width="340" height="102" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/56561a03-700d-476e-9c63-7a6e90c7fa83.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The above VSTS release has three "environments":&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Infrastructure Provision&lt;/li&gt;&lt;ul&gt;&lt;li&gt;Runs an ARM template to provision VMs, VNets, Storage and any other infrastructure required for the environment&lt;/li&gt;&lt;/ul&gt;&lt;li&gt;Infrastructure Config&lt;/li&gt;&lt;ul&gt;&lt;li&gt;Configure the OS of each machine, DNS and any other "low-level" settings&lt;/li&gt;&lt;/ul&gt;&lt;li&gt;App Install&lt;/li&gt;&lt;ul&gt;&lt;li&gt;Install and configure the application(s)&lt;/li&gt;&lt;/ul&gt;&lt;/ul&gt;&lt;p&gt;This separation also allows you to run the "Infrastructure Provision" environment and then set it to a manual trigger and just trigger the config environment - particularly useful when you're developing the pipeline, since you can skip environments that end up being no-ops but take a couple minutes to pass through.&lt;/p&gt;&lt;p&gt;Within an Environment, you can have 1..&lt;em&gt;n&lt;/em&gt; phases. You specify tasks inside a phase - these are the smallest unit of work in the release.&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/2aa9823e-f332-4cbe-be09-427257de1fb8.png" target="_blank"&gt;&lt;img width="233" height="341" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/50b0fd52-f99c-4a97-bbbf-2306512d0f68.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;In the above image, there are several phases within the "Infrastructure Config" environment. Each phase (in this case) is running a single task, but you can run as many tasks as you need for that particular phase.&lt;/p&gt;&lt;p&gt;There are three types of phases: agentless, agent-based or deployment-group based. You can think of agentless phases as phases that are executed on VSTS. Agent-based phases are executed on agent(s) in a build or release queue. Deployment Group phases are executed on all agents (with optional tag matching) within the specified Deployment Group. The agent for agent-based or deployment-group based is the same agent under the hood - the difference is that deployment group agents are only referenced through the Deployment Group while build/release agents are accessed through queues. You'd typically use agent queues for build servers or for "proxy servers" in releases (where the tasks are executing on the proxy but acting on other machines). Deployment Groups are used when you don't know the machines ahead of time - like when you're spinning up a set of machines in the cloud on demand. They also allow you to target multiple machines at the same time.&lt;/p&gt;&lt;p&gt;The VSTS Deployment agent joins a machine (this can be any machine anywhere that can connect to VSTS) to a Deployment Group. The agent is cross-platform (runs on DotNET Core) so it can run on practically any machine anywhere. It connects out to VSTS meaning you don't need to open incoming firewall ports at all. The agent runs on the machine and so any scripts you write can execute locally - which simplifies configuration dramatically. Executing remote instructions is typically much harder to do - you have to think about your connection and security and so on. Executing locally is much easier.&lt;/p&gt;&lt;h2&gt;TL;DR - The Top 10 Tips and Tricks&lt;/h2&gt;&lt;p&gt;Here are my top 10 tips and tricks:&lt;/p&gt;&lt;ol&gt;&lt;li&gt;Spin Up Azure VMs with the VSTS Deployment Agent Extension&lt;/li&gt;&lt;ol&gt;&lt;li&gt;This allows you to configure everything else locally on each machine&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Use Tagging for Parallelization and Specialization&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Tagging the VSTS agent allows you to repeat the same actions on many machines in parallel and/or distinguish machines for unique actions&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Use Phases to Start New Sessions&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Each phase in an Environment gets a new session, which is useful in a number of scenarios&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Update Your PowerShell PackageProviders and Install DSC Modules&lt;/li&gt;&lt;ol&gt;&lt;li&gt;If you're using DSC, install the modules in a separate step to ensure that they are available when you run DSC scripts. You may need to update your Package Providers for this to work&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Install Azure PowerShell and use the &lt;a href="https://github.com/Microsoft/vsts-tasks/tree/master/Tasks/AzurePowerShell" target="_blank"&gt;Azure PowerShell task&lt;/a&gt;&lt;/li&gt;&lt;ol&gt;&lt;li&gt;If you're going to be doing any scripting to Azure, you can quickly install Azure PowerShell so that you can use the Azure PowerShell task&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Use PowerShell DSC for OS Configuration&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Configuring Windows Features, firewalls and so on is best done with PowerShell DSC&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Use Plain PowerShell for Application Install and Config&lt;/li&gt;&lt;ol&gt;&lt;li&gt;Expressing application state can be challenging - so use "plain" PowerShell for application install and config&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Attaching Data Disks in Azure VMs&lt;/li&gt;&lt;ol&gt;&lt;li&gt;If you add data disks in your ARM template, you still need to mount them in the OS of the VM&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Configuring DNS on Azure VNets&lt;/li&gt;&lt;ol&gt;&lt;li&gt;If you create an Active Directory Domain Controller or DNS, you'll need to do some other actions on the VNet too&lt;/li&gt;&lt;/ol&gt;&lt;li&gt;Wait on machines when they reboot&lt;/li&gt;&lt;ol&gt;&lt;li&gt;If you reboot a machine and don't pause, the subsequent deployment steps fail because the agent goes offline.&lt;/li&gt;&lt;/ol&gt;&lt;/ol&gt;&lt;p&gt;In the next section I'll dig into each tip.&lt;/p&gt;&lt;h3&gt;Tip 1: Spin Up Azure VMs with the VSTS Deployment Agent Extension&lt;/h3&gt;&lt;p&gt;You can install the VSTS Deployment Agent (or just "the agent" for the remainder of this post) on any machine using a simple script. The script downloads the agent binary and configures it to connect the agent to your VSTS account and to the specified Deployment Group. However, if you're spinning up machines by using an ARM template, you can also install the agent via the VSTS extension. In order to do this you need a Personal Access Token (or PAT), the name of the VSTS account, the name of the Deployment Group and optionally some tags to tag the agent with. Tags will be important when you're distinguishing between machines in the same Deployment Group later on. You'll need to create the Deployment Group in VSTS before you run this step.&lt;/p&gt;&lt;p&gt;Here's a snippet of an ARM template that adds the extension to the Deployment Group:&lt;/p&gt;&lt;pre class="brush: javascript; highlight:[43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66]"&gt;{
+    "name": "[parameters('settings').vms[copyIndex()].name]",
+    "type": "Microsoft.Compute/virtualMachines",
+    "location": "[resourceGroup().location]",
+    "apiVersion": "2017-03-30",
+    "dependsOn": [
+      ...
+    ],
+    "properties": {
+      "hardwareProfile": {
+        "vmSize": "[parameters('settings').vms[copyIndex()].size]"
+      },
+      "osProfile": {
+        "computerName": "[parameters('settings').vms[copyIndex()].name]",
+        "adminUsername": "[parameters('adminUsername')]",
+        "adminPassword": "[parameters('adminPassword')]"
+      },
+      "storageProfile": {
+        "imageReference": "[parameters('settings').vms[copyIndex()].imageReference]",
+        "osDisk": {
+          "createOption": "FromImage"
+        },
+        "dataDisks": [
+            {
+                "lun": 0,
+                "name": "[concat(parameters('settings').vms[copyIndex()].name,'-datadisk1')]",
+                "createOption": "Attach",
+                "managedDisk": {
+                    "id": "[resourceId('Microsoft.Compute/disks/', concat(parameters('settings').vms[copyIndex()].name,'-datadisk1'))]"
+                }
+            }
+        ]
+      },
+      "networkProfile": {
+        "networkInterfaces": [
+          {
+            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(parameters('settings').vms[copyIndex()].name, if(equals(parameters('settings').vms[copyIndex()].name, 'JumpBox'), '-nicpub', '-nic')))]"
+          }
+        ]
+      }
+    },
+    "resources": [
+      {
+        "name": "[concat(parameters('settings').vms[copyIndex()].name, '/TeamServicesAgent')]",
+        "type": "Microsoft.Compute/virtualMachines/extensions",
+        "location": "[resourceGroup().location]",
+        "apiVersion": "2015-06-15",
+        "dependsOn": [
+          "[resourceId('Microsoft.Compute/virtualMachines/', concat(parameters('settings').vms[copyIndex()].name))]"
+        ],
+        "properties": {
+          "publisher": "Microsoft.VisualStudio.Services",
+          "type": "TeamServicesAgent",
+          "typeHandlerVersion": "1.0",
+          "autoUpgradeMinorVersion": true,
+          "settings": {
+            "VSTSAccountName": "[parameters('vstsAccount')]",
+            "TeamProject": "[parameters('vstsTeamProject')]",
+            "DeploymentGroup": "[parameters('vstsDeploymentGroup')]",
+            "Tags": "[parameters('settings').vms[copyIndex()].tags]"
+          },
+          "protectedSettings": {
+            "PATToken": "[parameters('vstsPat')]"
+          }
+        }
+      },
+      ...
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;The extension is defined in the highlighted lines&lt;/li&gt;&lt;li&gt;The "settings" section of the extension is where you specify the VSTS account name, team project name, deployment group name and comma-separated list of tags for the agent. You also need to supply a PAT that has access to join machines to the Deployment Group&lt;/li&gt;&lt;li&gt;You can also specify a "Name" property if you want the agent name to be custom. By default it will be machineName-DG (so if the machine name is WebServer, the agent will be named WebServer-DG.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Now you have a set of VMs that are bare-boned but have the VSTS agent installed. They are now ready for anything you want to throw at them - and you don't need to worry about ports or firewalls or anything like that.&lt;/p&gt;&lt;p&gt;There are some useful extensions and patterns for configuring VMs such as &lt;a href="https://docs.microsoft.com/en-us/azure/virtual-machines/windows/extensions-customscript" target="_blank"&gt;Custom Script&lt;/a&gt; or &lt;a href="https://azure.microsoft.com/en-us/resources/templates/201-vm-domain-join/" target="_blank"&gt;Join Domain&lt;/a&gt;. The problem with these scripts is that the link to the script has to be either in a public place or in a blob store somewhere, or they assume existing infrastructure. This can complicate deployment. Either you need to publish your scripts publically or you have to deal with uploading scripts and generating SAS tokens. So I recommend just installing the VSTS agent and let it do everything else that you need to do - especially since the agent will download artifacts (like scripts and build binaries) as a first step in any deployment phase.&lt;/p&gt;&lt;h3&gt;Tip 2: Use Tagging for Parallelization and Specialization&lt;/h3&gt;&lt;p&gt;Tags are really important for Deployment Groups. They let you identify machines or groups of machines within a Deployment Group. Let's say you have a load balanced application with two webservers and a SQL server. You'd probably want identical configuration for the webservers and a completely different configuration for the SQL server. In this case, tag two machines with WEBSERVER and the other machine with SQL. Then you'll define the tasks in the phase&amp;nbsp; - when the phase runs, it executes all the tasks on all the machines that match the filter - for example, you can target all WEBSERVER machines with a script to configure IIS. These will execute in parallel (you can configure it to work serially if you want to) and so you'll only specify the tasks a single time in the definition and you'll speed up the deployment.&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/2d415fda-4852-4327-adcd-07bd80234a0e.png" target="_blank"&gt;&lt;img width="331" height="99" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/5d918fca-64d5-4b20-a027-6afcb74dca7e.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Be careful though: multiple tags use AND (not OR) logic. This means if you want to do something like join a domain on machines with WEBSERVER and SQL, you would think you could specify WEBSERVER, SQL as the tag filter in the phase tag filter. But since the tags are joined with an AND, you'll see the phase won't match any machines. So you'd have to add a NODE tag (or something similar) and apply it to both webservers and SQL machine and then target NODE for things you want to do on all the machines.&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d5c254eb-a976-47a4-a9eb-7b375a8d080c.png" target="_blank"&gt;&lt;img width="314" height="187" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/0858d323-3c20-4bf1-9211-1d90279e32df.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The above image shows the tag filtering on the Phase settings. Note too the parallelization settings.&lt;/p&gt;&lt;h3&gt;Tip 3: Use Phases to Start New Sessions&lt;/h3&gt;&lt;p&gt;At my customer we were using Windows 2012 R2 machines. However, we wanted to use PowerShell DSC for configuring the VMs and you need Windows Management Framework 5.0 to get DSC. So we executed a PowerShell task to upgrade the PowerShell to 5.x:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;if ($PSVersionTable.PSVersion.Major -lt 5) {
+    $powershell5Url = "https://go.microsoft.com/fwlink/?linkid=839516"
+    wget -Uri $powershell5Url -OutFile "wmf51.msu"
+    Start-Process .\wmf51.msu -ArgumentList '/quiet' -Wait
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 1: This script checks the major version of the current PowerShell&lt;/li&gt;&lt;li&gt;Lines 2,3: If it's less than 5, then the script downloads PowerShell 5.1 (the path to the installer can be update to whichever PowerShell version you need)&lt;/li&gt;&lt;li&gt;Line 4: The installer is invoked with the quiet parameter&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;However, if we then called a task right after the update task, we'd still get the old PowerShell since all tasks within a phase are executed in&lt;em&gt; the same session&lt;/em&gt;. We just added another phase with the same Deployment Group settings - the second phase started a new session and we got the upgraded PowerShell.&lt;/p&gt;&lt;p&gt;This doesn't work for environment variables though. When you set machine environment variables, you have to restart the agent. The VSTS team are working on providing a task to do this, but for now you have to reboot the machine. We'll cover how to do this in Tip 10.&lt;/p&gt;&lt;h3&gt;Tip 4: Update Your PowerShell PackageProviders and Install DSC Modules&lt;/h3&gt;&lt;p&gt;You really should be using PowerShell DSC to configure Windows. The notation is succinct and fairly easy to read and Windows plays nicely with DSC. However, if you're using custom modules (like xNetworking) you have to ensure that the modules are installed. You can pre-install all the modules so that your scripts can assume the modules are already installed. To install modules you'll need to update your Package Providers. Here's how to do it:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;Import-Module PackageManagement
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+&lt;/pre&gt;&lt;p&gt;You'll need to start a new Phase in order to pick up the new packages. Then you'll be able to install modules:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;Install-Module -Name xActiveDirectory -Force
+Install-Module -Name xNetworking -Force
+Install-Module -Name xStorage -Force
+Install-Module -Name xDSCDomainjoin -Force
+Install-Module -Name xComputerManagement -Force
+&lt;/pre&gt;&lt;p&gt;Not all machines need all the modules, but this step is so quick I found it easier to just enumerate and install all the modules anyway. That way I know that any machine could run any DSC script I throw at it.&lt;/p&gt;&lt;h3&gt;Tip 5: Install Azure PowerShell&lt;/h3&gt;&lt;p&gt;If you're going to do anything against Azure from the VMs (in our case we were downloading binaries from a blob store) then you'll want to use the Azure PowerShell task. This task provides an authenticated context (via a preconfigured endpoint) so you don't have to worry about adding passwords or anything to your script. However, for it to work, you'll need to install Azure PowerShell. Again this must be a separate phase so that subsequent phases can make use of the Azure cmdlets. To do this simply add a PowerShell task and run this line of script: &lt;font face="Courier New"&gt;Install-Module AzureRM -AllowClobber -Force&lt;/font&gt;&lt;/p&gt;&lt;h3&gt;Tip 6: Use PowerShell DSC for OS Configuration&lt;/h3&gt;&lt;p&gt;OS configuration can easily be specified by describing the state: is IIS installed or not? Which other OS roles are installed? So DSC is the perfect tool for this kind of work. You can use a single DSC script to configure a group of machines (or nodes, in DSC) but since we have the VSTS agent you can simply write your scripts for each machine using "node localhost". DSC script are also (usually) idempotent - so they work no matter what state the environment is in when the script executes. No messy if statements to check various conditions - DSC does it for you.&lt;/p&gt;&lt;p&gt;When you're doing DSC, you should first check if there is a "native" resource for your action - for example, configuring Windows Features uses the WindowsFeature resource. However, there are some custom actions you may want to perform. There are tons of extensions out there - we used xActiveDirectory to configure an Active Directory Domain Controller settings, for example.&lt;/p&gt;&lt;p&gt;There are times when you'll want to do some custom work that there simply is no custom module for. In that case, you'll need to use the Script resource. The script resource is composed of three parts: GetScript, TestScript and SetScript. GetScript is optional and should return the current state as an object if specified. TestScript should return a boolean - true for "the state is correct" or false for "the state is not correct". If TestScript returns a false, then the SetScript is invoked. Here's an example Script we wrote to configure SMB on a machine according to Security requirements:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;Script SMBConfig
+{
+	GetScript = { @{ Result = Get-SmbServerConfiguration } }
+	TestScript =
+	{
+		$config = Get-SmbServerConfiguration
+		$needConfig = $config.EnableSMB2Protocol -and (-not ($config.EnableSMB1Protocol))
+		if ($needConfig) {
+				Write-Host "SMB settings are not correct." 
+		}
+		$needConfig
+	}
+	SetScript =
+	{
+		Write-Host "Configuring SMB settings" 
+		Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+		Set-SmbServerConfiguration -EnableSMB2Protocol $true -Force
+	}
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 1: Specify the type of resource (Script) and a unique name&lt;/li&gt;&lt;li&gt;Line 3: The GetScript returns an hash table with a Result property that describes the current state - in this case, the SMB settings on the machine&lt;/li&gt;&lt;li&gt;Line 4: The start of the TestScript&lt;/li&gt;&lt;li&gt;Line 6: Query the SMB settings&lt;/li&gt;&lt;li&gt;Line 7: Determine if we need to configure anything or not - this is a check on the SMBProtocol states&lt;/li&gt;&lt;li&gt;Lines 8-10: Write a message if we do need to set state&lt;/li&gt;&lt;li&gt;Line 11: return the bool: true if the state is correct, false otherwise&lt;/li&gt;&lt;li&gt;Lines 16-17: correct the state of the machine - in this case, set protocols accordingly&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Tip 7: Use Plain PowerShell for Application Install and Config&lt;/h3&gt;&lt;p&gt;Expressing application state and configuration as a DSC script can be challenging. I once wrote some DSC that could &lt;a href="http://colinsalmcorner.com/post/install-and-configure-sql-server-using-powershell-dsc" target="_blank"&gt;install SQL&lt;/a&gt;. However, I ended up using a Script resource - and the TestScript just checked to see if a SQL service was running. This check isn't enough to determine if SQL features are installed according to some config.&lt;/p&gt;&lt;p&gt;Instead of writing long Script resources, I just revert to "plain" PowerShell for app install and configuration. This is especially true for more complicated apps. Just make sure your script are &lt;em&gt;idempotent&lt;/em&gt; - that is that they can run and succeed every time. For example, if you're installing a service, you may want to first check to see if the service exists before running the installer (otherwise the installer may fail since the service already exists). This allows you to re-run scripts again if other scripts fail.&lt;/p&gt;&lt;h3&gt;Tip 8: Attaching Data Disks in Azure VMs&lt;/h3&gt;&lt;p&gt;If you're creating data disks for your VMs, then you usually specify the size and type of disk in the ARM template. But even if you add a disk, you need to attach it in the OS. To do this, I used the &lt;a href="https://github.com/PowerShell/xStorage" target="_blank"&gt;xStorage DSC extension&lt;/a&gt;. This requires a disk number. When we started, the data disk was always disk 2. Later, we added &lt;a href="https://docs.microsoft.com/en-us/azure/security/azure-security-disk-encryption" target="_blank"&gt;Azure Disk Encryption&lt;/a&gt; - but this added another disk and so our disk numbers were off. We ended up needing to add some logic to determine the data disk number and pass that in as a parameter to the DSC configuration:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;Configuration DiskConfig
+{
+	param
+	(
+		[Parameter(Mandatory)]
+		[string]$dataDiskId
+	)
+
+	# import DSC Resources 
+	Import-DscResource -ModuleName PSDscResources
+	Import-DscResource -ModuleName xStorage
+
+	Node localhost
+	{
+        LocalConfigurationManager
+		{
+			ActionAfterReboot = 'ContinueConfiguration'
+			ConfigurationMode = 'ApplyOnly'
+			RebootNodeIfNeeded = $true
+		}
+
+        xWaitforDisk DataDisk
+        {
+            DiskId = $dataDiskId
+            RetryIntervalSec = 60
+            RetryCount = 3
+        }
+
+        xDisk FVolume
+        {
+            DiskId = $dataDiskId
+            DriveLetter = 'F'
+            FSLabel = 'Data'
+            DependsOn = "[xWaitforDisk]DataDisk"
+        }
+    }
+}
+
+# work out what disk number the data disk is on
+$dataDisks = Get-Disk -FriendlyName "Microsoft Virtual Disk" -ErrorAction SilentlyContinue
+if ($dataDisk -eq $null) {
+	$dataDisk = Get-Disk -FriendlyName "Microsoft Storage Space Device" -ErrorAction SilentlyContinue
+}
+# filter to GPT partitions
+$diskNumber = 2
+Get-Disk | Out-Host -Verbose
+$dataDisk = Get-Disk | ? { $_.PartitionStyle -eq "RAW" -or $_.PartitionStyle -eq "GPT" }
+if ($dataDisk -eq $null) {
+	Write-Host "Cannot find any data disks"
+} else {
+	if ($dataDisk.GetType().Name -eq "Object[]") {
+		Write-Host "Multiple data disks"
+		$diskNumber = $dataDisk[0].Number
+	} else {
+		Write-Host "Found single data disk"
+		$diskNumber = $dataDisk.Number
+	}
+}
+Write-Host "Using $diskNumber for data disk mounting"
+
+DiskConfig -ConfigurationData .\ConfigurationData.psd1 -dataDiskId "$($diskNumber)"
+Start-DscConfiguration -Wait -Force -Path .\DiskConfig -Verbose 
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Lines 3-7: We specify that the script requires a dataDiskId parameter&lt;/li&gt;&lt;li&gt;Lines 11,12: Import the modules we need&lt;/li&gt;&lt;li&gt;Lines 23-28: Wait for disk with number $dataDiskId to be available (usually it was immediately anyway)&lt;/li&gt;&lt;li&gt;Lines 30-36: Mount the disk and assign drive letter F with a label of Data&lt;/li&gt;&lt;li&gt;Lines 41-43: Get potential data disks&lt;/li&gt;&lt;li&gt;Lines 46-59: Calculate the data disk number, defaulting to 2&lt;/li&gt;&lt;li&gt;Lines 62,63: Compile the DSC and the invoke the configuration manager to "make it so"&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Tip 9: Configuring DNS on Azure VNets&lt;/h3&gt;&lt;p&gt;In our example, we needed a Domain Controller to be on one of the machines. We were able to configure the domain controller using DSC. However, I couldn't get the other machines to join the domain since they could never find the controller. Eventually I realized the problem was a DNS problem. So we added the DNS role to the domain controller VM. We also added a private static IP address for the domain controller so that we could configure the VNet accordingly. Here's a snippet of the DSC script for this:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;WindowsFeature DNS
+{
+        Ensure = "Present"
+        Name = "DNS"
+        DependsOn = "[xADDomain]ADDomain"
+}
+
+xDnsServerAddress DnsServerAddress
+{
+        Address        = '10.10.0.4', '127.0.0.1'
+        InterfaceAlias = 'Ethernet 2'
+        AddressFamily  = 'IPv4'
+        DependsOn = "[WindowsFeature]DNS"
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Lines 1-6: Configure the DNS feature&lt;/li&gt;&lt;li&gt;Lines 8-14: Configure the network DNS NIC using the static private IP 10.10.0.4&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Now we needed to configure the DNS on the Azure VNet to use the domain controller IP address. We used this script:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;param($rgName, $vnetName, $dnsAddress)
+$vnet = Get-AzureRmVirtualNetwork -ResourceGroupName $rgName -Name $vnetName
+if ($vnet.DhcpOptions.DnsServers[0] -ne $dnsAddress) {
+    $vnet.DhcpOptions.DnsServers = @($dnsAddress)
+    Set-AzureRmVirtualNetwork -VirtualNetwork $vnet
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 2: Get the VNet using the resource group name and VNet name&lt;/li&gt;&lt;li&gt;Line 3: Check if the DNS setting of the VNet is correct&lt;/li&gt;&lt;li&gt;Lines 4,5: If it's not, then set it to the internal IP address of the DNS server&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;This script needs to run as an &lt;a href="https://github.com/Microsoft/vsts-tasks/tree/master/Tasks/AzurePowerShell" target="_blank"&gt;Azure PowerShell script task&lt;/a&gt; so that it's already logged in to an Azure context (the equivalent of running Login-AzureRMAccount -ServicePrincipal). It's sweet that you don't have to provide any credentials in the script!&lt;/p&gt;&lt;p&gt;Now that we've set the DNS on the VNet, we have to reboot every machine on the VNet (otherwise they won't pick up the change). That brings us to the final tip.&lt;/p&gt;&lt;h3&gt;Tip 10: Wait on Machines When They Reboot&lt;/h3&gt;&lt;p&gt;You can easily reboot a machine by running this (plain) PowerShell: &lt;font face="Courier New"&gt;Restart-Machine -ComputerName localhost -Force&lt;/font&gt;. This is so simple that you can do it as an inline PowerShell task:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/c7a4e385-8587-4347-a7a5-77aff6f7bb7b.png" target="_blank"&gt;&lt;img width="300" height="135" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/a2dd904d-386d-4f9a-8a47-a200a8aba5e7.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Rebooting the machine is easy: it's waiting for it to start up again that's more challenging. If you have a task right after the reboot task, the deployment fails since the agent goes offline. So you have to build in a wait. The simplest method is to add an agentless phase and add a Delay task:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/92f15bf4-6607-4aff-85d7-a1d1a102cec2.png" target="_blank"&gt;&lt;img width="322" height="211" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/be0c7bbe-79ed-4cb1-85e6-ed9b61d7ca42.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;However, you can be slightly more intelligent if you poll the machine states using some Azure PowerShell:&lt;/p&gt;&lt;pre class="brush: powershell;"&gt;param (
+    [string]$ResourceGroupName,
+    [string[]]$VMNames = @(),
+    $TimeoutMinutes = 2,
+    $DelaySeconds = 30
+)
+
+Write-Host "Delay for $DelaySeconds seconds."
+Start-Sleep -Seconds $DelaySeconds
+
+if($VMNames.Count -eq 0)
+{
+    $VMNames = (Get-AzureRmVm -ResourceGroupName $ResourceGroupName).Name
+    Write-Host "Getting VM names."
+}
+
+$seconds = 10
+$desiredStatus = "PowerState/running"
+
+foreach($vmName in $VMNames)
+{
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    Write-Host "Getting statuses of VMs."
+    $statuses = (Get-AzureRmVm -ResourceGroupName $ResourceGroupName -VMName $vmName -Status).Statuses
+    $status = $statuses | Where-Object { $_.Code -eq $desiredStatus }
+    while($status -eq $null -and ($timer.Elapsed.TotalMinutes -lt $TimeoutMinutes))
+    {
+        Write-Verbose "Retrying in $($seconds) seconds."
+        Start-Sleep -Seconds $seconds
+        $statuses = (Get-AzureRmVm -ResourceGroupName $ResourceGroupName -VMName $vmName -Status).Statuses
+        $status = $statuses | Where-Object { $_.Code -eq $desiredStatus }
+    }
+
+    if($timer.Elapsed.TotalMinutes -ge $TimeoutMinutes)
+    {
+        Write-Error "VM restart exceeded timeout."
+    }
+    else
+    {
+        Write-Host "VM name $($vmName) has current status of $($status.DisplayStatus)."
+    }
+}
+&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;The script requires a resource group name, an optional array of machine names (otherwise it will poll all the VMs in the resource group), a delay (defaulted to 30 seconds) and a timeout (defaulted to 2 minutes)&lt;/li&gt;&lt;li&gt;The script will delay for a small period (to give the machines time to start rebooting) and then poll them until they're all running or the timeout is reached.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;This script has to run in an Azure PowerShell task in an &lt;em&gt;agent&lt;/em&gt; phase from either the Hosted agent or a private agent - you can't run it in a Deployment Group phase since those machines are rebooting!&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Deployment Groups are very powerful - they allow you to dynamically target multiple machines and execute configuration in a local context. This makes complex environment provisioning and configuration much easier to manage. However, it's always good to know limitations, gotchas and practical tips when designing a complex deployment workflow. Hopefully these tips and tricks make your life a bit easier.&lt;/p&gt;&lt;p&gt;Happy deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+    <category>DevOps</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="dce0c818-569a-4510-8492-4ebbebb1dd0d">
+      <author>kcpr</author>
+      <email>kacper@gmx.com</email>
+      <website></website>
+      <ip>89.76.223.8</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36 OPR/49.0.2725.64</userAgent>
+      <date>2018-01-08 01:28:33</date>
+      <content>If I&amp;#39;d like to have the ability to create multiple, identical, separated environments, I&amp;#39;d have to create separate Deployment Group for each one. Do I understand correctly?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="70bd8560-168b-4918-b2ec-538470dfdc30">
+      <author>Andrew M</author>
+      <email>andrew.cm74@gmail.com</email>
+      <website></website>
+      <ip>62.116.192.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299</userAgent>
+      <date>2018-01-24 17:14:17</date>
+      <content>Hi Colin,&lt;br /&gt;great post!  I am in the middle of a similar process and your post has been a big help.  A couple of questions - can you get an ARM template to complete only after the deployment group agent has completed provisioning (I get errors in the process that communication cannot be established with the agent, and the vm provisioning completes about 10 minutes before the agent finishes it&amp;#39;s installation)? Also using the resource group deployment task to configure winRM fails consistently with the error &amp;quot;deletion of extension failed&amp;quot;, irrespective of whether there is a custom script extension or not for that VM. Have you come across this problem in your efforts?  Thanks in advance for any help or advice.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="86ee78a1-3788-4fd9-8bab-4f31a660320b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:11:13</date>
+      <content>Hi @kcpr&lt;br /&gt;&lt;br /&gt;Yep, if you want to duplicate the environment you&amp;#39;d have to create another Deployment Group. This is a bit of a pain at the moment since you can&amp;#39;t (currently) parameterize the Deployment Group on any of the Deployment Group Phases. Once you can do that, it should be fairly easy to clone the release, update the Deployment Group and you&amp;#39;re good to go.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="c6aba785-c243-4236-a7aa-ace81e2fc700">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:12:41</date>
+      <content>Hi @Andrew M&lt;br /&gt;&lt;br /&gt;The agent install/config *always* completes before the Deploy Resource Group task returns. Are you using that task or invoking the ARM template deploy some other way? If you are invoking via PowerShell, make sure to add &amp;quot;-Wait&amp;quot; to the deploy command.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="19f1745e-a115-44ef-a2af-f476e73da2ef">
+      <author>Piotr</author>
+      <email>71rogi@gmail.com</email>
+      <website>https://justcloud.pl/</website>
+      <ip>78.133.207.130</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36</userAgent>
+      <date>2018-04-03 13:17:56</date>
+      <content>Cool stuff!!  Serious very good article :)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="d231f0cb-2eae-4e53-9fdf-c27ab61aa6f9">
+      <author>Aaron</author>
+      <email>acavender@tradewestsystems.com</email>
+      <website></website>
+      <ip>64.211.181.0</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; rv:63.0) Gecko/20100101 Firefox/63.0</userAgent>
+      <date>2018-11-09 18:56:42</date>
+      <content>Colin,&lt;br /&gt;&lt;br /&gt;I am finding your post very informative, particularly with your Infrastructure pipeline, but one thing eludes me.  I am assuming you have a Deployment Group for these nodes that need to be provisioned.  When they enter the pipeline, how do you determine which nodes should be provisioned from the Deployment Group?  And once they are provisioned (installed), then what do you do to make certain they do not get run through again?  I would think one would do that with tags for both items, but I cannot see anything in VSTS that supports dynamically adding or removing tags from a Deployment Agent - it seems to be manual.&lt;br /&gt;&lt;br /&gt;Thanks again.  Your post is a keeper and I wish there was more material from the Real World on how they used VSTS to solve these kinds of problems.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="dd127f99-3ca9-4f19-936f-0b636a45c0fc">
+      <author>ERIC SCHRADER</author>
+      <email>eric@eschrader.com</email>
+      <website>http://eschrader.com/</website>
+      <ip>107.77.228.209</ip>
+      <userAgent>Mozilla/5.0 (Linux; Android 8.0.0; SAMSUNG-SM-G891A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.80 Mobile Safari/537.36</userAgent>
+      <date>2018-11-15 04:32:09</date>
+      <content>Wow, great post! I have been using Azure Automation after I execute my RM template with params to run additional DSC scripts, but want my code in source control. I see a VS TS tab in preview under Azure Automation, but it&amp;#39;s pretty confusing. This article is just what I need for DevOps with Sharepoint Dev/test envriomements. I have an old powershell sharepoint post on my blog, so I will combine these two to use VS TS and DSC. &lt;br /&gt;&lt;br /&gt;For #7, why didn&amp;#39;t you use one of the xSQL type modules that seem to be pretty popular?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

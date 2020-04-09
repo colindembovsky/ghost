@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>3f78dc36-09f6-4f09-982e-03d07180b196</id>
+  <title>Branch Info Team Explorer Extension (BITE) Now Available for VS 2013</title>
+  <slug>branch-info-team-explorer-extension-(bite)-now-available-for-vs-2013</slug>
+  <shortUrl>http://bit.ly/1mZm1MC</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-08-30 20:24:00</pubDate>
+  <lastModified>2020-02-27 02:19:42</lastModified>
+  <content>&lt;p&gt;&lt;strong&gt;&lt;u&gt;Update 2013-09-12:&lt;/u&gt;&lt;/strong&gt; I’ve updated the &lt;a href="http://visualstudiogallery.msdn.microsoft.com/33a5274b-271b-45dd-8dc5-734d927a19dd" target="_blank"&gt;extension&lt;/a&gt; to work with VS 2013 RC (since there were some breaking changes from Preview).&lt;/p&gt; &lt;p&gt;I wrote a Team Explorer Extension (&lt;a href="http://visualstudiogallery.msdn.microsoft.com/1d61464c-65af-4d25-af15-3b6b6919c56e" target="_blank"&gt;BITE&lt;/a&gt;) &lt;a href="http://www.colinsalmcorner.com/2013/07/bitebranch-info-team-explorer-extension.html" target="_blank"&gt;a few months ago&lt;/a&gt; to show you which branch your solution is on and how to easily change to the same solution on another branch.&lt;/p&gt; &lt;p&gt;Today I opened up and converted the extension for &lt;a href="http://visualstudiogallery.msdn.microsoft.com/85185516-dfe6-44e6-aa64-892cbff0e98a" target="_blank"&gt;VS 2013&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Since the architecture of the Home page in Team Explorer has changed a little, it wasn’t simply open and recompile for VS 2013. The BITE page actually stayed the same – but the classes that allow me to hook into the Team Explorer had to change quite a lot. And of course there’s scant documentation – even for extending 2012, never mind the dearth of information about extending Team Explorer 2013. Anyway, nothing that Reflector couldn’t help me with…&lt;/p&gt; &lt;p&gt;Here’s what the extension looks like in the VS 2013 Team Explorer Home page:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh5.ggpht.com/-_cFZK458Psc/UiDjZPBkdgI/AAAAAAAABDU/_By03NAdx18/s1600-h/image%25255B2%25255D.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; background-image: none; border-bottom-width: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; display: block; padding-right: 0px; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-hkEo-H5clLM/UiDjZwDMIWI/AAAAAAAABDc/7NNclLymTdA/image_thumb.png?imgmax=800" width="244" height="196"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;While I was at it, I cleaned up the UI a little especially when you don’t have a solution open or the solution you have open is not branched. Other than that, it works exactly like before – only for TFVC, of course!&lt;/p&gt; &lt;p&gt;Happy branching!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>TFS API</category>
+    <category>ALM</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="94521fe4-c8ab-4dc8-9c97-316395d1e1d5">
+      <author>Rodrigo Pires</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/06530543442407637248</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-09-06 00:44:48</date>
+      <content>I've just installed, and ...... Object reference not set to an instance of an object :(</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="700c7353-050d-4f9c-bd49-c58e15369f60">
+      <author>Colin Dembovsky</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/02577890234096457646</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2013-09-12 12:8:28</date>
+      <content>Hi Rodrigo - I've just updated the extension for VS 2013 RC. Please uninstall the Preview version and install the RC version. I've made quite a few bug fixes, so let me know if that resolves your issue.</content>
+    </comment>
+  </comments>
+  <viewCount>3066</viewCount>
+</post>

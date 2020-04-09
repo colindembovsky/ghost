@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>ccb6479b-d5ee-4c54-8fcb-6c001c609397</id>
+  <title>Presenting @ DevDays SA 2011: Cape Town and Johannesburg</title>
+  <slug>presenting--devdays-sa-2011-cape-town-and-johannesburg</slug>
+  <shortUrl>http://bit.ly/1uliYjG</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-05-10 15:28:00</pubDate>
+  <lastModified>2020-04-06 15:28:46</lastModified>
+  <content>&lt;p&gt;I am going to be co-presenting with Ahmed Salijee (a Development Solution Specialist) from Microsoft South Africa at &lt;a href="http://www.microsoft.com/southafrica/devdays/"&gt;DevDays&lt;/a&gt; later this month. We’re going to be showing off a ton of TFS and VS 2010 capabilities around testing applications. Here’s the official blurb for our sessions:&lt;/p&gt; &lt;p&gt;Visual Studio 2010 offers a wide range of software testing capabilities: manual testing, automated UI testing, database testing, low-level unit testing and even performance testing tools capable of simulating thousands of active users. It also provides support for test case management, defect tracking as well as configuring and running your tests in virtual and physical environments. But how do you know which tools to choose for your project? This session will, via a demo scenario, walk you through the various testing capabilities to assist you with the most effective use of Visual Studio 2010's testing capabilities. This session will be useful to developers as well as various tester roles including functional, performance and automation.&lt;/p&gt; &lt;p&gt;We’re going to start off with a simple web application: IBuySpy. This is a reference application for an ASP.NET store. We’re going to do some refactoring and then showcase:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/ms182532.aspx"&gt;Unit Testing&lt;/a&gt;  &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/dd172118.aspx"&gt;Database Testing&lt;/a&gt;  &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/dd998313(VS.100).aspx"&gt;Test Driven Development (TDD) using “Generate from Usage”&lt;/a&gt;  &lt;li&gt;&lt;a href="http://research.microsoft.com/en-us/projects/pex/"&gt;Moles and Pex&lt;/a&gt; for isolation and automated code coverage discovery  &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/dd286729.aspx"&gt;Functional Testing&lt;/a&gt;  &lt;li&gt;&lt;a href="http://blogs.msdn.com/b/edglas/archive/2010/03/24/web-test-authoring-and-debugging-techniques-for-visual-studio-2010.aspx"&gt;Web&lt;/a&gt; and &lt;a href="http://msdn.microsoft.com/library/dd293540.aspx"&gt;Load Testing&lt;/a&gt;  &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/dd286726.aspx"&gt;Coded UI Testing&lt;/a&gt;  &lt;li&gt;&lt;a href="http://msdn.microsoft.com/en-us/library/dd647547.aspx#run_tests"&gt;Running Automated Tests during Builds&lt;/a&gt;  &lt;li&gt;Lab Management &lt;a href="http://msdn.microsoft.com/en-us/library/ff972305.aspx"&gt;Build-Deploy-Test Workflow&lt;/a&gt; for Automated Testing&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Hope to see you there!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>news</category>
+  </categories>
+  <comments></comments>
+  <viewCount>654</viewCount>
+</post>

@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2e56728e-68e8-47ea-aa70-2a97595dc16e</id>
+  <title>Source Control Operations During Deployments in Release Management</title>
+  <slug>source-control-operations-during-deployments-in-release-management</slug>
+  <shortUrl>http://bit.ly/1sV5zQ6</shortUrl>
+  <author></author>
+  <pubDate>2014-10-16 09:57:03</pubDate>
+  <lastModified>2016-11-18 15:27:30</lastModified>
+  <content>&lt;p&gt;Before we start: Don’t ever do this.&lt;/p&gt; &lt;p&gt;But if you really have to, then it can be done. There are actually legitimate cases for doing source control operations during a deployment. For example, you don’t have source control and you get “files” from a vendor that need to be deployed to servers. Or you have a vendor application that has “extensions” that are just some sort of script file that is deployed onto the server – so you don’t compile anything for customizations. Typically these sorts of applications are legacy applications.&lt;/p&gt; &lt;h2&gt;Simple Solution: Install Team Explorer on the Target Servers&lt;/h2&gt; &lt;p&gt;The simplest way to do source control operations is just to install Team Explorer on your target server. Then you can use the “Run Command” tool from Release Management and invoke tf.exe directly, or create a script that does a number of tf operations.&lt;/p&gt; &lt;p&gt;However, I was working at a customer where they have hundreds of servers, so they don’t want to have to manually maintain Team Explorer on all their servers.&lt;/p&gt; &lt;h2&gt;Creating a TF.exe Tool&lt;/h2&gt; &lt;p&gt;Playing around a bit, I realized that you can actually invoke tf.exe on a machine that doesn’t have Team Explorer. You copy tf.exe to the target machine – as well as all its dependencies – and you’re good to go. Fortunately it’s not a huge list of files – around 20 altogether.&lt;/p&gt; &lt;p&gt;That covers the exe itself – however, a lot of TF commands are “location dependent” – they use the directory you’re in to give context to the command. For example, running “tf get” will get files for the current directory (assuming there is a mapping in the workspace). When RM deploys a tool to the target server, it copies the tool files to a temporary directory and executes them from there. This means that we need a script that can “remember” the path where the tool (tf.exe) is but execute from a target folder on the target server.&lt;/p&gt; &lt;p&gt;PowerShell is my scripting language of choice – so here’s the PowerShell script to wrap the tf.exe call:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;&lt;p&gt;param(
+    [string]$targetPath,
+    [string]$tfArgs
+)
+
+try {
+    $tf = "$pwd\tf.exe"
+    Push-Location
+
+    if (-not(Test-Path $targetPath)) {
+        mkdir $targetPath
+    }
+
+    cd $targetPath
+    &amp;amp;$tf $tfArgs.Split(" ")
+    
+    if (-not($?)) {
+        throw "TF.exe failed"
+    }
+}
+finally {
+    Pop-Location
+}
+&lt;/p&gt;&lt;p&gt;&amp;nbsp;&lt;/p&gt;&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 2: We pass in the $targetPath – this is the path on the target server we want to perform tf commands from&lt;/li&gt;
+&lt;li&gt;Line 3: We in $tfArgs – these are the arguments to pass to tf.exe&lt;/li&gt;
+&lt;li&gt;Line 7-8: get the path to tf.exe and store it&lt;/li&gt;
+&lt;li&gt;Line 10-12: if the $targetPath does not exist, create it&lt;/li&gt;
+&lt;li&gt;Line 14: change directory to the $targetPath&lt;/li&gt;
+&lt;li&gt;Line 15: Invoke tf.exe passing the $tfArgs we passed in as parameters&lt;/li&gt;
+&lt;li&gt;Line 17-19: Since this script invokes tf.exe, you could get a failure from the invocation, but have the script still “succeed”. In order to make sure the deployment fails if tf.exe fails, we need to check if the tf.exe invocation succeeded or not – that’s what these lines are doing&lt;/li&gt;
+&lt;li&gt;Line 22: Change directory back to the original directory we were in – not strictly necessary, but “clean”&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s the list of dependencies for tf.exe:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Microsoft.TeamFoundation.Build.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.Build.Common.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.Common.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.TestManagement.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.VersionControl.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.VersionControl.Common.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.VersionControl.Common.Integration.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.VersionControl.Common.xml&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.VersionControl.Controls.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.WorkItemTracking.Client.DataStoreLoader.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.WorkItemTracking.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.WorkItemTracking.Client.QueryLanguage.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.WorkItemTracking.Common.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.TeamFoundation.WorkItemTracking.Proxy.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.VisualStudio.Services.Client.dll&lt;/li&gt;
+&lt;li&gt;Microsoft.VisualStudio.Services.Common.dll&lt;/li&gt;
+&lt;li&gt;TF.exe&lt;/li&gt;
+&lt;li&gt;TF.exe.config&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Open up the Release Management client and navigate to Inventory-&amp;gt;Tools. Click New to create a new tool, and specify a good name and description. For the command, specify “powershell” and for arguments type the following:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;-command ./tf.ps1 –targetPath ‘__TargetPath__’ –tfArgs ‘__TFArgs__’&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;Note that the quotes around the parameters __TargetPath__ and __TFArgs__ should be single-quotes.&lt;/p&gt;
+&lt;p&gt;Finally, click “Add” on the Resources section and add all the tf files – don’t forget the tf.ps1 file!&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/6f0e72f1-be2f-4569-a5d3-f3b2c069b3df.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/7111413d-0c74-4c8c-a08c-a13cd6d3cbe8.png" width="644" height="361"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;h2&gt;Creating TF Actions&lt;/h2&gt;
+&lt;p&gt;Once you have the tf.exe tool, you can then create TF.exe actions – like “Create Workspace” and “Get Files”. Let’s do “Create Workspace”:&lt;/p&gt;
+&lt;p&gt;Navigate to Inventory-&amp;gt;Actions and click “New”. Enter an appropriate name and description. I created a new Category called “TFS Source Control” for these actions, but this is up to you. For “Tool used” specify the TF.exe tool you just created. When you select this tool, it will bring in the arguments for the tool – we’re going to edit those to be more specific for this particular Action. I set my arguments to:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;-command ./tf.ps1 -targetPath '__TargetPath__' -tfArgs 'workspace /new /noprompt /collection:&lt;/font&gt;&lt;font face="Courier New"&gt;http://rmserver:8080/tfs/__TPC__&lt;/font&gt;&lt;font face="Courier New"&gt; "__WorkspaceName__"'&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;(Note where the single and double quotes are).&lt;/p&gt;
+&lt;p&gt;The parameters are as follows:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;__TargetPath__: the path we want to create the workspace in&lt;/li&gt;
+&lt;li&gt;__TPC__: the name of the Team Project Collection in the rmserver TFS – this can be totally hardcoded (if you only have one TFS server) or totally dynamic (if you have multiple TFS servers). In this case, we have a single server but can run deployments for several collections, so that’s why this parameter is “partly hardcoded” and “partly dynamic”&lt;/li&gt;
+&lt;li&gt;__WorkspaceName__: the name we want to give to the workspace&lt;/li&gt;&lt;/ul&gt;
+&lt;h2&gt;Using Create Workspace Action in a Release Template&lt;/h2&gt;
+&lt;p&gt;Now that you have the action, you can use it in a release template:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/95bf9577-cdf4-4095-8428-a0e5f787cb19.png" target="_blank"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/148962db-f550-4af0-8c16-87f080600911.png" width="644" height="322"&gt;&lt;/a&gt; Here you can see that I’ve create some other actions (Delete Workspace and TF Get) to perform other TF.exe commands. This workflow deletes the workspace called “Test”, then creates a new Workspace in the “c:\files” folder, and then gets a folder from source control. From there, I can copy or run or do whatever I need to with the files I got from TFS.&lt;/p&gt;
+&lt;p&gt;Happy releasing from Source Control (though you can’t really be &lt;em&gt;happy&lt;/em&gt; about this – it’s definitely a last-resort).&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+    <category>source control</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="6e44b9cd-ce6e-4ce8-9928-38d663776a1a">
+      <author>ismael</author>
+      <email>idrissisolutions@gmail.com</email>
+      <website></website>
+      <ip>195.207.46.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; rv:35.0) Gecko/20100101 Firefox/35.0</userAgent>
+      <date>2015-02-02 15:32:25</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;Thanks for your great article that helped me a lot ! &lt;br /&gt;&lt;br /&gt;But i have a question : Is it possible to create an action to have a &amp;quot;Get Specific version&amp;quot; ? With a ChangeSet parameters ?&lt;br /&gt;&lt;br /&gt;Thanks a lot .</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="eb7e91a1-95b2-4fb3-8f1a-93a0686fb253">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:25:58</date>
+      <content>Hi @Ismael&lt;br /&gt;&lt;br /&gt;This command sets up tf.exe - you can execute whatever tf.exe command you want to (including Get Specific Version). See this page for the Get command options: https://msdn.microsoft.com/en-us/library/fx7sdeyf.aspx&lt;br /&gt;&lt;br /&gt;Make sure you REALLY want to do this in Release Management - and good luck!</content>
+    </comment>
+  </comments>
+  <viewCount>5274</viewCount>
+</post>

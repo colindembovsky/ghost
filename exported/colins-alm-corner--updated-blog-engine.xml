@@ -1,0 +1,433 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>1bbcc27b-a919-4085-b8fb-13972c6d09a0</id>
+  <title>Colin’s ALM Corner – Updated Blog Engine</title>
+  <slug>colins-alm-corner--updated-blog-engine</slug>
+  <shortUrl>http://bit.ly/1fy225o</shortUrl>
+  <author></author>
+  <pubDate>2014-04-25 11:26:08</pubDate>
+  <lastModified>2015-08-11 12:43:50</lastModified>
+  <content>&lt;p&gt;I have been using &lt;a href="http://blogger.com" target="_blank"&gt;Blogger&lt;/a&gt; ever since I started my blog back in 2010. Once you get the template right (and set up a domain) it’s not a bad hosting platform. It works nicely with Windows Live Writer (as every self-respecting blog engine should). However, I felt it was time for a change – I wanted to take charge of my own blogging platform.&lt;/p&gt; &lt;p&gt;A couple of week’s ago I read a post by &lt;a href="https://www.hanselman.com/" target="_blank"&gt;Scott Hanselman&lt;/a&gt; about &lt;a href="http://madskristensen.net/" target="_blank"&gt;Mad’s Krisensen’s&lt;/a&gt; &lt;a href="https://github.com/madskristensen/miniblog" target="_blank"&gt;MiniBlog&lt;/a&gt; engine. I had a look and liked it instantly – but there was no way to port from Blogger to MiniBlog. So I left it to stew in the back of my mind (*ominous chuckle - BWAHAHAHA*).&lt;/p&gt; &lt;h2&gt;Porting to MiniBlog from Blogger&lt;/h2&gt; &lt;p&gt;I finally had another look a few days ago to see if I could port my existing blog posts over. While there was no native way to do this, I found a util (&lt;a href="http://bloggerbackup.codeplex.com/" target="_blank"&gt;BloggerBackup&lt;/a&gt;) that let me export my blog posts (in ATOM format). I promptly exported all my posts.&lt;/p&gt; &lt;p&gt;The next trick was to import them into MiniBlog format. Fortunately there’s a little util that converts from BlogEngine.NET (or WordPress) to MiniBlog called &lt;a href="https://github.com/madskristensen/MiniBlogFormatter" target="_blank"&gt;MiniBlogFormatter&lt;/a&gt;. I cloned the repo and wrote my own formatter. This wasn’t too hard – using some &lt;a href="http://msdn.microsoft.com/en-us/library/bb387061.aspx" target="_blank"&gt;Linq-to-XML&lt;/a&gt; I had something going pretty quickly. Here’s the code:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class BloggerATOMFormatter
+{
+    public void Format(string originalFolderPath, string targetFolderPath)
+    {
+        FormatPosts(originalFolderPath, targetFolderPath);
+    }
+
+    private void FormatPosts(string originalFolderPath, string targetFolderPath)
+    {
+        var oldPostList = new Dictionary&amp;lt;string, string&amp;gt;();
+        foreach (string file in Directory.GetFiles(originalFolderPath, "*.xml").Where(s =&amp;gt; !s.EndsWith("comments.xml")))
+        {
+            var originalDoc = LoadDocument(file);
+            XNamespace atomNS = @"http://www.w3.org/2005/Atom";
+
+            var entry = originalDoc.Element(atomNS + "entry");
+
+            var title = entry.Element(atomNS + "title").Value;
+            var oldUrl = (from link in entry.Elements(atomNS + "link")
+                          where link.Attributes().ToList().Any(a =&amp;gt; a.Name == "rel" &amp;amp;&amp;amp; a.Value == "alternate")
+                          select link).First().Attribute("href").Value.Replace("http://www.colinsalmcorner.com", "");
+            
+            var content = FixContent(entry.Element(atomNS + "content").Value);
+            var publishDate = DateTime.Parse(entry.Element(atomNS + "published").Value);
+            var lastModDate = DateTime.Parse(entry.Element(atomNS + "updated").Value);
+            var slug = FormatterHelpers.FormatSlug(title);
+            var categories = from cat in entry.Elements(atomNS + "category")
+                             select cat.Attribute("term").Value;
+
+            var post = new Post();
+            post.Author = "Colin Dembovsky";
+            post.Categories = categories.ToArray();
+            post.Content = content;
+            post.IsPublished = true;
+            post.PubDate = publishDate;
+            post.Title = title;
+            post.Slug = slug;
+            post.LastModified = lastModDate;
+            post.Comments = GetCommentsForPost(file);
+
+            var newId = Guid.NewGuid().ToString();
+            Storage.Save(post, Path.Combine(targetFolderPath, newId + ".xml"));
+            oldPostList[oldUrl] = newId;
+        }
+        SaveOldPostMap(targetFolderPath, oldPostList);
+    }
+
+    private void SaveOldPostMap(string targetFolderPath, Dictionary&amp;lt;string, string&amp;gt; oldPostList)
+    {
+        var mapElement = new XElement("OldPostMap");
+        foreach(var key in oldPostList.Keys)
+        {
+            mapElement.Add(
+                new XElement("OldPost",
+                    new XAttribute("oldUrl", key),
+                    new XAttribute("postId", oldPostList[key])
+                )
+            );
+        }
+        var doc = new XDocument(mapElement);
+        doc.Save(Path.Combine(targetFolderPath, "oldPosts.map"));
+    }
+
+    private List&amp;lt;Comment&amp;gt; GetCommentsForPost(string file)
+    {
+        var commentsFile = file.Replace(".xml", ".comments.xml");
+        if (!File.Exists(commentsFile))
+        {
+            return new List&amp;lt;Comment&amp;gt;();  
+        }
+
+        var commentsDoc = LoadDocument(commentsFile);
+        XNamespace atomNS = @"http://www.w3.org/2005/Atom";
+
+        var list = new List&amp;lt;Comment&amp;gt;();
+        foreach (var originalComment in commentsDoc.Descendants(atomNS + "entry"))
+        {
+            var authorElement = originalComment.Element(atomNS + "author");
+            var name = authorElement.Element(atomNS + "name").Value;
+            var email = authorElement.Element(atomNS + "email").Value;
+            var uriElement = authorElement.Element(atomNS + "uri");
+            string website = null;
+            if (uriElement != null)
+            {
+                website = uriElement.Value;
+            }
+
+            var content = originalComment.Element(atomNS + "content").Value;
+            var publishDate = DateTime.Parse(originalComment.Element(atomNS + "published").Value);
+
+            var comment = new Comment();
+            comment.Author = name;
+            comment.Email = email;
+            comment.PubDate = publishDate;
+            comment.Content = content;
+            comment.IsAdmin = false;
+            comment.Website = website;
+            list.Add(comment);
+        }
+
+        return list.OrderBy(c =&amp;gt; c.PubDate).ToList();
+    }
+
+    private string FixContent(string originalContent)
+    {
+        var regex = new Regex("&amp;lt;pre class=\"brush: \\w*;\"&amp;gt;(.*?)&amp;lt;/pre&amp;gt;", RegexOptions.IgnoreCase);
+        foreach(Match match in regex.Matches(originalContent))
+        {
+            var formatted = match.Groups[1].Value.Replace("&amp;lt;br /&amp;gt;", Environment.NewLine);
+            originalContent = originalContent.Replace(match.Groups[1].Value, formatted);
+        }
+        return originalContent.Replace("&amp;lt;p&amp;gt;&amp;lt;/p&amp;gt;&amp;lt;br /&amp;gt;", "").Replace("&amp;lt;p&amp;gt;&amp;lt;/p&amp;gt;", "").Replace("&amp;lt;h3&amp;gt;", "&amp;lt;h2&amp;gt;").Replace("&amp;lt;/h3&amp;gt;", "&amp;lt;/h2&amp;gt;");
+    }
+
+    private XDocument LoadDocument(string file)
+    {
+        return XDocument.Parse(File.ReadAllText(file));
+    }
+}&lt;/pre&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;There is a bit of “colinsALMcorner” specific code here, but if you’re looking to move from Blogger to MiniBlog you should be able to use most of this code. I had some issues with the formatting of the &amp;lt;pre&amp;gt; sections for &lt;a href="http://alexgorbatchev.com/SyntaxHighlighter/" target="_blank"&gt;Syntax Highlighter&lt;/a&gt; – once I had that sorted, the formatter worked flawlessly.&lt;/p&gt;
+&lt;h2&gt;Redirecting Existing Posts&lt;/h2&gt;
+&lt;p&gt;One of the challenges I had was what about search engines that already reference existing posts? Since I wanted to host MiniBlog on Azure and point my domain to the new site, I wanted to preserve any existing reference. However, the naming scheme for posts in Blogger is different from that in MiniBlog.&lt;/p&gt;
+&lt;p&gt;What I ended up doing was creating a map file as part of my convert-from-blogger-file-to-MiniBlog-file in the MiniBlogFormatter. I then created a simple HttpHandler that can server a “301 Moved Permanently” redirect when you hit an old post. Here’s the code:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class OldPostHandler : IHttpHandler
+{
+    public bool IsReusable
+    {
+        get { return false; }
+    }
+
+    public void ProcessRequest(HttpContext context)
+    {
+        var oldUrl = context.Request.RawUrl;
+        var oldPost = Storage.GetOldPost(oldUrl);
+
+        if (oldPost == null)
+        {
+            throw new HttpException(404, "The post does not exist");
+        }
+
+        var newUrl = "/post/" + oldPost.Slug;
+        context.Response.Status = "301 Moved Permanently";
+        context.Response.AddHeader("Location", newUrl);
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;It’s small, neat and quick – keeping in line with the MiniBlog philosophy. Here’s the Storage.GetOldPost() method:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public static Post GetOldPost(string url)
+{
+    var map = GetOldPostMap();
+    if (map.ContainsKey(url))
+    {
+        return GetAllPosts().SingleOrDefault(p =&amp;gt; p.ID == map[url]);
+    }
+    return null;
+}
+
+public static Dictionary&amp;lt;string, string&amp;gt; GetOldPostMap()
+{
+    GetAllPosts();
+
+    if (HttpRuntime.Cache["oldPostMap"] != null)
+    {
+        return (Dictionary&amp;lt;string, string&amp;gt;)HttpRuntime.Cache["oldPostMap"];
+    }
+    return new Dictionary&amp;lt;string, string&amp;gt;();
+}
+
+private static void LoadOldPostMap()
+{
+    var map = new Dictionary&amp;lt;string, string&amp;gt;();
+    var mapFile = Path.Combine(_folder, "oldPosts.map");
+    if (File.Exists(mapFile))
+    {
+        var doc = XDocument.Load(mapFile);
+        foreach (var mapping in doc.Descendants("OldPost"))
+        {
+            var oldUrl = mapping.Attribute("oldUrl").Value;
+            var newId = mapping.Attribute("postId").Value;
+            map[oldUrl] = newId;
+        }
+    }
+    HttpRuntime.Cache.Insert("oldPostMap", map);
+}
+&lt;/pre&gt;
+&lt;p&gt;GetAllPosts() add’s a call to LoadOldPostMap() which finds the map file and reads it into memory. I only have 87 posts, so it’s not too heavy.&lt;/p&gt;
+&lt;p&gt;Here’s the code to invoke the handler in web.config:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;handlers&amp;gt;
+  &amp;lt;remove name="CommentHandler"/&amp;gt;
+  &amp;lt;add name="CommentHandler" verb="*" type="CommentHandler" path="/comment.ashx"/&amp;gt;
+  &amp;lt;remove name="PostHandler"/&amp;gt;
+  &amp;lt;add name="PostHandler" verb="POST" type="PostHandler" path="/post.ashx"/&amp;gt;
+  &amp;lt;remove name="MetaWebLogHandler"/&amp;gt;
+  &amp;lt;add name="MetaWebLogHandler" verb="POST,GET" type="MetaWeblogHandler" path="/metaweblog"/&amp;gt;
+  &amp;lt;remove name="FeedHandler"/&amp;gt;
+  &amp;lt;add name="FeedHandler" verb="GET" type="FeedHandler" path="/feed/*"/&amp;gt;
+  &amp;lt;remove name="FeedsHandler"/&amp;gt;
+  &amp;lt;add name="FeedsHandler" verb="GET" type="FeedHandler" path="/feeds/*"/&amp;gt;
+  &amp;lt;remove name="CssHandler"/&amp;gt;
+  &amp;lt;add name="CssHandler" verb="GET" type="MinifyHandler" path="*.css"/&amp;gt;
+  &amp;lt;remove name="JsHandler"/&amp;gt;
+  &amp;lt;add name="JsHandler" verb="GET" type="MinifyHandler" path="*.js"/&amp;gt;
+  &amp;lt;remove name="OldPostHandler"/&amp;gt;
+  &amp;lt;add name="OldPostHandler" verb="GET" type="OldPostHandler" path="*.html"/&amp;gt;
+&amp;lt;/handlers&amp;gt;&lt;/pre&gt;
+&lt;p&gt;You’ll see that I also added a “FeedsHandler” as well to work with the blogger feeds format, so that existing subscribers wouldn’t be affected by the switch (hopefully).&lt;/p&gt;
+&lt;p&gt;I then styled the site (since it’s based on bootstrap that wasn’t a problem). I also added a tag-cloud function and a search function. Both turned out to be really simple.&lt;/p&gt;
+&lt;h3&gt;Tag Cloud&lt;/h3&gt;
+&lt;p&gt;I needed a method that would return all the categories and their frequency for the tag cloud. Here’s the code in the backend:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public static Dictionary&amp;lt;string, int&amp;gt; GetTags()
+{
+    var categories = Storage.GetAllPosts().SelectMany(p =&amp;gt; p.Categories).Distinct();
+    var tags = new Dictionary&amp;lt;string, int&amp;gt;();
+    foreach(var cat in categories)
+    {
+        var count = Storage.GetAllPosts().Where(p =&amp;gt; p.Categories.Any(c =&amp;gt; c.Equals(cat, StringComparison.OrdinalIgnoreCase))).Count();
+        tags[cat] = count;
+    }
+    return tags;
+}
+&lt;/pre&gt;
+&lt;p&gt;Next I had to find a way to present a tag cloud on the page using javascript. There are lots of ways of doing this – I ended up using this &lt;a href="https://github.com/addywaddy/jquery.tagcloud.js" target="_blank"&gt;jQuery tagcloud script&lt;/a&gt;. Here’s the html for my tag cloud:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;div id="tagcloud"&amp;gt;
+    @{
+        var tags = Blog.GetTags();
+        foreach (var tag in tags.Keys)
+        {
+            &amp;lt;a href="/category/@tag" rel="@tags[tag]"&amp;gt;@tag&amp;lt;/a&amp;gt;
+        }
+    }
+&amp;lt;/div&amp;gt;
+
+&amp;lt;script type="text/javascript"&amp;gt;
+    // tag cloud script
+    $("#tagcloud a").tagcloud({
+        size: {
+            start: 0.8,
+            end: 1.75,
+            unit: 'em'
+        },
+        color: {
+            start: "#7cc0f4",
+            end: "#266ca2"
+        }
+    });
+&amp;lt;/script&amp;gt;
+&lt;/pre&gt;
+&lt;h3&gt;Search&lt;/h3&gt;
+&lt;p&gt;I regularly search my own blog – it’s a “working journal” of sorts. Having a search function was pretty important to me. Again the solution was really simple. Here’s the search code:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public static List&amp;lt;Post&amp;gt; Search(string term)
+{
+    term = term.ToLower();
+    return (from p in Storage.GetAllPosts()
+            where p.Title.ToLower().Contains(term) || p.Content.ToLower().Contains(term) || p.Comments.Any(c =&amp;gt; c.Content.ToLower().Contains(term))
+            select p).ToList();
+}
+&lt;/pre&gt;
+&lt;p&gt;Once I had the results, I created a new search.cshtml page that shows just the first few lines of the blog post:&lt;pre class="brush: csharp;"&gt;@{
+    var term = Request.QueryString["term"];
+
+    Page.Title = Blog.Title;
+    Layout = "~/themes/" + Blog.Theme + "/_Layout.cshtml";
+    
+    if (string.IsNullOrEmpty(term))
+    {
+        &amp;lt;h1&amp;gt;Oops!&amp;lt;/h1&amp;gt;
+        &amp;lt;p&amp;gt;Something went wrong with your search. Try again...&amp;lt;/p&amp;gt;
+    }
+    else
+    {
+        &amp;lt;h1&amp;gt;Results for search: '@term'&amp;lt;/h1&amp;gt;
+        
+        var list = Blog.Search(term);
+        if (list.Count == 0)
+        {
+            &amp;lt;p&amp;gt;No matches...&amp;lt;/p&amp;gt;
+        }
+        else
+        {
+            foreach(var p in list)
+            {
+                @RenderPage("~/themes/" + Blog.Theme + "/PostSummary.cshtml", p);
+            }
+        }
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;The final bit was to get a search control. I ended up doing one entirely in css:&lt;pre class="brush: css;"&gt;input {
+    outline: none;
+}
+input[type=search] {
+    -webkit-appearance: textfield;
+    -webkit-box-sizing: content-box;
+    font-family: inherit;
+    font-size: 80% !important;
+}
+input::-webkit-search-decoration,
+input::-webkit-search-cancel-button {
+    display: none; /* remove the search and cancel icon */
+}
+
+/* search input field */
+input[type=search] {
+    background: #ededed url(images/search-icon.png) no-repeat 9px center;
+    border: solid 1px #ccc;
+    padding: 5px 5px 5px 10px;
+    width: 130px;
+    
+    -webkit-border-radius: 10em;
+    -moz-border-radius: 10em;
+    border-radius: 10em;
+    
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    transition: all .5s;
+}
+input[type=search]:focus {
+    width: 100%;
+    background-color: #fff;
+    border-color: #6dcff6;
+    
+    -webkit-box-shadow: 0 0 5px rgba(109,207,246,.5);
+    -moz-box-shadow: 0 0 5px rgba(109,207,246,.5);
+    box-shadow: 0 0 5px rgba(109,207,246,.5);
+}
+
+/* placeholder */
+input:-moz-placeholder {
+    color: #999;
+}
+input::-webkit-input-placeholder {
+    color: #999;
+}
+&lt;/pre&gt;
+&lt;p&gt;And here’s the search control in my side-bar:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;section&amp;gt;
+    &amp;lt;br /&amp;gt;
+    &amp;lt;form action="/search" method="get" role="form" id="searchForm"&amp;gt;
+        &amp;lt;fieldset&amp;gt;
+            &amp;lt;input type="search" placeholder="Search this blog" name="term"&amp;gt;
+        &amp;lt;/fieldset&amp;gt;
+    &amp;lt;/form&amp;gt;
+    &amp;lt;hr /&amp;gt;
+&amp;lt;/section&amp;gt;
+&lt;/pre&gt;
+&lt;h3&gt;Approve or Delete Comments from the Alert Mail&lt;/h3&gt;
+&lt;p&gt;When someone writes a comment on a post, MiniBlog sends you an email. I like to moderate comments, so that’s how I’ve configured MiniBlog. In the mail there are 2 links – one to approve and one to delete the comment. However, I kept getting 403 “unauthorized” then clicking the links if I wasn’t logged in on the site. I made a small tweak to the CommentHandler Accept and Delete methods to redirect me to the login page instead of throwing a 403:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;if (!context.User.Identity.IsAuthenticated)
+{
+    // was throwing 403 here
+    FormsAuthentication.RedirectToLoginPage();
+    return;
+}&lt;/pre&gt;
+&lt;p&gt;Now when I hit the link from my mail, I get redirected to the login screen. Once logged in, the comment is approved/deleted and all’s well.&lt;/p&gt;
+&lt;h2&gt;Publishing to Azure&lt;/h2&gt;
+&lt;p&gt;After testing posting from Windows Live Writer (no issues there) I then published the site to Azure. I changed my DNS records from Blogger to Azure and hey presto – new site is up!&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;I’m really happy with the new look &amp;amp; feel and with the other modern web benefits (like SEO optimization and of course, speed) that MiniBlog brings. Thanks Mads!&lt;/p&gt;
+&lt;p&gt;I expect there may be a glitch or two for the switch over, but hopefully everything works well. Let me know in the comments if you experience any issues.&lt;/p&gt;
+&lt;p&gt;Happy reading!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>news</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="af8bf4f3-aebc-4e2d-a922-45bd92fa5dfb">
+      <author>Gordon Beeming</author>
+      <email>gordon@beemings.com</email>
+      <website>http://31og.com/</website>
+      <ip>196.37.229.15</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36</userAgent>
+      <date>2014-04-30 17:28:14</date>
+      <content>Hi Colin, I can confirm for you that the RSS stuff works for &amp;quot;old&amp;quot; readers =). Nice going, I&amp;#39;m currently just using the &amp;quot;default&amp;quot; theme but this one looks awesome =)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a71b53b2-2145-4faa-a4aa-ab6a11609c56">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.84.135</ip>
+      <userAgent>Mozilla/5.0 (Windows Phone 8.1; ARM; Trident/7.0; Touch; rv:11.0; IEMobile/11.0; NOKIA; Lumia 920) like Gecko</userAgent>
+      <date>2014-04-30 17:33:33</date>
+      <content>Thanks Gordon! Appreciate the feedback.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8c5fcb09-7463-4a5b-96b2-0b803279a52f">
+      <author>Sam</author>
+      <email>sam@tolon.com.au</email>
+      <website></website>
+      <ip>105.228.56.194</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-09-17 06:53:16</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;I was curious how you were gathering the blog statistics and most popular posts in the footer. Have you just rolled your own code to keep track?? Or is it hooked into a 3rd party service? (or is it just manually maintained)&lt;br /&gt;&lt;br /&gt;Cheers&lt;br /&gt;Sam</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="d804a7dc-a58e-403e-b688-075b3bb97c0b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.56.194</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-09-17 06:55:41</date>
+      <content>@Sam - I added a &amp;quot;post count&amp;quot; to the post metadata (the xml file for each post). Whenever a post is requested, I increment the counter and save the xml.&lt;br /&gt;&lt;br /&gt;Since MiniBlog is so lightweight and the posts are all in memory, it&amp;#39;s easy enough to use Linq to do &amp;quot;get posts sorted by count descending select top 5&amp;quot; which is how I do my &amp;quot;top 5 posts&amp;quot; and how I know the total views in the footer.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="4137c713-cac3-4b92-b205-0bda3d46c434">
+      <author>Alex</author>
+      <email>afilipek@sva.edu</email>
+      <website>http://alexandra.filipek.us/</website>
+      <ip>63.118.6.251</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.125 Safari/537.36</userAgent>
+      <date>2015-08-10 14:25:59</date>
+      <content>Sorry to comment on a year old post, but this was exactly what I was looking for but I can&amp;#39;t get it to work. When I run the site I get the compilation error message CS0117: &amp;#39;Blog&amp;#39; does not contain a definition for &amp;#39;GetTags&amp;#39; from the line &amp;#39;var tags = Blog.GetTags();&amp;#39;. Any idea what the problem could be?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8e5210e8-8605-4b18-a4ac-4989294a50e9">
+      <author>Alex</author>
+      <email>afilipek@sva.edu</email>
+      <website>http://alexandra.filipek.us/</website>
+      <ip>63.118.6.251</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.125 Safari/537.36</userAgent>
+      <date>2015-08-10 14:47:49</date>
+      <content>Okay sorry, I managed to figure it out, maybe it is because of updates, but I had to change Blog.GetTags to MarkupHelper.GetTags</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="a2e0ccb4-52c2-4be0-9a80-1a76d4b0f984">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.31.173</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-08-11 12:43:48</date>
+      <content>Hi @Alex&lt;br /&gt;&lt;br /&gt;My code has digressed pretty far from the version I was using from Mads when I wrote this post. I haven&amp;#39;t published it to GitHub since I built in quite a bit of code that was very specific to my blog. For example, I moved from blogger, and I still kept getting old links to old posts from the blogger site. I then made a &amp;quot;map&amp;quot; file that could look up the new slug for the old post URL - so that kind of thing won&amp;#39;t make sense for other people.&lt;br /&gt;&lt;br /&gt;Glad you came right though!</content>
+    </comment>
+  </comments>
+  <viewCount>9760</viewCount>
+</post>

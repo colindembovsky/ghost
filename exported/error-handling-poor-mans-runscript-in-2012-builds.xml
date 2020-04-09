@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>ad4f8327-ba16-436f-8873-51ca2f31d09e</id>
+  <title>Error Handling Poor Man’s RunScript in 2012 Builds</title>
+  <slug>error-handling-poor-mans-runscript-in-2012-builds</slug>
+  <shortUrl>http://bit.ly/1mZoUx4</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2014-01-23 08:45:00</pubDate>
+  <lastModified>2020-04-07 15:11:01</lastModified>
+  <content>&lt;p&gt;Yesterday I posted about &lt;a href="http://www.colinsalmcorner.com/2014/01/build-script-hooks-for-tfs-2012-builds.html" target="_blank"&gt;how to create script hooks in a 2012 build template&lt;/a&gt;. My colleague Tyler Doerksen commented and pointed out that there was no error handling in my solution.&lt;/p&gt; &lt;h2&gt;Returning Error Codes from PowerShell&lt;/h2&gt; &lt;p&gt;I knew that if I could get the script to return an error code, it would be simple to add an If activity to check it. The trick is to use “exit 0” for success and “exit 1” for failures. I also changed any error messages from Write-Host to Write-Error so that they go to errOutput and not stdOutput. Here’s the updated “UpdateVersion” script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$pathToSearch = $env:TF_BUILD_SOURCESDIRECTORY,
+  [string]$buildNumber = $env:TF_BUILD_BUILDNUMBER,
+  [string]$searchFilter = "AssemblyInfo.*",
+  [regex]$pattern = "\d+\.\d+\.\d+\.\d+"
+)
+
+if ($buildNumber -match $pattern -ne $true) {
+    Write-Error "Could not extract a version from [$buildNumber] using pattern [$pattern]"
+    exit 1
+} else {
+    try {
+        $extractedBuildNumber = $Matches[0]
+        Write-Host "Using version $extractedBuildNumber"
+
+        gci -Path $pathToSearch -Filter $searchFilter -Recurse | %{
+            Write-Host "  -&gt; Changing $($_.FullName)" 
+        
+            # remove the read-only bit on the file
+            sp $_.FullName IsReadOnly $false
+
+            # run the regex replace
+            (gc $_.FullName) | % { $_ -replace $pattern, $extractedBuildNumber } | sc $_.FullName
+        }
+
+        Write-Host "Done!"
+        exit 0
+    } catch {
+        Write-Error $_
+        exit 1
+    }
+}
+&lt;/pre&gt;&lt;br /&gt;&lt;h2&gt; &lt;/h2&gt;&lt;br /&gt;&lt;h2&gt;Error Handling in the Build&lt;/h2&gt;&lt;br /&gt;&lt;p&gt;Go back to the InvokeProcess activity that calls your script. Go to its parent activity (usually a sequence) and add a variable Int32 called “scriptResult”. On the InvokeProcess, set the result property to “scriptResult”.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-qNekJ3Hour8/UuC6fEQ-p7I/AAAAAAAABNM/M4gYUr9O4x4/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-4tYWfCn9V_I/UuC6f6pcTPI/AAAAAAAABNU/_SeZD3uAPiM/image_thumb%25255B1%25255D.png?imgmax=800" width="353" height="222"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Now you just need to add an If activity below the InvokeProcess that has condition “scriptResult &lt;&gt; 0” and add a Throw in the “Then”. I’m just throwing an Exception with an error message.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh6.ggpht.com/-MTQdOTgLRDg/UuC6gsK3_II/AAAAAAAABNc/qC-XTk2fIWg/s1600-h/image%25255B7%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-ozo4fmKIliU/UuC6hZtLoEI/AAAAAAAABNk/qT4IrldRB30/image_thumb%25255B3%25255D.png?imgmax=800" width="370" height="206"&gt;&lt;/a&gt; Here’s the output if the script fails:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh5.ggpht.com/--a1xaEwoCgI/UuC6iVATnlI/AAAAAAAABNs/-ixIhLWldus/s1600-h/image%25255B11%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://lh6.ggpht.com/-Q89AqukHG8E/UuC6jJdpQlI/AAAAAAAABN0/vvy9_ZMnmF8/image_thumb%25255B5%25255D.png?imgmax=800" width="479" height="214"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;Happy building!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="bb74cfe2-c876-4c54-a9bd-b1f8e400351c">
+      <author>efisher</author>
+      <email>dashtrash@hotmail.com</email>
+      <website></website>
+      <ip>199.79.222.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36</userAgent>
+      <date>2014-07-21 23:10:11</date>
+      <content>Thanks, Colin! Exactly what I was looking for and what &amp;#39;return&amp;#39; wasn&amp;#39;t giving me through Powershell/InvokeProcess.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="99ee7bae-4905-4e2b-b13e-648bfdcf845e">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.143.214</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2014-12-17 21:29:18</date>
+      <content>@efisher - glad it was useful!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a4f80ed4-dbeb-4cf3-8acb-f9a5decd3d80">
+      <author>Chris</author>
+      <email>spam@prettycode.org</email>
+      <website></website>
+      <ip>38.88.166.34</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36</userAgent>
+      <date>2015-03-18 15:24:40</date>
+      <content>Thank you very much for including the images! I&amp;#39;ve been trying to figure this out for a few days and wasn&amp;#39;t able to until I ran across this article! Thanks again!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="f9482bda-8b0c-4f31-b351-1218a77492a4">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.187.16.54</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-22 17:33:30</date>
+      <content>@Chris - happy to help!</content>
+    </comment>
+  </comments>
+  <viewCount>29760</viewCount>
+</post>

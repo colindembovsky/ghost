@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>37e6514b-1351-4e4a-b9fd-efa03efe5097</id>
+  <title>Contributions to TFS Build Extensions</title>
+  <slug>contributions-to-tfs-build-extensions</slug>
+  <shortUrl>http://bit.ly/1meHO3x</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-09-11 17:23:00</pubDate>
+  <lastModified>2020-04-08 06:12:19</lastModified>
+  <content>&lt;p&gt;Some of the code I’ve written before has made it into the &lt;a href="https://tfsbuildextensions.codeplex.com/" target="_blank"&gt;TFS Build Extensions&lt;/a&gt; latest release. They are my &lt;a href="http://www.colinsalmcorner.com/2013/02/custom-build-task-include-merged.html" target="_blank"&gt;“Include Merges (and associated work items) in a build"&lt;/a&gt; and “&lt;a href="http://www.colinsalmcorner.com/2013/02/failing-builds-based-on-code-coverage.html" target="_blank"&gt;Fail code based on Code Coverage&lt;/a&gt;” activities.&lt;/p&gt; &lt;p&gt;If you use the activities, make sure to leave comments or suggestions on the codeplex site.&lt;/p&gt; &lt;p&gt;Happy build customizing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>news</category>
+  </categories>
+  <comments></comments>
+  <viewCount>2653</viewCount>
+</post>

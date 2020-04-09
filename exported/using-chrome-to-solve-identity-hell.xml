@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>50ac53e5-8ca7-4c3d-a28a-a3789a1f3a15</id>
+  <title>Using Chrome to Solve Identity Hell</title>
+  <slug>using-chrome-to-solve-identity-hell</slug>
+  <shortUrl>http://bit.ly/2FiUztp</shortUrl>
+  <author></author>
+  <pubDate>2018-03-07 17:33:59</pubDate>
+  <lastModified>2018-07-03 14:41:23</lastModified>
+  <content>&lt;p&gt;This week at MVP summit, I showed some of my colleagues a trick that I use to manage identity hell. I have several accounts that I use to access VSTS and the Azure Portal: my own Microsoft Account (MSA), several org accounts and customer org accounts. Sometimes I want to open a release from my 10th Magnitude VSTS account so that I can grab some tasks to put into CustomerX VSTS release. The problem is that if I open the 10M account in a browser, and then open a new browser, I have to sign out of the 10M account and sign in with the CustomerX account and then the windows break… identity hell.&lt;/p&gt;&lt;p&gt;At first I used to open InPrivate or Incognito windows. That gave me the ability to get to 4 different profiles: IE and IE InPrivate, Chrome and Chrome Incognito. But then my incognito windows don't have cached identities or history or anything that I like to have in my browser. Hacky - very hacky.&lt;/p&gt;&lt;h2&gt;Solution: Chrome People&lt;/h2&gt;&lt;p&gt;About 2 years ago I stumbled onto Chrome People (or Profiles). This really simple "trick" has been fantastic and I almost never open Incognito anymore. In the upper right of the Chrome chrome (ahem) there is a little text that tells you what your current "person" is:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/c5684a4c-045c-4878-a9cf-d4ca02e208e3.png" target="_blank"&gt;&lt;img width="315" height="240" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/41ad0268-687f-4d26-ab58-115081d1a475.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Click that text to open the People hub:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b046296c-4e92-4ee2-af41-9c5438d179e1.png" target="_blank"&gt;&lt;img width="308" height="273" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/9ff3f10d-52c4-436e-8fe6-192622845d0c.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Here you can see that I have 5 People: ColinMSA, 10M, AdminNWC and NWC and another customer profile. To switch profiles, I just click on the name. To add a person, just click "Manage people".&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/bfec3555-7347-480e-86b9-4e19d31a77dc.png" target="_blank"&gt;&lt;img width="321" height="254" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/315ab52b-f5f4-458c-bcc7-2f2ea07769e2.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;I can easily add a new person from this view - and I can assign an icon to the person.&lt;/p&gt;&lt;p&gt;When you create a new person, Chrome creates a shortcut to that person's browser on the desktop. I end up clicking on that and adding it to my taskbar:&lt;/p&gt;&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/7d1b015a-7023-4d2e-aeae-13987165781f.png" target="_blank"&gt;&lt;img width="344" height="51" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/735cf97a-8765-4dd3-8668-8c71c286a4dc.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If I want to open up the Azure Portal or VSTS using my MSA, I click the ColinMSA icon and I'm there. If I need to open my customer VSTS or Portal, I just click that icon. Each window is isolated and my identities don't leak. Very neat, very clean. Under the hood, the shortcuts just add a small arg to the Chrome.exe launcher: &lt;font face="Courier New"&gt;--profile-directory="Profile 1"&lt;/font&gt;. The first profile is Default, the second is Profile 1, the third Profile 2 and so on.&lt;/p&gt;&lt;h2&gt;Final Thoughts&lt;/h2&gt;&lt;p&gt;You can also do something similar in FireFox, but I like Chrome. This simple trick helps me sort out my identity hell and I can quickly switch to different identity contexts without having to sign in and out all the time. For my MSA I sign into my Google account, but I don't do that for the other browsers. All in all it's a great way to manage multiple identities.&lt;/p&gt;&lt;p&gt;Happy browsing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="3599b890-a5cc-418f-965e-de8c4e5dbbfc">
+      <author>Gordon Beeming</author>
+      <email>gordon@beeming.co.za</email>
+      <website>https://beeming.net/</website>
+      <ip>167.220.63.86</ip>
+      <userAgent>Mozilla/5.0 (Linux; Android 8.0.0; TA-1033 Build/OPR1.170623.026) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.137 Mobile Safari/537.36</userAgent>
+      <date>2018-03-07 22:17:40</date>
+      <content>this is amazing, can&amp;#39;t believe I didn&amp;#39;t know this &amp;#128513;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5e1ee379-6a81-4b38-9512-97ca11d1c119">
+      <author>Emmanuel Brandão</author>
+      <email>egomesbrandao@gmail.com</email>
+      <website>http://egomesbrandao.com.br/</website>
+      <ip>177.79.39.69</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0</userAgent>
+      <date>2018-03-13 19:25:12</date>
+      <content>This workaround is very usefull and I have used too much.&lt;br /&gt;But sometime ago I decided to went to Firefox, anda... Well... I missing this.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="1c835a44-49bc-41b2-a7f5-223fbb3e93a7">
+      <author>Thomas Rümmler</author>
+      <email>thomas.ruemmler@aitgmbh.de</email>
+      <website>https://aitgmbh.de/</website>
+      <ip>185.17.206.226</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36</userAgent>
+      <date>2018-03-23 06:44:58</date>
+      <content>Amazing, man! I never used the people switcher before and ended up in the InPrivate-Incognito-Browser-mess ;) all the times.&lt;br /&gt;I like these &amp;quot;simple&amp;quot; solutions :):):) - thumbs up for sharing</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

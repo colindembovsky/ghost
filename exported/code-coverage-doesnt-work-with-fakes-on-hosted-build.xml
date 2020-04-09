@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>0f8e3e1a-5ab6-4101-85a9-0ad520d99372</id>
+  <title>Code Coverage doesn’t work with Fakes on Hosted Build</title>
+  <slug>code-coverage-doesnt-work-with-fakes-on-hosted-build</slug>
+  <shortUrl>http://bit.ly/1hipLln</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2012-07-13 12:01:00</pubDate>
+  <lastModified>2020-04-02 18:53:52</lastModified>
+  <content>&lt;p&gt;In my &lt;a href="http://colinsalmcorner.blogspot.com/2012/07/build-with-hosted-build-controller.html" target="_blank"&gt;post about hosted build&lt;/a&gt;, I discovered that if you enable code coverage on unit tests that use the Fakes framework, the unit tests fail (even though the tests pass without code coverage turned on). The error is a “ShimNotSupportedException”.&lt;/p&gt; &lt;p&gt;I mailed the ChampsList, and it turns out that there is a problem with the hosted build servers for this scenario.In short, the problem has to do with the mix of RC and RTM on the build agent machines, which are running VS 2012 RC, and TfsPreview, that is running a later build (closer to RTM) of TFS.&lt;/p&gt; &lt;p&gt;When VS goes to RTM and the build agents are upgraded, this problem should go away. Until then, you’ll have to build the code on a local build server if you need code coverage and use the Fakes framework in your tests.&lt;/p&gt; &lt;p&gt;Happy building!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments></comments>
+  <viewCount>2897</viewCount>
+</post>

@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>de940a83-6934-46bd-bafc-ed24c3b7bb08</id>
+  <title>Bulk Migrate Work Item Comments, Links and Attachments</title>
+  <slug>bulk-migrate-work-item-comments-links-and-attachments</slug>
+  <shortUrl>http://bit.ly/1vfb79x</shortUrl>
+  <author></author>
+  <pubDate>2014-08-25 19:50:57</pubDate>
+  <lastModified>2015-11-23 08:31:13</lastModified>
+  <content>&lt;p&gt;I was working at a customer that had set up a test TFS environment. When we set up their “real” TFS, they did a get-latest of their code and imported their code – easy enough. They did have about 100 active work items that they also wanted to migrate. Not being a big fan of TFS Integration Platform, I usually recommend using Excel to port work items &lt;em&gt;en masse&lt;/em&gt;. &lt;/p&gt; &lt;p&gt;There are a couple of “problems” with the Excel approach:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;When you create work items in the new Team Project, they have to go into the “New” state (or the first state for the work item)  &lt;li&gt;You can’t migrate test cases (since the steps don’t play nicely in Excel) – and you can’t migrate test results either.  &lt;li&gt;You can’t migrate comments, hyperlinks or attachments in Excel (other than opening each work item one by one)&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;You can mitigate the “new state” limitation by creating several sheets – one for “New” items, one for “Active” items, one for “Resolved” items and so on. The “New” items are easy – just import “as-is”. For the other states, import them into the “New” state and then bulk update the state to the “target” state. Keeping the sheets separated by state makes this easier to manage. Another tip I advise is to add a custom field to the new Team Project (you don’t have to expose it on the forms if you don’t want to) called “OldID” that you set to the id of the old work item – that way you’ve always got a link back to the original work item if you need it.&lt;/p&gt; &lt;p&gt;For test case, you have to go to the API to migrate them over to the new team project – I won’t cover that topic in this post.&lt;/p&gt; &lt;p&gt;For comments, hyperlinks and attachments I quickly wrote a PowerShell script that does exactly that! I’ve uploaded it to OneDrive so you can download it &lt;a href="http://1drv.ms/1vFDpr5" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Here’s the script itself:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;$oldTpcUrl = "http://localhost:8080/tfs/oldCollection"
+$newTpcUrl = "http://localhost:8080/tfs/newCollection"
+
+$csvFile = ".\map.csv" #format: oldId, newId
+$user = "domain\user"
+$pass = "password"
+
+[Reflection.Assembly]::LoadWithPartialName('Microsoft.TeamFoundation.Common')
+[Reflection.Assembly]::LoadWithPartialName('Microsoft.TeamFoundation.Client')
+[Reflection.Assembly]::LoadWithPartialName('Microsoft.TeamFoundation.WorkItemTracking.Client')
+
+$oldTpc = [Microsoft.TeamFoundation.Client.TfsTeamProjectCollectionFactory]::GetTeamProjectCollection($oldTpcUrl)
+$newTpc = [Microsoft.TeamFoundation.Client.TfsTeamProjectCollectionFactory]::GetTeamProjectCollection($newTpcUrl)
+
+$oldWorkItemStore = $oldTpc.GetService([Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItemStore])
+$newWorkItemStore = $newTpc.GetService([Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItemStore])
+
+$list = Import-Csv $csvFile
+$cred = new-object System.Net.NetworkCredential($user, $pass)
+
+foreach($map in $list) {
+    $oldItem = $oldWorkItemStore.GetWorkItem($map.oldId)
+    $newItem = $newWorkItemStore.GetWorkItem($map.newId)
+
+    Write-Host "Processing $($map.oldId) -&amp;gt; $($map.newId)" -ForegroundColor Cyan
+    
+    foreach($oldLink in $oldItem.Links | ? { $_.BaseType -eq "HyperLink" }) {
+        Write-Host "   processing link $($oldLink.Location)" -ForegroundColor Yellow
+
+        if (($newItem.Links | ? { $_.Location -eq $oldLink.Location }).count -gt 0) {
+            Write-Host "      ...link already exists on new work item"
+        } else {
+            $newLink = New-Object Microsoft.TeamFoundation.WorkItemTracking.Client.Hyperlink -ArgumentList $oldLink.Location
+            $newLink.Comment = $oldLink.Comment
+            $newItem.Links.Add($newLink)
+        }
+    }
+
+    if ($oldItem.Attachments.Count -gt 0) {
+        foreach($oldAttachment in $oldItem.Attachments) {
+            mkdir $oldItem.Id | Out-Null
+            Write-Host "   processing attachment $($oldAttachment.Name)" -ForegroundColor Magenta
+
+            if (($newItem.Attachments | ? { $_.Name.Contains($oldAttachment.Name) }).count -gt 0) {
+                Write-Host "      ...attachment already exists on new work item"
+            } else {
+                $wc = New-Object System.Net.WebClient
+                $file = "$pwd\$($oldItem.Id)\$($oldAttachment.Name)"
+
+                $wc.Credentials = $cred
+                $wc.DownloadFile($oldAttachment.Uri, $file)
+
+                $newAttachment = New-Object Microsoft.TeamFoundation.WorkItemTracking.Client.Attachment -ArgumentList $file, $oldAttachment.Comment
+                $newItem.Attachments.Add($newAttachment)
+            }
+        }
+    
+        try {
+            $newItem.Save();
+            Write-Host "   Attachments and links saved" -ForegroundColor DarkGreen
+        }
+        catch {
+            Write-Error "Could not save work item $newId"
+            Write-Error $_
+        }
+    }
+
+    $comments = $oldItem.GetActionsHistory() | ? { $_.Description.length -gt 0 } | % { $_.Description }
+    if ($comments.Count -gt 0){
+        Write-Host "   Porting $($comments.Count) comments..." -ForegroundColor Yellow
+        foreach($comment in $comments) {
+            Write-Host "      ...adding comment [$comment]"
+            $newItem.History = $comment
+            $newItem.Save()
+        }
+    }
+    
+    Write-Host "Done!" -ForegroundColor Green
+}
+
+Write-Host
+Write-Host "Migration complete"
+&lt;/pre&gt;
+&lt;p&gt;When you run this, open the script and fix the top 5 lines (the variables for this script). Enter in the Team Project Collection URL’s (these can be the same if you’re migrating links from one Team Project to another in the same Collection). The person running the script needs to have read permissions on the old server and contributor permission on the new server. You then need to make a cvs file with 2 columns: oldId and newId. Populate this with the mapping from the old work item Id to the new work item Id. Finally, enter a username and password (this is simply for fetching the attachments) and you can run the script.&lt;/p&gt;
+&lt;p&gt;Happy migrating!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>TFS API</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="1993c978-c5d0-4651-a5a5-b364cb76b982">
+      <author>Jeff</author>
+      <email>jeffy@tomecat.com</email>
+      <website></website>
+      <ip>164.90.32.2</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36</userAgent>
+      <date>2014-08-25 19:13:52</date>
+      <content>There&amp;#39;s an incomplete sentence in your post that&amp;#39;s kind of a cliffhanger: &amp;quot;Another tip I advise is to add an&amp;quot;</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ff596351-d73e-44e8-99e8-37539a7e16ab">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.228.187.1</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-08-25 19:52:52</date>
+      <content>Hey Jeff - good spot! I&amp;#39;ve completed the &amp;quot;cliff-hanger&amp;quot;...</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="7c3d0672-b606-4b9a-97a6-a847a86c66e6">
+      <author>Ngan Menegay</author>
+      <email>nnguyen81@gmail.com</email>
+      <website></website>
+      <ip>71.164.182.23</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36</userAgent>
+      <date>2015-11-09 22:48:14</date>
+      <content>Hi Colin :)&lt;br /&gt;Thanks for this code snippet!!!!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="1bca1263-1eef-4619-a787-baa10e6f0e16">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-11-23 08:31:11</date>
+      <content>No problem @Ngan! Glad it&amp;#39;s useful.</content>
+    </comment>
+  </comments>
+  <viewCount>10433</viewCount>
+</post>

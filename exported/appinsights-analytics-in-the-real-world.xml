@@ -1,0 +1,321 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>b8336a26-79cb-40b1-87f5-6f1ad62bf89f</id>
+  <title>AppInsights Analytics in the Real World</title>
+  <slug>appinsights-analytics-in-the-real-world</slug>
+  <shortUrl>http://bit.ly/1TkEjHM</shortUrl>
+  <author></author>
+  <pubDate>2016-03-31 11:57:35</pubDate>
+  <lastModified>2017-03-28 05:46:49</lastModified>
+  <content>&lt;p&gt;Ever since &lt;a href="https://azure.microsoft.com/en-us/services/application-insights/" target="_blank"&gt;Application Insights&lt;/a&gt; (AppInsights) was released, I’ve loved it. Getting tons of analytics about site usage, performance and diagnostics – pretty much for free – makes adding Application Performance Monitoring (APM) to you application a no-brainer. If you aren’t using AppInsights, then you really should be.&lt;/p&gt; &lt;p&gt;APM is the black sheep of DevOps – most teams are concentrating on getting continuous integration and deployment and release management, which are critical pillars of DevOps. But few teams are taking DevOps beyond deployment into APM, which is also fundamental to successful DevOps. AppInsights is arguably the easiest, least-friction method of quickly and easily getting real APM into your applications. However, getting insights from your AppInsights data has not been all that easy up until now.&lt;/p&gt; &lt;h3&gt;Application Insights Analytics&lt;/h3&gt; &lt;p&gt;A few days ago Brian Harry wrote a blog post called &lt;a href="https://blogs.msdn.microsoft.com/bharry/2016/03/28/introducing-application-analytics/" target="_blank"&gt;Introducing Application Insights Analytics&lt;/a&gt;. Internally, MS was using a tool called Kusto to do log analytics for many systems – including Visual Studio Team Services (VSTS) itself. (Perhaps Kusto is a reference perhaps to the naval explorer Jacques Cousteau – as in, Kusto lets you explore the oceans of data?) MS then productized their WPF Kusto app into web-based Application Insights Analytics. App Insights Analytics adds phenomenal querying and visualizations onto AppInsights telemetry, allowing you to really dig into the data AppInsights logs. Later on I’ll show you some really simple queries that we use to analyze our usage data.&lt;/p&gt; &lt;p&gt;Brian goes into detail about how fast the Application Insights Analytics engine is – and he should know since they process terrabytes worth of telemetry. Our telemetry is nowhere near that large, so performance of the query language isn’t that big a deal for us. What is a big deal is the analytics and visualizations that the engine makes possible.&lt;/p&gt; &lt;p&gt;In this post I want to show you how to get AppInsights into a real world application. &lt;a href="http://nwcadence.com/" target="_blank"&gt;Northwest Cadence&lt;/a&gt; has a &lt;a href="https://library.nwcadence.com/" target="_blank"&gt;Knowledge Library&lt;/a&gt; application and in order to generate tracing diagnostics and usage telemetry, we added AppInsights. We learned some lessons about AppInsights on the way, and here are some of our lessons-learned.&lt;/p&gt; &lt;h3&gt;Configuring AppInsights&lt;/h3&gt; &lt;p&gt;We have 4 sites that we deploy the same code to – there are 2 production sites, Azure Library and Knowledge Library, and each has a dev environment too. By default the AppInsights key is configured in ApplicationInsights.config. We wanted to have a separate AppInsights instance for each site, so we created 4 in Azure. Now we had the problem of where to set the key so that each site logs to the correct AppInsights instance.&lt;/p&gt; &lt;p&gt;Server-side telemetry is easy to configure. Add an app setting called “AIKey” in the web.config. In a startup method somewhere, you make a call to the Active TelemetryConfig:&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration.Active.InstrumentationKey = WebConfigurationManager.AppSettings["AIKey"];&lt;/font&gt;&lt;/p&gt; &lt;p&gt;This call then sets the AIKey for all serve-side telemetry globally. But what about client side?&lt;/p&gt; &lt;p&gt;For that we added a static getter to a class like this:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;private static string aiKey;
+public static string AIKey
+{
+    get
+    {
+        if (string.IsNullOrEmpty(aiKey))
+        {
+            aiKey = WebConfigurationManager.AppSettings.Get("AIKey");
+        }
+        return aiKey;
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;In the master.cshtml file, we added the client-side script for AppInsights and made a small modification to get the key injected in instead of hard-coded:&lt;/p&gt;&lt;pre class="brush: js;"&gt;&amp;lt;script type="text/javascript"&amp;gt;
+    var appInsights=window.appInsights||function(config){
+        function s(config){t[config]=function(){var i=arguments;t.queue.push(function(){t[config].apply(t,i)})}}var t={config:config},r=document,f=window,e="script",o=r.createElement(e),i,u;for(o.src=config.url||"//az416426.vo.msecnd.net/scripts/a/ai.0.js",r.getElementsByTagName(e)[0].parentNode.appendChild(o),t.cookie=r.cookie,t.queue=[],i=["Event","Exception","Metric","PageView","Trace"];i.length;)s("track"+i.pop());return config.disableExceptionTracking||(i="onerror",s("_"+i),u=f[i],f[i]=function(config,r,f,e,o){var s=u&amp;amp;&amp;amp;u(config,r,f,e,o);return s!==!0&amp;amp;&amp;amp;t["_"+i](config,r,f,e,o),s}),t
+    }({
+        instrumentationKey: "@Easton.Web.Helpers.Utils.AIKey"
+    });
+
+    window.appInsights=appInsights;
+    appInsights.trackPageView();
+&amp;lt;/script&amp;gt;
+&lt;/pre&gt;You can see how we’re using Razor syntax to get the AIKey static property value for the instrumentationKey value. 
+&lt;p&gt;The next thing we wanted was to set the application version (assembly version) and site type (either KL for “Knowledge Library” or Azure for “Azure Library”). Perhaps this is a bit overkill since we have 4 separate AppInsights instances anyway, but if we decide to consolidate at some stage we can do so and preserve partitioning in the data.&lt;/p&gt;
+&lt;p&gt;Setting telemetry properties for every log entry is a little harder – there used to be an IConfigurationInitializer interface, but it seems it was deprecated. So we implemented an ITelmetryInitializer instance:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public class AppInsightsTelemetryInitializer : ITelemetryInitializer
+{
+    string appVersion = GetApplicationVersion();
+    string siteType = GetSiteType();
+
+    private static string GetSiteType()
+    {
+        return WebConfigurationManager.AppSettings["SiteType"];
+    }
+
+    private static string GetApplicationVersion()
+    {
+        return typeof(AppInsightsTelemetryInitializer).Assembly.GetName().Version.ToString();
+    }
+
+    public void Initialize(ITelemetry telemetry)
+    {
+        telemetry.Context.Component.Version = appVersion;
+        telemetry.Context.Properties["siteType"] = siteType;
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;In order to tell AppInsights to use the initializer, you need to add an entry to the ApplicationInsights.config file:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;TelemetryInitializers&amp;gt;
+  ...
+  &amp;lt;Add Type="Easton.Web.AppInsights.AppInsightsTelemetryInitializer, Easton.Web"/&amp;gt;
+&amp;lt;/TelemetryInitializers&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Now the version and siteType properties are added to every server-side log. Of course we could add additional “global” properties using the same code if we needed more.&lt;/p&gt;
+&lt;h3&gt;Tracing&lt;/h3&gt;
+&lt;p&gt;Last week we had an issue with our site – there’s a signup process in which we generate an access code and customers then enter the access code and enable integration with their Azure Active Directory so that their users can authenticate against their AAD when logging into our site. Customers started reporting that the access code “wasn’t found”. The bug turned out to be the fact that a static variable on a base class is shared across all child instances too – so our Azure Table data access classes were pointing to the incorrect tables (We fixed the issue using a &lt;a href="http://stackoverflow.com/questions/8142768/c-sharp-static-instance-members-for-each-inherited-class" target="_blank"&gt;curiously recurring generic base class&lt;/a&gt; – a study for another day) but the issue had us stumped for a while.&lt;/p&gt;
+&lt;p&gt;Initially I thought, “I can debug this issue quickly – I have AppInsights on the site so I can see what’s going on.” Turns out that there wasn’t any exception for the issue – the data access searched for an entity and couldn’t find it, so it reported the “access code not found” error that our customers were seeing. I didn’t have AppInsights tracing enabled – so I immediately set about adding it.&lt;/p&gt;
+&lt;p&gt;First, you install the Microsoft.ApplicationInsights.TraceListener package from NuGet. Then you can pepper your code with trace calls to System.Diagnostics.Trace – each one is sent to AppInsights by the TraceListener.&lt;/p&gt;
+&lt;p&gt;We decided to create an ILogger interface and a base class that just did a call to System.Diagnostics.Trace. Here’s a snippet:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public abstract class BaseLogger : ILogger
+{
+    public virtual void TraceError(string message)
+    {
+        Trace.TraceError(message);
+    }
+
+    public virtual void TraceError(string message, params object[] args)
+    {
+        Trace.TraceError(message, args);
+    }
+
+    public virtual void TraceException(Exception ex)
+    {
+        Trace.TraceError(ex.ToString());
+    }
+
+    // ... TraceInformation and TraceWarning methods same as above
+
+    public virtual void TraceCustomEvent(string eventName, IDictionary&amp;lt;string, string&amp;gt; properties = null, IDictionary&amp;lt;string, double&amp;gt; metrics = null)
+    {
+        var propertiesStr = "";
+        if (properties != null)
+        {
+            foreach (var key in properties.Keys)
+            {
+                propertiesStr += string.Format("{0}{1}{2}", key, properties[key], Environment.NewLine);
+            }
+        }
+
+
+        var metricsStr = "";
+        if (metrics != null)
+        {
+            foreach (var key in metrics.Keys)
+            {
+                metricsStr += string.Format("{0}{1}{2}", key, metrics[key], Environment.NewLine);
+            }
+        }
+
+        Trace.TraceInformation("Custom Event: {0}{1}{2}{1}{3}", eventName, Environment.NewLine, propertiesStr, metricsStr);
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;The TraceInformation and TraceError methods are pretty straightforward – the TraceCustomEvent was necessary to enable custom telemetry. Using the logger to add tracing and exception logging is easy. We inject an instance of our AppInsightsLogger (more on this later) and then we can use it to log. Here’s an example of our GET videos method (we use &lt;a href="http://nancyfx.org/" target="_blank"&gt;NancyFx&lt;/a&gt; which is why this is an indexer method):&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;Get["/videos"] = p =&amp;gt;
+{
+    try
+    {
+        logger.TraceInformation("[/Videos] Returning {0} videos", videoManager.Videos.Count);
+        return new JsonResponse(videoManager.Videos, new EastonJsonNetSerializer());
+    }
+    catch (Exception ex)
+    {
+        logger.TraceException(ex);
+        throw ex;
+    }
+};&lt;/pre&gt;
+&lt;h3&gt;Custom Telemetry&lt;/h3&gt;
+&lt;p&gt;Out of the box you get a ton of great logging in AppInsights – page views (including browser type, region, language and performance) and server side requests, exceptions and performance. However, we wanted to start doing some custom analytics on usage. Our application is multi-tenant, so we wanted to track the tenantId as well as the user. We want to track each time a user views a video so we can see which users (across which tenants) are accessing which videos. Here’s the call we make to log that a user has accessed a video:&lt;/p&gt;
+&lt;p&gt;&lt;font size="2" face="Courier New"&gt;logger.TraceCustomEvent("ViewVideo", new Dictionary&amp;lt;string, string&amp;gt;() { { "TenantId", tenantId }, { "User", userId }, { "VideoId", videoId } });&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;The method in the AppInsightsLogger is as follows:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;public override void TraceCustomEvent(string eventName, IDictionary&amp;lt;string, string&amp;gt; properties = null, IDictionary&amp;lt;string, double&amp;gt; metrics = null)
+{
+    AppInsights.TrackEvent(eventName, properties, metrics);
+}
+&lt;/pre&gt;
+&lt;p&gt;Pretty simple.&lt;/p&gt;
+&lt;h3&gt;Analytics Queries&lt;/h3&gt;
+&lt;p&gt;Now that we’re getting some telemetry, including requests and custom events, we can start to query. Logging on to the Azure Portal I navigate to the AppInsights instance and click on the Analytics button in the toolbar:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/d3f3fe7f-3b73-4a84-b1c3-3a550dd6ce89.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/66d6768d-b2ac-4bb2-b9fa-a41d3b533a7a.png" width="321" height="314"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;That will open the AppInsights Analytics page. Here I can start querying my telemetry. There are several “tables” that you can query – requests, traces, exceptions and so on. If I want to see the performance percentiles of my requests in 1 hour bins for the last 7 days, I can use this query which calculates the percentiles and then renders to a time chart:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/2d1a099e-9795-44cb-bfe5-e72e46f02568.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/8f4b66db-f304-4d46-b596-01ae7a2853fd.png" width="461" height="208"&gt;&lt;/a&gt;&lt;/p&gt;&lt;pre&gt;
+requests
+| where timestamp &amp;gt;= ago(7d)
+| summarize percentiles(duration,50,95,99) by bin (timestamp, 1h)
+| render timechart
+
+&lt;/pre&gt;
+&lt;p&gt;The query syntax is fairly “natural” though I did have to look at these &lt;a href="https://azure.microsoft.com/en-us/documentation/articles/app-analytics/" target="_blank"&gt;help docs&lt;/a&gt; to get to grips with the language.&lt;/p&gt;
+&lt;p&gt;Sweet!&lt;/p&gt;
+&lt;p&gt;You can even join the tables. Here’s an example from Brian Harry’s post that correlates exceptions and requests:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/034d4bad-1c0a-4d92-b224-94de1c340742.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/9eb64962-7829-4af4-9833-fbb68a72c20e.png" width="371" height="178"&gt;&lt;/a&gt;&lt;/p&gt;&lt;pre&gt;
+requests
+| where timestamp &amp;gt; ago(2d)
+| where success == "False"
+| join kind=leftouter (
+    exceptions
+    | where timestamp &amp;gt; ago(2d)
+) on operation_Id
+| summarize exceptionCount=count() by operation_Name
+| order by exceptionCount asc
+&lt;/pre&gt;
+&lt;p&gt;Note that I did have some trouble with the order by direction – it could be a bug (this is still in preview) or maybe I just don’t understand the ordering will enough.&lt;/p&gt;
+&lt;p&gt;Here are a couple of queries against our custom telemetry:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a3b253b5-eeb3-4987-b6b6-c547e42ccb8a.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/73638438-1a40-4d31-a632-6fb776258470.png" width="411" height="145"&gt;&lt;/a&gt;&lt;/p&gt;&lt;pre&gt;
+customEvents
+| where timestamp &amp;gt; ago(7d)
+| where name == "ValidateToken"
+| extend user = tostring(customDimensions.User), tenantId = tostring(customDimensions.TenantId)
+| summarize logins = dcount(user) by tenantId, bin(timestamp, 1d)
+| order by logins asc
+
+&lt;/pre&gt;
+&lt;p&gt;Again, the ordering direction seems odd to me.&lt;/p&gt;
+&lt;p&gt;I love the way that the customDimensions (which is just a json snippet) is directly addressable. Here’s what the json looks like for our custom events:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/270acbcd-6b70-4605-bfb9-1ec2cdcb12d8.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/f8037c71-324a-4e4e-900e-53ce34503802.png" width="439" height="160"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You can see how the “siteType” property is there because of our ITelemetryInitializer.&lt;/p&gt;
+&lt;h3&gt;Visualizations&lt;/h3&gt;
+&lt;p&gt;After writing a couple queries, we can then add a visualization by adding a render clause. You’ve already seen the “render timechart“ above – but there’s also piechart, barchart and table. Here’s a query that renders a stacked bar chart showing user views (per tenant) in hourly bins:&lt;/p&gt;&lt;pre&gt;
+customEvents
+| where timestamp &amp;gt;= ago(7d)
+| extend user = tostring(customDimensions.User), videoId = tostring(customDimensions.VideoId), tenantId = tostring(customDimensions.TenantId)
+| summarize UserCount = dcount(user) by tenantId, bin (timestamp, 1h)
+| render barchart
+
+&lt;/pre&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/9fd825be-e6a5-4d68-8630-a365617dfd51.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4b41a4df-ed56-4f67-9a8a-4823deebeca9.png" width="414" height="206"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;This is just scratching the surface, but I hope you get a feel for what this tool can bring out of your telemetry.&lt;/p&gt;
+&lt;h3&gt;Exporting Data to PowerBI&lt;/h3&gt;
+&lt;p&gt;The next step is to make a dashboard out of the queries that we’ve created. You can export to Excel, but for a more dynamic experience, you can also export to PowerBI. I was a little surprised that when I clicked “Export to PowerBI” I got a text file. Here’s the same bar chart query exported to PowerBI:&lt;/p&gt;&lt;pre&gt;
+/*
+The exported Power Query Formula Language (M Language ) can be used with Power Query in Excel 
+and Power BI Desktop. 
+For Power BI Desktop follow the instructions below: 
+ 1) Download Power BI Desktop from https://powerbi.microsoft.com/en-us/desktop/ 
+ 2) In Power BI Desktop select: 'Get Data' -&amp;gt; 'Blank Query'-&amp;gt;'Advanced Query Editor' 
+ 3) Paste the M Language script into the Advanced Query Editor and select 'Done' 
+*/
+
+
+let
+Source = Json.Document(Web.Contents("https://management.azure.com/subscriptions/someguid/resourcegroups/rg/providers/microsoft.insights/components/app-insights-instance/api/query?api-version=2014-12-01-preview", 
+[Query=[#"csl"="customEvents| where timestamp &amp;gt;= ago(7d)| extend user = tostring(customDimensions.User), videoId = tostring(customDimensions.VideoId), tenantId = tostring(customDimensions.TenantId)| summarize UserCount = dcount(user) by tenantId, bin (timestamp, 1h)| render barchart"]])),
+SourceTable = Record.ToTable(Source), 
+SourceTableExpanded = Table.ExpandListColumn(SourceTable, "Value"), 
+SourceTableExpandedValues = Table.ExpandRecordColumn(SourceTableExpanded, "Value", {"TableName", "Columns", "Rows"}, {"TableName", "Columns", "Rows"}), 
+RowsList = SourceTableExpandedValues{0}[Rows], 
+ColumnsList = SourceTableExpandedValues{0}[Columns],
+ColumnsTable = Table.FromList(ColumnsList, Splitter.SplitByNothing(), null, null, ExtraValues.Error), 
+ColumnNamesTable = Table.ExpandRecordColumn(ColumnsTable, "Column1", {"ColumnName"}, {"ColumnName"}), 
+ColumnsNamesList = Table.ToList(ColumnNamesTable, Combiner.CombineTextByDelimiter(",")), 
+Table = Table.FromRows(RowsList, ColumnsNamesList), 
+ColumnNameAndTypeTable = Table.ExpandRecordColumn(ColumnsTable, "Column1", {"ColumnName", "DataType"}, {"ColumnName", "DataType"}), 
+ColumnNameAndTypeTableReplacedType1 = Table.ReplaceValue(ColumnNameAndTypeTable,"Double",Double.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType2 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType1,"Int64",Int64.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType3 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType2,"Int32",Int32.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType4 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType3,"Int16",Int16.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType5 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType4,"UInt64",Number.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType6 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType5,"UInt32",Number.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType7 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType6,"UInt16",Number.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType8 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType7,"Byte",Byte.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType9 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType8,"Single",Single.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType10 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType9,"Decimal",Decimal.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType11 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType10,"TimeSpan",Duration.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType12 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType11,"DateTime",DateTimeZone.Type,Replacer.ReplaceValue,{"DataType"}),
+ColumnNameAndTypeTableReplacedType13 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType12,"String",Text.Type,Replacer.ReplaceValue,{"DataType"}),
+ColumnNameAndTypeTableReplacedType14 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType13,"Boolean",Logical.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType15 = Table.ReplaceValue(ColumnNameAndTypeTableReplacedType14,"SByte",Logical.Type,Replacer.ReplaceValue,{"DataType"}), 
+ColumnNameAndTypeTableReplacedType16 = Table.SelectRows(ColumnNameAndTypeTableReplacedType15, each [DataType] is type), 
+ColumnNameAndTypeList = Table.ToRows(ColumnNameAndTypeTableReplacedType16), 
+TypedTable = Table.TransformColumnTypes(Table, ColumnNameAndTypeList) 
+in
+TypedTable
+
+&lt;/pre&gt;
+&lt;p&gt;Ah, so I’ll need PowerBI desktop. No problem. Download it, open it and follow the helpful instructions in the comments at the top of the file:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/67b87404-e41f-4252-bb67-6352b93c52ff.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/a5cead1f-f37a-45ce-93b8-2050e98b8320.png" width="344" height="211"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now I can create visualizations, add custom columns – do whatever I would normally do in PowerBI.&lt;/p&gt;
+&lt;p&gt;One thing I did want to do was fix up the nasty “tenantId”. This is a guid which is the Partition Key for an Azure Table that we use to store our tenants. So I just added a new Query to the report to fetch the tenant data from the table. Then I was able to create a relationship (i.e. foreign key) that let me use the tenant name rather than the nasty guid in my reports:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/3cbbe27e-17b2-4319-8f8b-48b97a47ed86.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/c2c86a37-e7aa-463c-b181-8046b3bdcade.png" width="276" height="198"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Here’s what the relationship looks like for the “Users Per Tenant Per Hour Query”:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/f11921cc-7a26-458e-bc54-d31423f31290.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/bae5a9dc-1b0b-41f2-98ba-4c02f445a6a7.png" width="277" height="227"&gt;&lt;/a&gt;&lt;br&gt;Once I had the tables in, I could create reports. Here’s a performance report:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/382d58fd-fe06-4b54-a850-6ff1c9fed2b0.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/90252b21-893a-49e8-be63-1650268cfef5.png" width="420" height="245"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;One tip – when you add the “timestamp” property, PowerBI defaults to a date hierarchy (Year, Quarter, Month, Day). To use the timestamp itself, you can just click on the field in the axis box and select “timestamp” from the values:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/0863c82c-8865-4c55-8d02-6f94f3c4a260.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/e5c4c392-1968-4be5-9e0f-826eea025567.png" width="239" height="321"&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;Here’s one of our usage reports:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/27f766e0-950a-4a76-8afd-a01b1441cf4d.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/330c3205-1117-46ab-ba18-c46c35d6b40f.png" width="576" height="326"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;And of course, once I’ve written the report, I can just upload it to PowerBI to share with the team:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/7c95e26f-c8a1-4e1f-ac6b-f921085bd68f.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/72d138c7-7cc7-4320-89ae-b760df0c6c76.png" width="375" height="213"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Look ma – it’s the same report!&lt;/p&gt;
+&lt;h3&gt;Conclusion&lt;/h3&gt;
+&lt;p&gt;If you’re not doing APM, then you need to get into AppInsights. If you’re already using AppInsigths, then it’s time to move beyond &lt;em&gt;logging&lt;/em&gt; telemetry to actually &lt;em&gt;analyzing&lt;/em&gt; telemetry and gaining insights from your applications using AppInights Analytics.&lt;/p&gt;
+&lt;p&gt;Happy analyzing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>AppInsights</category>
+    <category>DevOps</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="f13632d6-cf41-4ec5-aabe-0b4195394443">
+      <author>Noam Ben Zeev</author>
+      <email>noamben@microsoft.com</email>
+      <website></website>
+      <ip>79.181.203.200</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-04-01 11:6:29</date>
+      <content>Hi Colin,&lt;br /&gt;Great coverage of the end to end scenario!&lt;br /&gt;As for your comment re the order by, it is indeed a bug in the Web UI grid and a fix should be available during the upcoming week.&lt;br /&gt;Thank you for your post,&lt;br /&gt;Noam</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e9aa2ce0-76e9-4090-b829-07b05074f076">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.125.252</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-01 13:14:27</date>
+      <content>Hi @Noam&lt;br /&gt;&lt;br /&gt;Thanks for the feedback - and for letting me know about the bug fix!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="6461716c-d932-4d94-a070-0332bef07bdd">
+      <author>Yariv Louck</author>
+      <email>yelouck@microsoft.com</email>
+      <website></website>
+      <ip>12.173.182.250</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-04-05 07:33:39</date>
+      <content>Hi &lt;br /&gt;&lt;br /&gt;Just wanted to inform you that the bug should be fixed now. &lt;br /&gt;please feel free to contact us if you find additional issues &lt;br /&gt;&lt;br /&gt;Thanks for a great post and for letting us know about the issue &lt;br /&gt;&lt;br /&gt;Yariv</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="24ffec01-5d7b-4dcd-88de-ae42cb0e6d97">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.115.228</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-05 14:47:51</date>
+      <content>Thanks @Yariv! Keep up the great work.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5de9a4a5-0dfa-4cde-b7a2-c851b2d5cda7">
+      <author>Michel van den Berg</author>
+      <email>mvb@promontis.nl</email>
+      <website></website>
+      <ip>77.249.121.13</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.86 Safari/537.36</userAgent>
+      <date>2016-05-11 10:11:25</date>
+      <content>How do you guys handle analytics over multiple insights instances? When do you decide that you need multiple instances and when not?&lt;br /&gt;&lt;br /&gt;For example, you wrote that you are using 4 insights instances. Do you all hook them up to the same Power BI instance? Does that work? From what I can see the analytics explorer is per instance, not over multiple instances. Do you combine the analytics in Power BI? Or am not doing the correct analytics if I want to combine?&lt;br /&gt;&lt;br /&gt;Another example, would be a load balanced app. Would definitely want that combined in one graph. Perhaps one insights instance per load balanced service would suffice?&lt;br /&gt;&lt;br /&gt;A third example would be a &amp;#39;processing&amp;#39; service, where the service contains of a web app and an independent (running in its own web app) webjob (to make it more scalable). Would you also log it to two instances?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="da6909e4-65e0-4471-9129-eedcd011bbc0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:22:43</date>
+      <content>Hi @Michel&lt;br /&gt;&lt;br /&gt;There are several ways to handle multiple instances in AppInsights. Distinct applications should of course be in separate AppInsight instances. However, if you want to track a single application that is load balanced, then all 4 should be using the same AppInsights instance. You can add a ITelemetryInitializer (as we did above) to add the local machine name into all the telemetry sent from each web app. Then you can segregate all the telemetry by that dimension.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="54c5bdd8-ec27-4a06-ba11-df80c08321a1">
+      <author>krishna</author>
+      <email>sbk1251@gmail.com</email>
+      <website>http://www.jumbojobs.com/jobs-in-thane</website>
+      <ip>49.204.45.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36</userAgent>
+      <date>2017-02-03 10:56:03</date>
+      <content>hi,thanks for sharing the nice info with us.</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

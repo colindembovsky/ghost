@@ -67,6 +67,7 @@ function getPost(path: string) {
     const postString = parser.toJson(xml);
     const postObj = JSON.parse(postString);
     const post = postObj.post;
+    console.log("--> Converting " + post.title);
     
     const mobileDocContent = converter.toMobiledoc(post.content, { plugins });
     const body = JSON.stringify(mobileDocContent);
@@ -88,11 +89,12 @@ function getPost(path: string) {
 let posts = <any[]>[];
 let postTags = <any[]>[];
 
-var files = fs.readdirSync("exported");
+const folder = "exported";
+//const folder = "dev";
+var files = fs.readdirSync(folder);
 files.forEach(f => {
-    const postData = getPost("exported/" + f);
-    console.log("Imported " + postData.post.title);
-    postTags.push(postData.postTags);
+    const postData = getPost(folder + "/" + f);
+    postTags.push(...postData.postTags);
     posts.push(postData.post);
 });
 

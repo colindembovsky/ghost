@@ -1,0 +1,442 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>4db636fd-d165-4d7d-beb8-96e9c8e9d745</id>
+  <title>WebDeploy, Configs and Web Release Management</title>
+  <slug>webdeploy-configs-and-web-release-management</slug>
+  <shortUrl>http://bit.ly/21uFeIo</shortUrl>
+  <author></author>
+  <pubDate>2015-12-02 11:18:38</pubDate>
+  <lastModified>2017-06-01 11:50:08</lastModified>
+  <content>&lt;p&gt;It’s finally here – the new &lt;a href="https://www.visualstudio.com/en-us/get-started/release/release-management-vs"&gt;web-based Release Management&lt;/a&gt; (WebRM). At least, it’s here in preview on VSTS (formerly VSO) and should hopefully come to TFS 2015 in update 2.&lt;/p&gt; &lt;p&gt;I’ve blogged frequently about Release Management, the “old” WPF tool that Microsoft purchased from InCycle (it used to be called InRelease). The tool was good in some ways, and horrible in others – but it always felt like a bit of a stop-gap while Microsoft implemented something truly great – which is what WebRM is!&lt;/p&gt; &lt;p&gt;One of the most common deployment scenarios is deploying web apps – to IIS or to Azure. I blogged about using the old tool along with WebDeploy &lt;a href="http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way"&gt;here&lt;/a&gt;. This post is a follow-on – how to use WebDeploy and WebRM correctly.&lt;/p&gt; &lt;p&gt;First I want to outline a problem with the out-of-the-box Tasks for deploying web apps. Then I’ll talk about how to tokenize the build package ready for multi-environment deployments, and finally I’ll show you how to create a Release Definition.&lt;/p&gt; &lt;h2&gt;Azure Web App Deployment Task Limitations&lt;/h2&gt; &lt;p&gt;If you create a new Release Definition, there is an “Azure Web App Deployment” Task. Why not just use that to deploy web apps? There are a couple of issues with this Task:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;You can’t use it to deploy to IIS&lt;/li&gt; &lt;li&gt;You can’t manage different configurations for different environments (with the exception of connection strings)&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;The Task is great in that it uses a predefined Azure Service Endpoint, which abstracts credentials away from the deployment. However, the underlying implementation invokes an Azure PowerShell cmdlet &lt;a href="https://msdn.microsoft.com/en-us/library/azure/dn722468.aspx"&gt;Publish-AzureWebsiteProject&lt;/a&gt;. This cmdlet works – as long as you don’t intend to change any configuration except the connection strings. Have different app settings in different environments? You’re hosed. Here’s the Task UI in VSTS:&lt;/p&gt; &lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/2a26c2ff-f9a0-4dc4-9619-4111a7e8e9ab.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/54e7111d-5892-44e8-b0f8-f2eb7f277d3b.png" width="377" height="114"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;The good:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;You select the Azure subscription from the drop-down – no messing with passwords&lt;/li&gt; &lt;li&gt;You can enter a deployment slot&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;The bad:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;You have to select the zip file for the packaged site – no place for handling configs&lt;/li&gt; &lt;li&gt;Additional arguments – almost impossible to figure out what to put here. You can use this to set connection strings if you’re brave enough to figure it out&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;The ugly:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Web App Name is a combo-box, but it’s never populated, so you have to type the name yourself (why is it a combo-box then?)&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;In short, this demo’s nicely, but you’re not really going to use it for any serious deployments – unless you’ve set the app settings on the slots in the Azure Portal itself. Perhaps this will work for you – but if you change a setting value (or add a new setting) you’re going to have to manually update the slot using the Portal. Not a great automation story.&lt;/p&gt; &lt;h2&gt;Config Management&lt;/h2&gt; &lt;p&gt;So besides not being able to use the Task for IIS deployments, your biggest challenge is config management. Which is ironic, since building a WebDeploy package actually handles the config well – it places config into a SetParameters.xml file. Unfortunately the Task (because it is calling Publish-AzureWebsiteProject under the hood) only looks for the zip file – it ignores the SetParameters file.&lt;/p&gt; &lt;p&gt;So I got to thinking – and I stole an idea from &lt;a href="https://octopus.com/"&gt;Octopus Deploy&lt;/a&gt;: what if the deployment would just automagically replace any config setting value with any correspondingly named variable defined in the Release Definition for the target Environment? That would mean you didn’t have to edit long lists of arguments at all. Want a new value? Just add it to the Environment variables and the deployment takes care of it for you.&lt;/p&gt; &lt;h2&gt;The Solution&lt;/h2&gt; &lt;p&gt;The solution turned out to be fairly simple:&lt;/p&gt; &lt;p&gt;For the VS Solution:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Add a parameters.xml file to your Website project for any non-connecting string settings you want to manage, using tokens for values&lt;/li&gt; &lt;li&gt;Create a publish profile that inserts tokens for the website name and any db connection strings&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;For the Build:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Configure a Team Build to produce the WebDeploy package (and cmd and SetParameters files) using the publish profile&lt;/li&gt; &lt;li&gt;Configure the Build to upload the zip and supporting files as the output&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;For the Release:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Write a script to do the parameter value substitution (replacing tokens with actual values defined in the target Environment) into the SetParameters file&lt;/li&gt; &lt;li&gt;Invoke the cmd to deploy the Website&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Of course, the “parameter substituting script” has to be checked into the source repo and also included as a build output in order for you to use it in the Release.&lt;/p&gt; &lt;h3&gt;Creating a Tokenized WebDeploy Package in a Team Build&lt;/h3&gt; &lt;p&gt;Good releases start with good packages. Since the same package is going to be deployed to multiple environments, you cannot “hardcode” any config settings into the package. So you have to create the package in such a way that it has tokens for any config values that the Release pipeline will replace with Environment specific values at deployment time. In my previous &lt;a href="http://colinsalmcorner.com/post/webdeploy-and-release-management--the-proper-way"&gt;WebDeploy and Release Management post&lt;/a&gt;, I explain how to add the parameters.xml file and how to create a publish profile to do exactly that. That technique stays exactly the same as far as the VS solution goes.&lt;/p&gt; &lt;p&gt;Here’s my sample parameters.xml file for this post:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;!--?xml version="1.0" encoding="utf-8" ?--&amp;gt;
+&amp;lt;parameters&amp;gt;
+  &amp;lt;parameter name="CoolKey" description="The CoolKey setting" defaultvalue="__CoolKey__" tags=""&amp;gt;
+    &amp;lt;parameterentry kind="XmlFile" scope="\\web.config$" match="/configuration/appSettings/add[@key='CoolKey']/@value"&amp;gt;
+    &amp;lt;/parameterentry&amp;gt;
+  &amp;lt;/parameter&amp;gt;
+&amp;lt;/parameters&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Note how I’m sticking with the double-underscore pre- and post-fix as the token, so the value (token) for CoolKey is __CoolKey__.&lt;/p&gt;
+&lt;p&gt;Once you’ve got a parameters.xml file and a publish profile committed into your source repo (Git or TFVC – either one works fine), you’re almost ready to create a Team Build (vNext Build). You will need the script that “hydrates” the parameters from the Environment variables. I’ll cover the contents of that script shortly – let’s assume for now that you have a script called “Replace-SetParameters.ps1” checked into your source repo along with your website. Here’s the structure I use:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/47811e0e-47d3-4131-a14c-4da0c5fd828f.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/0ca3df4c-51ba-486a-ae98-772b7034b779.png" width="423" height="325"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Create a new Build Definition – select Visual Studio Build as the template to start from. You can then configure whatever you like in the build, but you have to do 3 things:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Configure the MSBuild arguments as follows in the “Visual Studio Build” Task:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;font face="Courier New"&gt;/p:DeployOnBuild=true /p:PublishProfile=Release /p:PackageLocation="$(build.StagingDirectory)"&lt;/font&gt;&lt;/li&gt;
+&lt;li&gt;The name of the PublishProfile is the same name as the pubxml file in your solution&lt;/li&gt;
+&lt;li&gt;The package location is set to the build staging directory&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/2a5f8f9c-c7cf-4264-b22b-351cb07046bb.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4d9e81c0-4cd6-4685-b27d-080a7fa2b106.png" width="393" height="127"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;Configure the “Copy and Publish Build Artifacts” Task to copy the staging directory to a server drop:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/a249909e-a879-4e40-9ef2-a2a3cff04ad2.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/6f8812b9-142f-434b-a6f9-4b060630517d.png" width="395" height="95"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;Add a new “Publish Build Artifact” Task to copy the “Replace-SetParameters.ps1” script to a server drop called “scripts”:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/664fa560-0f9f-4034-b959-b97b5b5d88e3.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/66fb8d87-a768-4adf-8ff8-6ab42fcfcf50.png" width="407" height="78"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;&lt;/ol&gt;
+&lt;p&gt;&amp;nbsp;&lt;/p&gt;
+&lt;p&gt;I like to version my assemblies so that my binary versions match my build number. I use a &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/VersionAssemblies"&gt;custom build Task&lt;/a&gt; to do just that. I also run unit tests as part of the build. Here’s my entire build definition:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/ddd96c1f-4c66-4cfe-b666-202738ffe9b9.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/4c86556e-4b23-4852-9aa3-9c0bf78486a8.png" width="302" height="177"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Once the build has completed, the Artifacts look like this:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/499b4107-1af6-4272-bbc1-a8d5fb0c4494.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/f90dcc60-02cc-429e-9016-9b401a7eb6e1.png" width="345" height="130"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/374f429e-bcb4-49e4-9a94-4760f4703ae3.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/1ec03479-9722-4704-a3bd-a028d1663996.png" width="346" height="154"&gt;&lt;/a&gt;&lt;/p&gt;
+
+
+
+
+
+
+
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/cfddee21-bdd1-4a0e-bbde-6bd7e61560b9.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/55f87666-1e7e-4228-91e7-260b515a0597.png" width="348" height="84"&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;Here’s what the SetParameters file looks like if you open it up:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;?xml version="1.0" encoding="utf-8"?&amp;gt;
+&amp;lt;parameters&amp;gt;
+  &amp;lt;setParameter name="IIS Web Application Name" value="__SiteName__" /&amp;gt;
+  &amp;lt;setParameter name="CoolKey" value="__CoolKey__" /&amp;gt;
+  &amp;lt;setParameter name="EntityDB-Web.config Connection String" value="__EntityDB__" /&amp;gt;
+&amp;lt;/parameters&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;The tokens for SiteName and EntityDB both come from my publish profile – the token for CoolKey comes from my parameters.xml file.&lt;/p&gt;
+&lt;p&gt;Now we have a package that’s ready for Release!&lt;/p&gt;
+&lt;h3&gt;Filling in Token Values&lt;/h3&gt;
+&lt;p&gt;You can see how the SetParameters file contains tokens. We will eventually define values for each token for each Environment in the Release Definition. Let’s assume that’s been done already – then how does the release pipeline perform the substitution? Enter PowerShell!&lt;/p&gt;
+&lt;p&gt;When you execute PowerShell in a Release, any Environment variables you define in the Release Definition are created as environment variables that the script can access. So I wrote a simple script to read in the SetParameters file, use Regex to find any tokens and replace the tokens with the environment variable value. Of course I then overwrite the file. Here’s the script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;param(
+    [string]$setParamsFilePath
+)
+Write-Verbose -Verbose "Entering script Replace-SetParameters.ps1"
+Write-Verbose -Verbose ("Path to SetParametersFile: {0}" -f $setParamsFilePath)
+
+# get the environment variables
+$vars = gci -path env:*
+
+# read in the setParameters file
+$contents = gc -Path $setParamsFilePath
+
+# perform a regex replacement
+$newContents = "";
+$contents | % {
+    $line = $_
+    if ($_ -match "__(\w+)__") {
+        $setting = gci -path env:* | ? { $_.Name -eq $Matches[1]  }
+        if ($setting) {
+            Write-Verbose -Verbose ("Replacing key {0} with value from environment" -f $setting.Name)
+            $line = $_ -replace "__(\w+)__", $setting.Value
+        }
+    }
+    $newContents += $line + [Environment]::NewLine
+}
+
+Write-Verbose -Verbose "Overwriting SetParameters file with new values"
+sc $setParamsFilePath -Value $newContents
+
+Write-Verbose -Verbose "Exiting script Replace-SetParameters.ps1"
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 2: The only parameter required is the path to the SetParameters file&lt;/li&gt;
+&lt;li&gt;Line 8: Read in all the environment variables – these are populated according to the Release Definition&lt;/li&gt;
+&lt;li&gt;Line 11: Read in the SetParameters file&lt;/li&gt;
+&lt;li&gt;Line 15: Loop through each line in the file&lt;/li&gt;
+&lt;li&gt;Line 17: If the line contains a token, then:&lt;/li&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 18-22: Find the corresponding environment variable, and if there is one, replace the token with the value&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;Line 27: Overwrite the SetParameters file&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Caveats: note, this can be a little bit dangerous since the environment variables that are in scope include more than just the ones you define in the Release Definition. For example, the environment includes a “UserName” variable, which is set to the build agent user name. So if you need to define a username variable, make sure you name it “WebsiteUserName” or something else that’s going to be unique.&lt;/p&gt;
+&lt;h2&gt;Creating the Release Definition&lt;/h2&gt;
+&lt;p&gt;We now have all the pieces in place to create a Release Definition. Each Environment is going to execute (at least) 2 tasks:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;PowerShell – to call the Replace-SetParameters.ps1 script&lt;/li&gt;
+&lt;li&gt;Batch Script – to invoke the cmd file to publish the website&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;The PowerShell task is always going to be exactly the same – however, the Batch Script arguments are going to change slightly depending on if you’re deploying to IIS or to Azure.&lt;/p&gt;
+&lt;p&gt;I wanted to make sure this technique worked for IIS as well as for Azure (both deployment slots and “real” sites). So in this example, I’m deploying to 3 environments: Dev, Staging and Production. I’m using IIS for dev, to a staging deployment slot in Azure for Staging and the “real” Azure site for Production.&lt;/p&gt;
+&lt;p&gt;Here are the steps to configure the Release Definition:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Go to the Release hub in VSTS and create a new Release Definition. Select “Empty” to start with an empty template.&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;Enter a name for the Release Definition and change “Default Environment” to Dev&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/e75f4709-35f4-44d0-aef2-b2dfbbe64479.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/218622b6-48aa-453c-92d3-eb5d9884aacf.png" width="301" height="196"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;Click “Link to a Build Definition” and select the build you created earlier:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/7a9168c1-a851-4693-a267-6c6d420c42d8.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/509668ce-0c8d-4c0d-807c-e509c7f02c8b.png" width="296" height="161"&gt;&lt;/a&gt;&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;Click “+ Add Tasks” and add a PowerShell Task:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;For the “Script filename”, browse to the location of the Replace-SetParameters.ps1 file:&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/61cc8620-e0f0-49e4-9e52-95bc65246bc6.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/45f0a4f9-0cd8-40af-bc7b-b26dd6fdb872.png" width="288" height="289"&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;For the “Arguments”, enter the following:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;font face="Courier New"&gt;-setParamsFilePath $(System.DefaultWorkingDirectory)\CoolWebApp\drop\CoolWebApp.SetParameters.xml&lt;/font&gt;&lt;/li&gt;
+&lt;li&gt;Of course you’ll have to fix the path to set it to the correct SetParameters file – $(System.DefaultWorkingDirectory) is the root of the Release downloads. Then there is a folder with the name of the Build (e.g. CoolWebApp), then the artifact name (e.g. drop), then the path within the artifact source.&lt;/li&gt;&lt;/ol&gt;&lt;/ol&gt;
+&lt;li&gt;Click “+ Add Tasks” and add a Batch Script Task:&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;For the “Script filename”, browse to the location of the WebDeploy cmd file:&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/58caff03-e790-4eec-96e1-8f9a4fa15a70.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/5b4b9268-fc4e-408a-99bb-5d0899151fd4.png" width="325" height="326"&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Enter the correct arguments (discussed below).&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;Configure variables for the Dev environment by clicking the ellipses button on the Environment tile and selecting “Configure variables”&lt;/li&gt;
+&lt;ol&gt;
+&lt;li&gt;Here you add any variable values you require for your web app – these are the values that you tokenized in the build:&lt;/li&gt;
+&lt;li&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/c53f51fe-d3eb-4e92-9fd8-81875695b77c.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; padding-top: 0px; padding-left: 0px; border-left: 0px; display: inline; padding-right: 0px" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/67406726-55b5-4513-803d-7f9c372cfbf7.png" width="367" height="217"&gt;&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Azure sites require a username and password – I’ll cover those shortly.&lt;/li&gt;&lt;/ol&gt;&lt;/ol&gt;
+&lt;p&gt;The Definition should now look something like this:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/3515cdc0-e574-4893-87d0-5313b84ef2ab.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/854cc6b2-2d55-492f-bd3a-1ab7afd8de10.png" width="531" height="142"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;Cmd Arguments and Variables&lt;/h3&gt;
+&lt;p&gt;For IIS, you don’t need username and password for the deployments. This means you’ll need to configure the build agent to run as an identity that has permissions to invoke WebDeploy. The SiteName variable is going to be the name of the website in IIS plus the name of your virtual application – something like “Default Web Site/cool-webapp”. Also, you’ll need to configure the Agent on the Dev environment to be an on-premise agent (so select an on-premise queue) since the hosted agent won’t be able to deploy to your internal IIS servers.&lt;/p&gt;
+&lt;p&gt;For Azure, you’ll need the website username and password (which you can get by downloading the Publish profile for the site from the Azure Portal). They’ll need to be added as variables in the environment, along with another variable called “WebDeploySiteName” (which is required only if you’re using deployment slots). The SiteName is going to be the name of the site in Azure. Of course you’re going to “lock” the password field to make it a secret. You can use the Hosted agent for Environments that deploy to Azure.&lt;/p&gt;
+&lt;p&gt;Here are the 2 batch commands – the first is for local deployment to IIS, the 2nd for deployment to Azure:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;/Y /M:http://$(WebDeploySiteName)/MsDeployAgentService&lt;/li&gt;
+&lt;li&gt;/Y /M:https://$(WebDeploySiteName).scm.azurewebsites.net:443/msdeploy.axd /u:$(AzureUserName) /p:$(AzurePassword) /a:Basic&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;For IIS deployments, you can set WebDeploySiteName to be the name or IP of the target on-premises server. Note that you’ll have to have WebDeploy remote agent running on the machine, with the appropriate permissions for the build agent identity to perform the deployment.&lt;/p&gt;
+&lt;p&gt;For Azure, the WebDeploySiteName is of the form “siteName[-slot]”. So if you have a site called “MyWebApp”, and you just want to deploy to the site, then WebDeploySiteName will be “MyWebApp”. If you want to deploy to a slot (e.g. Staging), then WebDeploySiteName must be set to “MyWebApp-staging”. You’ll also need to set the SiteName to the name of the site in Azure (“MyWebApp” for the site, “MyWebApp__slot” for a slot – e.g. “MyWebApp__staging”). Finally, you’ll need “AzureUserName” and “AzurePassword” to be set (according to the publish settings for the site).&lt;/p&gt;
+&lt;h4&gt;Cloning Staging and Production Environments&lt;/h4&gt;
+&lt;p&gt;Once you’re happy with the Dev Environment, clone it to Staging and update the commands and variables. Then repeat for Production. You’ll now have 3 Environments in the Definition:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/ffd5137d-6ee4-4330-a9cd-1fc1401bffdc.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/ed956818-8992-49a9-b73e-d4ca69dd7dd0.png" width="473" height="182"&gt;&lt;/a&gt;&lt;/p&gt;
+
+
+
+
+
+
+
+
+&lt;p&gt;Also, if you click on “Configuration”, you can see all the Environment variables by clicking “Release variables” and selecting “Environment Variables”:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/ceef56c7-7946-4390-94b2-a3fd237b6d7f.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/886e0140-1a69-41cb-9004-8c3df029bc7e.png" width="535" height="163"&gt;&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;That will open a grid so you can see all the variables side-by-side:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://www.colinsalmcorner.com/posts/files/86ece78f-6886-40a8-951a-934cac54fc2d.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://www.colinsalmcorner.com/posts/files/62df6094-71eb-4416-b260-e4afe6b260f9.png" width="587" height="177"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Now you can ensure that you’ve set each Environment’s variables correctly. Remember to set approvals on each environment as appropriate!&lt;/p&gt;
+&lt;h3&gt;2 More Tips&lt;/h3&gt;
+&lt;p&gt;If you want to trigger the Release every time the linked Build produces a new package, then click on Triggers and enable “Continuous Deployment”.&lt;/p&gt;
+&lt;p&gt;You can get the Release number to reflect the Build package version. Click on General and change the Release Name format to:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;$(Build.BuildNumber)-$(rev:r)&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;Now when you release 1.0.0.8, say, your release will be “1.0.0.8-1”. If you trigger a new release with the same package, it will be numbered “1.0.0.8-2” and so on.&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;WebRM is a fantastic evolution of Release Management. It’s much easier to configure Release Definitions, to track logs to see what’s going on and to configure deployment Tasks – thanks to the fact that the Release agent is the same as the Build agent. As far as WebDeploy goes, I like this technique of managing configuration – I may write a custom Build Task that bundles the PowerShell and Batch Script into a single task – that will require less argument “fudging” and bundle the PowerShell script so you don’t have to have it in your source repo. However, the process is not too difficult to master even without a custom Task, and that’s pleasing indeed!&lt;/p&gt;
+&lt;p&gt;Happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="c39b50f4-82c1-43bd-a463-da6897542084">
+      <author>Bert</author>
+      <email>bertkidd@gmail.com</email>
+      <website></website>
+      <ip>208.92.228.62</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-02 13:37:01</date>
+      <content>How come RM completely ignores web.config transforms?  Are there any good deployment solutions that allow us to continue using web.config transforms for the environment changes, instead of tokenization?  Transforms give a LOT more flexibility than tokenization does (and you can preview them in the IDE)</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="438e45bb-f0f0-4eae-9801-a8604ab3e454">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-02 14:28:22</date>
+      <content>@Bert&lt;br /&gt;&lt;br /&gt;It&amp;#39;s not that RM ignores the transforms - in fact, my technique uses transforms. The issue is that the transform is applied at build time, not deploy time. Therefore if you&amp;#39;re going to build a single package, it has to transform to tokens. You could create a config transform per environment, but then you&amp;#39;d end up having 1 package per environment. I prefer to have a single package and then use the deployment tool (in this case WebRM) to fill in the values for the tokens.&lt;br /&gt;&lt;br /&gt;I think this is cleaner - it separates build and deploy. Also, it lets you manage values in the deploy tool, rather than in the source code, which I prefer.&lt;br /&gt;&lt;br /&gt;Thanks for the comment!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="d3052d79-1eaf-4945-a69e-dd3b56c02c2e">
+      <author>Daniel</author>
+      <email>daniel.stefanescu@gmail.com</email>
+      <website></website>
+      <ip>91.183.131.196</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-04 09:33:10</date>
+      <content>Great article. Excellent.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="81dd4583-e164-4a9c-a1c0-7c05551a1118">
+      <author>Vic Peters</author>
+      <email>sandro997@gmail.com</email>
+      <website></website>
+      <ip>24.79.244.254</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.86 Safari/537.36</userAgent>
+      <date>2015-12-07 16:45:35</date>
+      <content>Is there any reason why config transforms must be performed at build time?  Our process is capable of invoking config transforms manually at any point in the process, so we choose to do so immediately before the deployment step, but after the build step.  Is there something wrong with this process?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5f6f8dd7-e534-4b74-a245-d54225ee3784">
+      <author>Colin Dembovskky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-08 08:21:37</date>
+      <content>@Daniel - thanks for the feedback! Glad you found the post helpful.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="36da9662-b9a0-4ad8-8576-a5a319c1f900">
+      <author>Colin Dembovskky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-08 08:25:02</date>
+      <content>@Vic&lt;br /&gt;&lt;br /&gt;Unfortunately you can&amp;#39;t run a transform on a WebDeploy package. I like to get my build to produce a single package (which is a zip file) and then use WebDeploy to push the site to the target server. That&amp;#39;s why I can&amp;#39;t run the transform after the build, since the transform won&amp;#39;t work on the zip file. That&amp;#39;s what the SetParameters.xml file is designed for.&lt;br /&gt;&lt;br /&gt;I&amp;#39;m guessing your deploy process is just doing an XCopy or FTP of the files that you&amp;#39;ve built. The advantage that WebDeploy has over this is that WebDeploy does a &amp;#39;sync&amp;#39; - so it only copies files you need, not everything. Also, it can delete files in the target server that don&amp;#39;t exist in the source package (though this can be turned off if you don&amp;#39;t want that). All in all, I prefer WebDeploy over XCopy and FTP - but if your process is working for you, then don&amp;#39;t fix it :-).</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c93ef6f3-b75c-4a28-9ef4-eca5b6b03419">
+      <author>David Tesar</author>
+      <email>dtzar@hotmail.com</email>
+      <website>http://www.itproguy.com/</website>
+      <ip>50.35.25.146</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-08 22:58:12</date>
+      <content>If you were to use an Azure RM deployment template task which references different variables for each environment in VSTS before you do the web app deploy, then it seems like you could not have to go through this exercise and the default task would work.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="075151c7-e0d7-408d-9eb1-f8ded05442a9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.184.116.155</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-09 11:11:06</date>
+      <content>Hi @David&lt;br /&gt;&lt;br /&gt;I didn&amp;#39;t know you could specify config settings for a site in and ARM template. But even if you can, conceptually I like to separate my environment from my application. So using ARM to set up the Web App is fine - but the app settings feel like they belong with the app more than the environment. Also, I think it&amp;#39;s overkill to define an ARM template just to manage some config settings! I&amp;#39;m working on an improved version of the technique I use in this post, so watch this space!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="94158aac-2483-42ab-8bf1-312291afdc72">
+      <author>Jim Ahles</author>
+      <email>jahles1@gmail.com</email>
+      <website></website>
+      <ip>199.17.246.149</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-17 14:41:33</date>
+      <content>My Replace-SetParameters.ps1 doesn&amp;#39;t replace anything. I&amp;#39;ve verified the names in the environment variables through the UI to what they are in the set parameters xml file and they are the same. But, when i do gci in the script, the log shows all the environment variables as all cap letters. Not sure if this is why its not finding anything to replace.&lt;br /&gt;&lt;br /&gt;Its very frustrating to have to save, run a build, and then have a release run the powershell. Any way i can run against the release environment directly? I am guessing not.&lt;br /&gt;&lt;br /&gt;thnx</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="18de40a2-3b93-4d1b-8476-fbc317d26b60">
+      <author>Colin Dembovskky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>24.22.233.21</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36</userAgent>
+      <date>2016-01-13 01:44:50</date>
+      <content>Hi @Jim&lt;br /&gt;&lt;br /&gt;You could change the regex to be case-insensitive. I didn&amp;#39;t seem to have that issue, even though the names are in upper case.&lt;br /&gt;&lt;br /&gt;As for testing against the environment, I&amp;#39;ve &amp;quot;simulated&amp;quot; the environment by creating env vars before calling the script. It&amp;#39;s not ideal since it&amp;#39;s not exactly the same, but for me it was close enough. I don&amp;#39;t think there&amp;#39;s a way to run against the environment directly.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="66d310fb-6482-4c07-96c1-a9bfa252e212">
+      <author>Jeremy</author>
+      <email>jeremyhillin@gmail.com</email>
+      <website>http://na/</website>
+      <ip>70.248.118.138</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9</userAgent>
+      <date>2016-01-18 21:18:06</date>
+      <content>It is unfortunate that you have to go through all of this to do token replacement.  This really needs to be a built in feature.  It is a good practice so you can hide sensitive operations information from source and needs to be a simple first class option in any RM tool.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="f7c2a7e7-5d3f-4413-9bd0-553f36b8d24a">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.218.79</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36</userAgent>
+      <date>2016-01-19 05:35:02</date>
+      <content>@Jeremy&lt;br /&gt;&lt;br /&gt;The team have made an excellent extension mechanism, meaning that users can fill in any gaps that they see. No tool is going to cover users&amp;#39; needs 100% - but at least the extension option is there.&lt;br /&gt;&lt;br /&gt;Still, I also wish this was a built in task since it seems so fundamental to deployments.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="eb5786bd-e294-430b-9b3a-ba6eb922667f">
+      <author>Greg Thompson</author>
+      <email>greg_d_thompson@yahoo.com</email>
+      <website></website>
+      <ip>173.172.188.31</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/601.4.4 (KHTML, like Gecko) Version/9.0.3 Safari/601.4.4</userAgent>
+      <date>2016-03-04 23:41:39</date>
+      <content>I got the web azure deploy to work, but it didn&amp;#39;t work if my build name has a space in it.  &lt;br /&gt;&lt;br /&gt;I use this and the version assemblies extension. &lt;br /&gt;&lt;br /&gt;Thanks!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="f2105df9-de40-43f3-9fef-f8c29aeaecf1">
+      <author>Patrick</author>
+      <email>pkoranda@hotmail.com</email>
+      <website></website>
+      <ip>70.95.132.75</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-13 23:56:48</date>
+      <content>This post sent me on my way!  Thank you very much it was extremely helpful.  Beers on me if your ever in San Diego!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="d87f7965-2aa6-4c5b-9cf2-eb1b01a9de3d">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.82.167</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36</userAgent>
+      <date>2016-04-14 13:18:47</date>
+      <content>Hey @Patrick - I&amp;#39;ll make sure to look you up with in San Diego!&lt;br /&gt;&lt;br /&gt;I&amp;#39;m going to do another post soon about how to do this even better. In the meantime, check out my ReplaceTokens task in my extension: https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks&lt;br /&gt;&lt;br /&gt;Happy releasing!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="2b0a620d-02cb-4e27-8637-662f42429e79">
+      <author>zsu</author>
+      <email>azure.ss@gmail.com</email>
+      <website></website>
+      <ip>108.171.130.160</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:44.0) Gecko/20100101 Firefox/44.0</userAgent>
+      <date>2016-05-05 17:59:22</date>
+      <content>I was using the powershell   task to run the script instead of calling the ps1 file, the log shows it replace some value but when I check the artifact, it did not change. don&amp;#39;t know if it&amp;#39;s some permission issue for the powershell   or the release was download the artifact to a different place than where the build published to. Below is the log:&lt;br /&gt;2016-05-05T17:35:54.9679577Z Executing the powershell script: C:\LR\MMS\Services\Mms\TaskAgentProvisioner\Tools\agents\1.99.0\tasks\Powershell  \0.2.0\task.ps1&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:55.6673862Z ##[debug]Entering script Replace-SetParameters.ps1&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:55.6673862Z ##[debug]Path to SetParametersFile: C:\a\7bad7eace\WebFrameworkMVC_Dev\drop\WebFramework.Web.SetParameters.xml&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:55.8363832Z ##[debug]Replacing key SMTPUSER with value from environment&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:55.9193847Z ##[debug]Replacing key RELEASE_ENVIRONMENTNAME with value from environment&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:55.9973832Z ##[debug]Overwriting SetParameters file with new values&lt;br /&gt;&lt;br /&gt;2016-05-05T17:35:56.0233831Z ##[debug]Exiting script Replace-SetParameters.ps1</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="36ed4922-3bc2-43bc-9de8-ce6ac801be4e">
+      <author>Todd</author>
+      <email>toddsteele@hotmail.com</email>
+      <website></website>
+      <ip>184.167.8.197</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.87 Safari/537.36</userAgent>
+      <date>2016-05-07 00:33:23</date>
+      <content>The additional arguments of the Azure Web App Deployment Task can do the token replacement for you. Check out the source @ https://github.com/Azure/azure-powershell/blob/master/src/ServiceManagement/Services/Commands/Websites/PublishAzureWebsiteProject.cs&lt;br /&gt;&lt;br /&gt;e.g. something like the following in the additional arguments field can do something similar:&lt;br /&gt;&lt;br /&gt;-SetParametersFile $(System.DefaultWorkingDirectory)/drop/CoolWebApp.SetParameters.xml -Tokens &amp;quot;SiteName=$(SiteName);CoolKey=$(CoolKey);EntityDB=$(EntityDB)&amp;quot;</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="dd46b526-7fef-43fd-96ca-c58a11c04dbd">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:31:03</date>
+      <content>Hi @Zsu&lt;br /&gt;&lt;br /&gt;The file is only changed on the release agent machine (you can see the path of the file that is changed). It does not modify the actual build artifact. If you want the artifact to be changed, then you should do the ReplaceTokens at the end of the build. Be aware that this defeats the purpose of tokenizing in the first place!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b1385ee3-5b0c-4720-9d7c-601d22ca2149">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:33:17</date>
+      <content>Thanks @Todd! I recently used your comment to set the params file (the actual argument is -setParamsFile) in the out-of-the-box Deploy Azure Web App task. I think this is the only argument I like overriding, since I can use my ReplaceTokens task (from here https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks) to replace tokens in the SetParameters.xml file without having to explicitly specify them one by one as your comment suggest. Still useful though!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="c12b6312-e8d9-4a8f-a61e-4bb9a4f85daf">
+      <author>Jaco</author>
+      <email>jwjanse@gmail.com</email>
+      <website></website>
+      <ip>62.163.194.92</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36</userAgent>
+      <date>2016-05-23 19:47:58</date>
+      <content>We are looking into using VSTS release management also, relying on token replacement when deploying a release package to the different environments. We are developing a WebApi2 application, and would like to give each of our (many) clients their own separate (integration-)test environment/application instance that they can test against from their own test-environment. Each of these applications will need web.config settings which are client-specific. Now I am afraid that we will end up with a very large number of (test)environment definitions within our VSTS test-release definition, each with its own environment variables. I wonder if the VSTS GUI will even display all these environments (and their variables) nicely? Anyone has experience with handling a very large set of environments for a specific release environment, each with their own parameters?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ac50e84d-5ebc-43a9-9080-ab3221d15810">
+      <author>Raghavendra</author>
+      <email>raghavendrasankark@hcl.com</email>
+      <website></website>
+      <ip>130.76.24.16</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2016-06-07 19:57:58</date>
+      <content>i just created a configuration variable named DATASOURCE in release definition&lt;br /&gt;and i tried to access the variable in powershell script as below&lt;br /&gt;&lt;br /&gt;$ds=&amp;quot;DATASOURCE&amp;quot;&lt;br /&gt;Write-Verbose $ds&lt;br /&gt;$ds1=gci -path env:$ds&lt;br /&gt;Write-Verbose $ds1&lt;br /&gt;&lt;br /&gt;and i get the below error&lt;br /&gt;Cannot find path &amp;#39;DATASOURCE&amp;#39; because it does not exist.&lt;br /&gt;&lt;br /&gt;I am not using &amp;quot;Azure Web App Deployment&amp;quot;, please let me know how we can access environment variable defined in release definition from powershell script in a normal release definition</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b1dd2100-d228-4b33-a5b4-55c847b3bc25">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 08:39:45</date>
+      <content>Hi @Jaco. There is a view that lets you see all the environment variables per environment. Click on the Release Definition, then click Edit. Then click on the Variables tab. In the upper right there is a link &amp;quot;Release variables&amp;quot; - click it and change it to &amp;quot;Environment variables&amp;quot; and you&amp;#39;ll get a table with variables as the rows and environments as the columns.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9486588f-3cda-4c7b-bad8-82e8b57c68e8">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 08:49:25</date>
+      <content>Hi @Raghavendra - to access a variable, you need to specify it as a parameter to the script. So you&amp;#39;d have Params ($DataSource) at the top of your script.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="50441188-8c90-4460-97a7-994cc1ddf529">
+      <author>Aaron</author>
+      <email>aaarneson@yahoo.com</email>
+      <website></website>
+      <ip>68.231.41.73</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36</userAgent>
+      <date>2017-01-10 23:14:16</date>
+      <content>Can this be used with website projects and not just web applications??</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="675cc450-73b8-4096-ac8c-ba66953db871">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:47:32</date>
+      <content>Hi @Aaron - nope, you have to convert your websites to web applications. Web sites are really old tech, so you&amp;#39;re better off converting anyway.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="df23f2c7-c557-44a7-bf28-119b666f3f78">
+      <author>Vishnu</author>
+      <email>svb_be@hotmail.com</email>
+      <website></website>
+      <ip>115.99.96.199</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36</userAgent>
+      <date>2017-04-12 02:40:26</date>
+      <content>Thanks Colin for great article and awesome ReplaceToken extension. &lt;br /&gt;I have question which is more about process, developer will add/remove entries in web.config and update Parameters.xml with properties for new environment and he/she has to communicate this to person maintain VSTS release environments to update values for new variables. This is a two step process and there is chance to miss at either place, hence I&amp;#39;m looking for option to find this early.&lt;br /&gt;&lt;br /&gt;I&amp;#39;m thinking of custom tasks which &lt;br /&gt;Build time: Get list of properties from web.config and compare against Parameters.xml (environment specific properties) and another file which has properties common for all environments. If any property present in web.config, but missing in either of these files, then fail the build&lt;br /&gt;&lt;br /&gt;Deploy time: After ReplaceToken task, scan SetParameters.xml for any pattern (__&amp;lt;var&amp;gt;__), if present then corresponding value is not defined in the release definition, hence abort further deployment tasks&lt;br /&gt;&lt;br /&gt;Is there any better out-of-the box or better solution for the same&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;Vishnu</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="0094c8eb-fa07-4708-a402-0f67ec610330">
+      <author>Mohammad</author>
+      <email>mryaesubi@gmail.com</email>
+      <website></website>
+      <ip>206.47.249.253</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36</userAgent>
+      <date>2017-05-08 20:51:11</date>
+      <content>Hi Colin,&lt;br /&gt;I&amp;#39;ve been using previous RM version (i.e. WPF) version with MSDeploy and setup all pipelines and server to deploy with non-Admin domain user to all stages. the deploy agent user has only full access to the website it can deploy to and all is good.&lt;br /&gt;&lt;br /&gt;I am planning to transition to WebRM in my new upgrade to TFS 2017 Update1, I wonder I could follow the same approach that I used to, since I rather not use the WebDeploy remote agent due to the fact that it requires the &amp;#39;Admin&amp;#39; privilege on the servers.&lt;br /&gt;&lt;br /&gt;Thanks in advance,&lt;br /&gt;Mohammad</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="7a6abe35-e4f3-42bd-8e7b-86d49f17d5ae">
+      <author>Wojtek</author>
+      <email>tadzik9634@gmail.com</email>
+      <website></website>
+      <ip>193.1.210.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36</userAgent>
+      <date>2017-05-29 15:18:14</date>
+      <content>I am stuck with the parameters.xml i am trying to pass diffrent parameters like username url password domain but my build generates projectname.SetParameters.xml without the parameters i have stated in paramaters.xml any thoughts?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="d34aea9c-7258-4346-848f-46c680239cf9">
+      <author>Wojtek</author>
+      <email>tadzik9634@gmail.com</email>
+      <website></website>
+      <ip>193.1.210.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36</userAgent>
+      <date>2017-06-01 11:50:08</date>
+      <content>Hi, I was following you tutorial and i ran into a problem i created my parameters.xml file i run the build everything seems fine but i cant see the parameters i have set inside the ProjectNameSetParameters.xml file i followed all the steps in your tutrial. Any Thoughts?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

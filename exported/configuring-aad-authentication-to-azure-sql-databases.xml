@@ -1,0 +1,152 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2b4355d9-bfb3-4f92-bc2b-323249145854</id>
+  <title>Configuring AAD Authentication to Azure SQL Databases</title>
+  <slug>configuring-aad-authentication-to-azure-sql-databases</slug>
+  <shortUrl>http://bit.ly/2wy5U3q</shortUrl>
+  <author></author>
+  <pubDate>2017-08-21 23:03:40</pubDate>
+  <lastModified>2019-11-10 14:55:13</lastModified>
+  <content>&lt;p&gt;Azure SQL is a great service - you get your databases into the cloud without having to manage all that nasty server stuff. However, one of the problems with Azure SQL is that you have to authenticate using SQL authentication - a username and password. However, you can also authenticate &lt;a href="https://blogs.msdn.microsoft.com/sqlsecurity/2016/02/09/token-based-authentication-support-for-azure-sql-db-using-azure-ad-auth/" target="_blank"&gt;via Azure Active Directory (AAD) tokens&lt;/a&gt;. This is analogous to integrated login using Windows Authentication - but instead of Active Directory, you're using AAD.&lt;/p&gt;&lt;p&gt;There are a number of advantages to AAD Authentication:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;div align="left"&gt;You no longer have to share logins since users log in with their AAD credentials, so auditing is better&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;You can manage access to databases using AAD groups&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;You can enable "app" logins via Service Principals&lt;/div&gt;&lt;/li&gt;&lt;/ul&gt;&lt;p align="left"&gt;In order to get this working, you need:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;&lt;div align="left"&gt;To enable AAD authentication on the Azure SQL Server&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;A Service Principal&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;Add logins to the database granting whatever rights required to the service principal&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;Add code to get an auth token for accessing the database&lt;/div&gt;&lt;/li&gt;&lt;li&gt;&lt;div align="left"&gt;If you're using Entity Framework (EF), create a new constructor for your DbContext&lt;/div&gt;&lt;/li&gt;&lt;/ul&gt;&lt;p align="left"&gt;In this post I'll walk through creating a service principal, configuring the database for AAD auth, creating code for retrieving a token and configuring an EF DbContext for AAD auth.&lt;/p&gt;&lt;h2&gt;Create a Service Principal&lt;/h2&gt;&lt;p&gt;Azure lets you configure service principals - these are like service accounts on an Active Directory. The advantage to this is that you can configure access to resources for the service and not have to worry about users leaving the org (or domain) and having to change creds and so on. Service principals get keys that can be rotated for better security too. You'll need the service principal when you configure your app to connect to the database.&lt;/p&gt;&lt;p&gt;You can create a service principal using the portal or you can do it easily using:&lt;/p&gt;&lt;pre class="brush: plain"&gt;# Azure CLI 2.0
+az ad sp create-for-rbac --name CoolAppSP --password SomeStrongPassword
+
+# PowerShell
+# get the application we want a service principal for
+$app = Get-AzureRmADApplication -DisplayNameStartWith MyDemoApp
+New-AzureRmADServicePrincipal -ApplicationId $app.ApplicationId -DisplayName CoolAppSP -Password SomeStrongPassword
+
+&lt;/pre&gt;&lt;p&gt;Of course you need to provide a proper strong password! Take a note of the servicePrincipalNames property - the one that looks like a GUID. We'll need this later.&lt;/p&gt;&lt;h2&gt;Configuring AAD on the Database&lt;/h2&gt;&lt;p&gt;In order to use AAD against the SQL Server, you'll need to configure an AAD admin (user or group) for the database. You can do this in the portal by browsing to the Azure SQL Server (not the database) and clicking "Active Directory Admin". In the page that appears, click "Set Admin" and assign a user or group as the AAD admin.&lt;/p&gt;&lt;p&gt;Once you've done that, you need to grant Azure AD users (or groups) permissions in the databases (not the server). To do that you have to connect to the database using an Azure AD account. Open Visual Studio or SQL Server Management Studio and connect to the database as the admin (or a member of the admin group) using "Active Directory Password Authentication" or "Azure Directory Integrated Authentication" from the Authentication dropdown:&lt;a href="http://colinsalmcorner.com/posts/files/48392dc1-e100-4568-8122-413720245376.png"&gt;&lt;img width="245" height="297" title="image" style="margin-right: auto; margin-left: auto; float: none; display: block; background-image: none;" alt="image" src="http://colinsalmcorner.com/posts/files/5c7acf37-8eb9-4ff5-b582-05b5016600ee.png" border="0"&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If you don't see these options, then you'll need to update your SQL Management Studio or SSDT. If you're domain joined to the Azure Active Directory domain, you can use the integrated method - in my case my laptop isn't domain joined so I used the password method. For username and password, I used my Azure AD (org account) credentials. Once you're logged in and connected to the database, execute the following T-SQL:&lt;p&gt;&lt;pre class="brush: plain"&gt;CREATE USER [CoolAppSP] FROM EXTERNAL PROVIDER
+EXEC sp_addrolemember 'db_owner', 'CoolAppSP'
+&lt;/pre&gt;&lt;p&gt;Of course you'll use the name of the Service Principal you created earlier - the name for the Login is the same name as the service principal you created, or can be the email address of a specific user or group display name if you're granting access to specific AAD users or groups so that they can access the db directly. And of course the role doesn't have to be dbowner - it can be whatever role you need it to be.&lt;/p&gt;&lt;h2&gt;Authenticating using the Service Principal&lt;/h2&gt;&lt;p&gt;There are a couple of pieces we need in order to authenticate an application to the Azure SQL database using AAD credentials. The first is a token (it's an OAuth token) that identifies the service principal. Secondly, we need to construct a database connection that uses the token to authenticate to the server.&lt;/p&gt;&lt;h3&gt;Retrieve a Token from AAD&lt;/h3&gt;&lt;p&gt;To get a token, we'll need to call Azure AD and request one. For this, you'll need the Microsoft.IdentityModel.Clients.ActiveDirectory Nuget package.&lt;/p&gt;&lt;p&gt;Here's the code snippet I used to get a token from AAD:&lt;/p&gt;&lt;p&gt;&lt;pre class="brush: csharp"&gt;public async Task&amp;lt;string&amp;gt; GetAccessTokenAsync(string clientId, string clientSecret, string authority, string resource, string scope)
+{
+	var authContext = new AuthenticationContext(authority, TokenCache.DefaultShared);
+	var clientCred = new ClientCredential(clientId, clientSecret);
+	var result = await authContext.AcquireTokenAsync(resource, clientCred);
+
+	if (result == null)
+	{
+		throw new InvalidOperationException("Could not get token");
+	}
+
+	return result.AccessToken;
+}&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 1: We need some information in order to get the token: ClientId and ClientSecret are from the service principal. The authority, resource and scope will need to be passed in too (more on this later).&lt;/li&gt;&lt;li&gt;Line 3: We're getting a token from the "authority" or tenant in Azure&lt;/li&gt;&lt;li&gt;Line 4: We create a new client credential using the id and secret of the "client" (in this case, the service principal)&lt;/li&gt;&lt;li&gt;Line 5: We get a token for this client onto the "resource"&lt;/li&gt;&lt;li&gt;Line 7: We throw if we don't get a token back&lt;/li&gt;&lt;li&gt;Line 12: If we do get a token, return it to the caller&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;The client id is the "application ID" of the service principal (the guid in the servicePrincipalNames property of the service principal). To get the secret, log in to the portal and click in the Active Directory blade. Click on "App Registration" and search for your service principal. Click on the service principal to open it. Click on Keys and create a key - make a note of the key so that you can add this to configurations. This key is the clientSecret that the GetAccessToken method needs.&lt;/p&gt;&lt;p&gt;For authority, you'll need to supply the URL to your Azure tenant. You can get this by running "az account show" (Azure CLI 2.0) or "Get-AzureRmSubscription" (PowerShell). Make a note of the tenantId of the subscription (it's a GUID). Once you have that, the authority is simply "https://login.windows.net/{tenantId}". The final piece of info required is the resource - for Azure SQL access, this is simply "https://database.windows.net/". The scope is just empty string - for databases, the security is configured per user (using the role assignments on the DB you configured earlier). The &lt;em&gt;authentication&lt;/em&gt; is done using Azure AD via the token - the database is doing &lt;em&gt;authorization&lt;/em&gt;. In other words, Azure lets an Azure AD user in when they present a valid token - the database defines what the user can do once they're in via roles.&lt;/p&gt;&lt;h3&gt;Creating a SQL Connection&lt;/h3&gt;&lt;p&gt;We've now got a way to get a token - so we can create a SQL Connection to the database. Here's a code snippet:&lt;/p&gt;&lt;pre class="brush: csharp"&gt;public async Task&amp;lt;SqlConnection&amp;gt; GetSqlConnectionAsync(string tenantId, string clientId, string clientSecret, string dbServer, string dbName)
+{
+	var authority = string.Format("https://login.windows.net/{0}", tenantId);
+	var resource = "https://database.windows.net/";
+	var scope = "";
+	var token = await GetTokenAsync(clientId, clientSecret, authority, resource, scope);
+
+	var builder = new SqlConnectionStringBuilder();
+	builder["Data Source"] = $"{dbServer}.database.windows.net";
+	builder["Initial Catalog"] = dbName;
+	builder["Connect Timeout"] = 30;
+	builder["Persist Security Info"] = false;
+	builder["TrustServerCertificate"] = false;
+	builder["Encrypt"] = true;
+	builder["MultipleActiveResultSets"] = false;
+
+	var con = new SqlConnection(builder.ToString());
+	con.AccessToken = token;
+	return con;
+}&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 1: All the info we need for the connection&lt;/li&gt;&lt;li&gt;Lines 3 - 5: Prepare the info for the call to get the token&lt;/li&gt;&lt;li&gt;Line 6: Get the access token&lt;/li&gt;&lt;li&gt;Lines 8-15: Prepare the SQL connection string to the Azure SQL database - tweak the properties (like Connect Timeout) appropriately.&lt;/li&gt;&lt;li&gt;Line 17: Create the connection&lt;/li&gt;&lt;li&gt;Line 18: Inject the token into the connection object&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;You'd now be able to use the connection just like you would any SqlConnection object.&lt;/p&gt;&lt;h2&gt;Entity Framework DataContext Changes&lt;/h2&gt;&lt;p&gt;If you're using Entity Framework for data access, you'll notice there's no obvious way to use the SqlConnection object that's now configured to access the Azure SQL database. You'll need to create a constructor on your DbContext:&lt;/p&gt;&lt;pre class="brush: csharp"&gt;public class CoolAppDataContext : DbContext
+{
+	public CoolAppDataContext(SqlConnection con)
+		: base(con, true)
+	{
+		Database.SetInitializer&amp;lt;CoolAppDataContext&amp;gt;(null);
+	}
+
+	public DbSet&amp;lt;Product&amp;gt; Products { get; set; }
+
+	...
+}&lt;/pre&gt;&lt;p&gt;Notes:&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Line 3: A constructor that accepts a SqlConnection object&lt;/li&gt;&lt;li&gt;Line 4: Call the base constructor method&lt;/li&gt;&lt;li&gt;Line 5: Override the initializer for the context's Database object&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Now you can use the above methods to construct a SqlConnection to an Azure SQL database using AAD credentials and pass it in to the DbContext - and you're good to go!&lt;/p&gt;&lt;h2&gt;Conclusion&lt;/h2&gt;&lt;p&gt;Configuring an application to use Azure AD credentials to connect to an Azure SQL database is straightforward once you have all the pieces in place. There's some configuration you need to ensure is in place, but once it's configured you can stop using SQL Authentication to access your cloud databases - and that's a win!&lt;/p&gt;&lt;p&gt;Happy connecting!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+    <category>Cloud</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="cfaa4b24-7b7c-46fa-a5c4-b220dd8b13de">
+      <author>Nils</author>
+      <email>nils.hjalmarsson@gmail.com</email>
+      <website></website>
+      <ip>213.89.197.54</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36</userAgent>
+      <date>2017-11-10 22:51:12</date>
+      <content>Great post. Thanks.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ef655381-6047-4fd7-8aee-5d38aea00a6c">
+      <author>daniel</author>
+      <email>daniel.steiner@phonak.ch</email>
+      <website></website>
+      <ip>80.218.206.55</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:51.0) Gecko/20100101 Firefox/51.0 SeaMonkey/2.48</userAgent>
+      <date>2017-11-11 19:52:27</date>
+      <content>why are you not using &lt;br /&gt;&lt;br /&gt;Authentication=Active Directory Integrated&lt;br /&gt;&lt;br /&gt;in the connection string and install ADALSQL assembly to use integrated Windows authentication?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5404d0ea-ce08-47ac-a379-756bb9a83c94">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.35.94.220</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.168 Safari/537.36</userAgent>
+      <date>2018-02-15 04:14:14</date>
+      <content>Hi @daniel&lt;br /&gt;&lt;br /&gt;Not sure what you mean by &amp;quot;install&amp;quot; - this is PaaS (Azure SQL) not IaaS (SQL on a VM).</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="15faeeec-a32c-4156-bfeb-308dfd23538e">
+      <author>Dory O</author>
+      <email>doryowen@hotmail.com</email>
+      <website></website>
+      <ip>68.115.74.121</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.117 Safari/537.36</userAgent>
+      <date>2018-04-23 22:22:44</date>
+      <content>Hi Colin: I am looking to host Azure SQL for my clients - successfully tested using SQL security. But they already have corporate SSOs, Active Directory</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="6c164972-bd17-4bfe-81b2-08823a328996">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>73.92.222.71</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36</userAgent>
+      <date>2018-07-03 14:45:50</date>
+      <content>Hi @Dory - if you&amp;#39;re able to sync AD to Azure Active Directory (AAD) using the AAD connector, you&amp;#39;ll be in good shape!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="7f5e862f-5282-41e3-a38f-a692054091e6">
+      <author>Balu Chand</author>
+      <email>balubchand@gmail.com</email>
+      <website></website>
+      <ip>137.97.81.23</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36</userAgent>
+      <date>2018-10-28 05:23:28</date>
+      <content>How do you implement this in EntityFramework with DB First approach where your connection string need the metadata information? You cannot create a SqlConnection with metadata information!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="e3e549f5-660d-442d-9d04-155552c6b4bd">
+      <author>Jeffery Birks</author>
+      <email>jeffery.birks@deepnetsecurity.com</email>
+      <website>http://wiki.deepnetsecurity.com/display/KB/How to Import SafeID Token into Azure MFA Server</website>
+      <ip>31.28.68.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36</userAgent>
+      <date>2019-06-12 15:11:18</date>
+      <content>Interesting Read.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="ffdeb5fc-678f-469d-94ff-ef5ecce2eb6e">
+      <author>Daniel K</author>
+      <email>dkhodabakhsh@pnimedia.com</email>
+      <website></website>
+      <ip>199.10.28.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36</userAgent>
+      <date>2019-09-19 20:3:11</date>
+      <content>Hey @Colin,&lt;br /&gt;Thanks for this article!&lt;br /&gt;&lt;br /&gt;Does this required &amp;#39;Managed Azure SQL Databases&amp;#39;? Or can this be done on regular &amp;#39;Azure SQL Databases&amp;#39;?&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve tried adding and AD admin but can&amp;#39;t connect via integrated or password login. Only the SQL admin can connect.&lt;br /&gt;&lt;br /&gt;Cheers,&lt;br /&gt;- Daniel K.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="e1795b0a-fe85-40b3-9ae1-c2c33269fad4">
+      <author>HannaH</author>
+      <email>hann2000_uk@hotmail.com</email>
+      <website></website>
+      <ip>193.103.207.10</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36</userAgent>
+      <date>2019-11-10 14:55:13</date>
+      <content>Honestly this post is by far MUCH MUCH better than the 10s of pages MS publishes.&lt;br /&gt;&lt;br /&gt;Sadly still can&amp;#39;t connect with my AD admin, getting &lt;br /&gt;&lt;br /&gt;A connection was successfully established with the server, but then an error occurred during the login process. (provider: SSL Provider, error: 0 - The target principal name is incorrect.)</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

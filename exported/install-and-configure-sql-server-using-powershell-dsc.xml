@@ -1,0 +1,212 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>114625bd-a2e9-471a-990e-b8c0544724b3</id>
+  <title>Install and Configure SQL Server using PowerShell DSC</title>
+  <slug>install-and-configure-sql-server-using-powershell-dsc</slug>
+  <shortUrl>http://bit.ly/1sYrBPn</shortUrl>
+  <author></author>
+  <pubDate>2014-07-15 14:35:13</pubDate>
+  <lastModified>2016-10-27 20:37:16</lastModified>
+  <content>&lt;p&gt;I’m well into my journey of discovering the capabilities of PowerShell DSC and Release Management’s DSC feature (See my previous posts: &lt;a href="http://colinsalmcorner.com/post/powershell-dsc-remotely-configuring-a-node-to-rebootnodeifneeded" target="_blank"&gt;PowerShell DSC: Configuring a Remote Node to “Reboot If Needed”&lt;/a&gt;, &lt;a href="http://colinsalmcorner.com/post/using-powershell-dsc-in-release-management-the-hidden-manual" target="_blank"&gt;Using PowerShell DSC in Release Management: The Hidden Manual&lt;/a&gt; and &lt;a href="http://colinsalmcorner.com/post/more-dsc-release-management-goodness-readying-a-webserver-for-deployment" target="_blank"&gt;More DSC Release Management Goodness: Readying a Webserver for Deployment&lt;/a&gt;). I’ve managed to work out how to use Release Management to run DSC scripts on nodes. Now I am trying to construct a couple of scripts that I can use to deploy applications to servers – including, of course, configuring the servers – using DSC. (All scripts for this post are available for download &lt;a href="http://1drv.ms/1n6C0J9" target="_blank"&gt;here&lt;/a&gt;).&lt;/p&gt; &lt;h2&gt;SQL Server Installation&lt;/h2&gt; &lt;p&gt;To install SQL Server via a script, there are two prerequisites: the SQL install sources and a silent (or unattended) installation command.&lt;/p&gt; &lt;p&gt;Fortunately the SQL server installer takes care of the install command – you run the install wizard manually, specifying your installation options as you go. On the last page, just before clicking “Install”, you’ll see a path to the ini conifguration file. I saved the configuration file and cancelled the install. Then I opened the config file and tweaked it slightly (see &lt;a href="http://msdn.microsoft.com/en-us/library/dd239405.aspx" target="_blank"&gt;this post&lt;/a&gt; and &lt;a href="http://www.mssqltips.com/sqlservertip/2511/standardize-sql-server-installations-with-configuration-files/" target="_blank"&gt;this post&lt;/a&gt; on some tweaking ideas)– till I could run the installer from the command line (using the /configurationFile switch). That takes care of the install command itself.&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b2b82361-a674-42ca-a2c3-f221f092fe92.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/8eb3ba64-e66c-496f-8cdc-56ff047923ed.png" width="644" height="483"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;There are many ways to make the SQL installation sources available to the target node. I chose to copy the ISO to the node (using the File DSC resource) from a network share, and then use a Script resource to mount the iso. Once it’s mounted, I can run the setup command using the ini file.&lt;/p&gt; &lt;p&gt;SQL Server requires .NET 3.5 to be installed on the target node, so I’ve added that into the script using the WindowsFeature resource. Here’s the final script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration SQLInstall
+{
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $PackagePath,
+
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $WinSources
+    )
+
+    Node $AllNodes.where{ $_.Role.Contains("SqlServer") }.NodeName
+    {
+        Log ParamLog
+        {
+            Message = "Running SQLInstall. PackagePath = $PackagePath"
+        }
+
+        WindowsFeature NetFramework35Core
+        {
+            Name = "NET-Framework-Core"
+            Ensure = "Present"
+            Source = $WinSources
+        }
+
+        WindowsFeature NetFramework45Core
+        {
+            Name = "NET-Framework-45-Core"
+            Ensure = "Present"
+            Source = $WinSources
+        }
+
+        # copy the sqlserver iso
+        File SQLServerIso
+        {
+            SourcePath = "$PackagePath\en_sql_server_2012_developer_edition_x86_x64_dvd_813280.iso"
+            DestinationPath = "c:\temp\SQLServer.iso"
+            Type = "File"
+            Ensure = "Present"
+        }
+
+        # copy the ini file to the temp folder
+        File SQLServerIniFile
+        {
+            SourcePath = "$PackagePath\ConfigurationFile.ini"
+            DestinationPath = "c:\temp"
+            Type = "File"
+            Ensure = "Present"
+            DependsOn = "[File]SQLServerIso"
+        }
+
+        #
+        # Install SqlServer using ini file
+        #
+        Script InstallSQLServer
+        {
+            GetScript = 
+            {
+                $sqlInstances = gwmi win32_service -computerName localhost | ? { $_.Name -match "mssql*" -and $_.PathName -match "sqlservr.exe" } | % { $_.Caption }
+                $res = $sqlInstances -ne $null -and $sqlInstances -gt 0
+                $vals = @{ 
+                    Installed = $res; 
+                    InstanceCount = $sqlInstances.count 
+                }
+                $vals
+            }
+            SetScript = 
+            {
+                # mount the iso
+                $setupDriveLetter = (Mount-DiskImage -ImagePath c:\temp\SQLServer.iso -PassThru | Get-Volume).DriveLetter + ":"
+                if ($setupDriveLetter -eq $null) {
+                    throw "Could not mount SQL install iso"
+                }
+                Write-Verbose "Drive letter for iso is: $setupDriveLetter"
+                
+                # run the installer using the ini file
+                $cmd = "$setupDriveLetter\Setup.exe /ConfigurationFile=c:\temp\ConfigurationFile.ini /SQLSVCPASSWORD=P2ssw0rd /AGTSVCPASSWORD=P2ssw0rd /SAPWD=P2ssw0rd"
+                Write-Verbose "Running SQL Install - check %programfiles%\Microsoft SQL Server\120\Setup Bootstrap\Log\ for logs..."
+                Invoke-Expression $cmd | Write-Verbose
+            }
+            TestScript =
+            {
+                $sqlInstances = gwmi win32_service -computerName localhost | ? { $_.Name -match "mssql*" -and $_.PathName -match "sqlservr.exe" } | % { $_.Caption }
+                $res = $sqlInstances -ne $null -and $sqlInstances -gt 0
+                if ($res) {
+                    Write-Verbose "SQL Server is already installed"
+                } else {
+                    Write-Verbose "SQL Server is not installed"
+                }
+                $res
+            }
+        }
+    }
+}
+
+# command for RM
+#SQLInstall -ConfigurationData $configData -PackagePath "\\rmserver\Assets" -WinSources "d:\sources\sxs"
+
+# test from command line
+SQLInstall -ConfigurationData configData.psd1 -PackagePath "\\rmserver\Assets" -WinSources "d:\sources\sxs"
+Start-DscConfiguration -Path .\SQLInstall -Verbose -Wait -Force
+&lt;/pre&gt;
+&lt;p&gt;Here’s some analysis:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;(Line 7 / 12) The config takes in 2 parameters: $PackagePath (location of SQL ISO and config ini file) and $WinSources (Path to windows sources). 
+&lt;li&gt;(Line 15) I changed my config data so that I can specify a comma-separated list of roles (since a node might be a SQLServer and a WebServer) so I’ve made the comparer a “contains” rather than an equals (as I’ve had in my previous scripts) – see the config script below. 
+&lt;li&gt;(Line 22 / 29) Configure .NET 3.5 and .NET 4.5 Windows features, using the $WinSources path if the sources are required 
+&lt;li&gt;(Line 37) Copy the SQL iso to the target node from the $PackagePath folder 
+&lt;li&gt;(Line 46) Copy the ini file to the target node from the $PackagePath folder 
+&lt;li&gt;(Line 58) Begins the Script to install SQL server 
+&lt;li&gt;The Get-Script does a check to see if there is a SQL server service running. If there is, it returns the SQL instance count for the machine. 
+&lt;li&gt;The Set-Script mounts the iso, saving the drive letter to a variable. Then I invoke the setup script (passing in the config file and required passwords) writing the output to Write-Verbose, which will appear on the DSC invoking machine as the script executes. 
+&lt;li&gt;The Test-Script does the same basic “is there a SQL server service running” check. If there is, skip the install – else run the install. Of course this could be refined to ensure each and every component is installed, but I didn’t want to get that granular. 
+&lt;li&gt;The last couple of lines of the script show the command for Release Management (commented out) as well as the command to run the script manually from a PowerShell prompt.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s my DSC config script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;#$configData = @{
+@{
+    AllNodes = @(
+        @{
+            NodeName = "*"
+            PSDscAllowPlainTextPassword = $true
+         },
+
+        @{
+            NodeName = "fabfiberserver"
+            Role = "WebServer,SqlServer"
+         }
+    );
+}
+
+# Note: different 1st line for RM or command line invocation
+# use $configData = @{ for RM
+# use @{ for running from command line
+&lt;/pre&gt;
+&lt;p&gt; You can download the above scripts (and my SQL configuration ini file for reference) &lt;a href="http://1drv.ms/1n6C0J9" target="_blank"&gt;here&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;What’s Next&lt;/h2&gt;
+&lt;p&gt;After running this script, I have a server with SQL Server installed and configured according to my preferences (which are contained in the ini file). From here, I can run restores or dacpac deployments and so on. Of course this is going to be executed from within Release Management as part of the release pipeline.&lt;/p&gt;
+&lt;p&gt;Next up will be the full WebServer DSC script – and then we’ll be ready to tackle the actual application deployment, since we’ll have servers ready to host our applications.&lt;/p&gt;
+&lt;p&gt;Until then, happy releasing!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>DevOps</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="fcd81a3e-a69b-45c5-97b5-3590fde43e94">
+      <author>Chirag</author>
+      <email>chirag_chheda09@yahoo.co.in</email>
+      <website></website>
+      <ip>12.17.131.114</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-01-29 18:59:21</date>
+      <content>After running the scrip the log says - Machine should be restarted before installing sql server. How would this work if I run this script on my Azure VM - SILENT INSTALLATION</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="d968c54d-02ca-4b67-b07e-7250442456c0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:43:09</date>
+      <content>Hi @Chirag&lt;br /&gt;&lt;br /&gt;You can try using my tips here http://colinsalmcorner.com/post/powershell-dsc-remotely-configuring-a-node-to-rebootnodeifneeded. Rebooting during installs is always tricky though. Sometimes there is just no alternative.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="20032736-cd81-4300-abe9-12e7be5a0efe">
+      <author>clove</author>
+      <email>cloverobert@gmail.com</email>
+      <website></website>
+      <ip>182.70.100.14</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 17:39:58</date>
+      <content>I want to install mssql 2012 on my single windows machine not on cluster ... will your script do the same&amp;gt;</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="36fa3129-ec31-4bfb-8501-6c1fe8c3a50a">
+      <author>Lupo</author>
+      <email>choloboy@live.ca</email>
+      <website></website>
+      <ip>99.241.158.16</ip>
+      <userAgent>Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36</userAgent>
+      <date>2016-06-28 01:7:37</date>
+      <content>does this work for sql express?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="aac9f4e1-87be-44c7-bcce-e426e4cdfa1c">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.48.68</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-07-22 14:45:00</date>
+      <content>Hi @clove and @Lupo&lt;br /&gt;&lt;br /&gt;If you&amp;#39;re going to run this on a single machine, just change the Node line (line 15) to &amp;quot;Node localhost&amp;quot;. Then run it on the machine you want to configure.&lt;br /&gt;&lt;br /&gt;You can have the iso mounted wherever you want - line 103 lets you specify the &amp;quot;package path&amp;quot; to the iso.&lt;br /&gt;&lt;br /&gt;Finally, you&amp;#39;ll probably have to modify the ini file for SQL Express. I ran the install manually and then on the last step of the wizard exported the config. You can do the same for SQL Express.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="bb2004c8-e31c-41f6-8e13-a3d94b1c505e">
+      <author>Anvesh M Patel</author>
+      <email>anveshpatel88@gmail.com</email>
+      <website></website>
+      <ip>49.205.70.192</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.116 Safari/537.36</userAgent>
+      <date>2016-09-20 19:31:03</date>
+      <content>Nice Article !&lt;br /&gt;This is my pleasure to read your article.&lt;br /&gt;Really this will help to people of SQL Server Community. &lt;br /&gt;&lt;br /&gt;I have also prepared one article about, Powershell environment with SQL Server 2012&lt;br /&gt;You can also visit my article, your comments and reviews are most welcome. &lt;br /&gt;&lt;br /&gt;http://www.dbrnd.com/2016/09/sql-server-2012-working-with-the-powershell-environment/</content>
+    </comment>
+  </comments>
+  <viewCount>14595</viewCount>
+</post>

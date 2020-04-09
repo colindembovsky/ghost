@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>f6ff63db-be8b-4b3b-818e-88c69c2cfadc</id>
+  <title>Improvements to Code Review Checkin Policy</title>
+  <slug>improvements-to-code-review-checkin-policy</slug>
+  <shortUrl>http://bit.ly/1n0aRaE</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-05-20 17:33:00</pubDate>
+  <lastModified>2020-04-03 22:54:44</lastModified>
+  <content>&lt;p&gt;Late last year I uploaded my first VS Gallery contribution – &lt;a href="http://visualstudiogallery.msdn.microsoft.com/c476b708-77a8-4065-b9d0-919ab688f078" target="_blank"&gt;Colin’s ALM Corner Checkin Policies&lt;/a&gt;. One of the policies in this pack is a Code Review Checkin Policy. I blogged about it in &lt;a href="http://www.colinsalmcorner.com/2012/12/custom-code-review-checkin-policy.html" target="_blank"&gt;this post&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;One of the pieces of feedback I got about this policy was that this is counter the “checkin early, checkin often” mantra of most development shops. Some suggestions were to only apply this policy to “junior” team members, allowing “senior” members to checkin without requiring a review. I decided however to approach this from a source control perspective as opposed to a group membership perspective.&lt;/p&gt; &lt;p&gt;The policy now allows you to configure which source control paths it must fire on – so if you checkin files in the “mapping”, a code review is required, otherwise no code review is necessary. This means you can make the DEV branch (or your equivalent) review-free, while enforcing reviews on MAIN or LIVE branches, according to your practices. This way you get the benefit of “checkin early, checkin often” without the hassle of reviewing every single change. When you merge a bunch of changes through to MAIN or LIVE, you can then enforce Code Review (you would perform your code review on the merge-set).&lt;/p&gt; &lt;p&gt;Here’s what the Policy Configuration settings now look like:&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-b8GGm8WncxY/UZpCUC-wWHI/AAAAAAAAAuk/rcUzkAhkcTM/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-r87J-QroDqY/UZpCWES-vmI/AAAAAAAAAus/E0SRc-OZ3_U/image_thumb%25255B1%25255D.png?imgmax=800" width="266" height="227"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;You can see a list of “Paths to apply policy to”. Just add your source folders here and you get finer-grained control over when a Code Review is required.&lt;/p&gt; &lt;p&gt;Happy reviewing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>ALM</category>
+  </categories>
+  <comments></comments>
+  <viewCount>4178</viewCount>
+</post>

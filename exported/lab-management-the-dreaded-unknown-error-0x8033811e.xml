@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>0262e1e1-27e5-49e5-bd69-d1213bffdb7a</id>
+  <title>Lab management: The Dreaded “Unknown Error: 0x8033811e”</title>
+  <slug>lab-management-the-dreaded-unknown-error-0x8033811e</slug>
+  <shortUrl>http://bit.ly/1hWf4sm</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-04-14 10:42:00</pubDate>
+  <lastModified>2020-04-06 08:47:41</lastModified>
+  <content>&lt;p&gt;I have been setting up a TFS for demos and web training. Since TFS installation is now really easy, I got it up quickly and configured Lab Management. Everything was plain sailing until I tried to deploy a stored environment. The SCVMM job failed and provided this rather unhelpful message (where host.com is my host server): &lt;p&gt;&lt;em&gt;A Hardware Management error has occurred trying to contact server host.com (Unknown error 0x8033811e). Check that WinRM is installed and running on the server host.com.&lt;/em&gt; &lt;p&gt;Well I did check WinRM – no problems there. So I started to search for other solutions – found one about ip listening ports and a whole bunch of other nothing. After sifting through some obscure sites, I managed to narrow the solution to one of two things: &lt;ol&gt; &lt;li&gt;BITS port conflicts&lt;/li&gt; &lt;li&gt;Delegation issues&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;Changing the BITS Port&lt;/h2&gt; &lt;p&gt;By default, BITS uses port 443 to transfer files – so if you have anything using SSL or firewalls blocking the port, you’ll have issues with BITS. I ignored this at first since the SCVMM job seemed to get past copying the VHD over BITS. Anyway, this turned out to be the solution to my problem. Here’s how you fix it: &lt;ol&gt; &lt;li&gt;Open the registry of the VMM server machine&lt;/li&gt; &lt;li&gt;Find HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Microsoft System Center Virtual Machine Manager Server\Settings&lt;/li&gt; &lt;li&gt;Edit the BITSTcpPort to something other than 443 (I used 8050)&lt;/li&gt; &lt;li&gt;Restart the “Virtual Machine Manager” service&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;Fixing Delegation Issues&lt;/h2&gt; &lt;p&gt;The other possibility is delegation issues. Follow these steps: &lt;ol&gt; &lt;li&gt;Go to the Domain Controller and open “Active Directory Users and Computers”&lt;/li&gt; &lt;li&gt;In the Computers node, find the host machine and open its properties&lt;/li&gt; &lt;li&gt;Go to the Delegation tab and check “Trust this computer for delegation to specified services only”&lt;/li&gt; &lt;li&gt;Select “Use any authentication protocol”&lt;/li&gt; &lt;li&gt;In the list of services, click “Add” and find the VMM server computer&lt;/li&gt; &lt;li&gt;When you click OK, a list of services is shown – find the “cifs” service, select it and click ok&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Happy labbing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Lab Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="660d3ef6-f217-4334-aa03-1983000ea12e">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-04-10 11:35:53</date>
+      <content>The port adjustment worked like a charm for me - the issue arose when I installed vCenter on the same server, which took port 443 for one of its own components.</content>
+    </comment>
+  </comments>
+  <viewCount>1714</viewCount>
+</post>

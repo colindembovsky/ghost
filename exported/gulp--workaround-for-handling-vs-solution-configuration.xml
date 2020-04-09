@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>31a9b33f-0671-4edf-85a9-65fa82638079</id>
+  <title>Gulp – Workaround for Handling VS Solution Configuration</title>
+  <slug>gulp--workaround-for-handling-vs-solution-configuration</slug>
+  <shortUrl>http://bit.ly/1IHb0I0</shortUrl>
+  <author></author>
+  <pubDate>2015-01-16 11:30:54</pubDate>
+  <lastModified>2016-06-27 08:53:22</lastModified>
+  <content>&lt;p&gt;We’ve got some &lt;a href="http://www.typescriptlang.org/" target="_blank"&gt;TypeScript&lt;/a&gt; models for our web frontend. If you’re doing any enterprise JavaScript development, then TypeScript is a must. It’s much more maintainable and even gives you some compile-time checking.&lt;/p&gt; &lt;p&gt;Even though TypeScript is a subset of JavaScript, you still need to “compile” the TypeScript into regular JavaScript for your files to be used in a web application. Visual Studio 2013 does this out of the box (you may need to install TypeScript if you’ve never done so). However, what if you want to concat the compiled scripts to reduce requests from the site? Or minify them?&lt;/p&gt; &lt;h2&gt;WebEssentials&lt;/h2&gt; &lt;p&gt;&lt;a href="http://vswebessentials.com/" target="_blank"&gt;WebEssentials&lt;/a&gt; provides functionality like bundling and minification within Visual Studio. The MVC bundling features let you bundle your client side scripts “server side” – so the server takes a bundle file containing a list of files to bundle as well as some settings (like minification) and produces the script file “on-the-fly”. However, if you’re using some over framework, such as &lt;a href="http://nancyfx.org/" target="_blank"&gt;Nancy&lt;/a&gt; – you’re out of luck. Well, not entirely.&lt;/p&gt; &lt;h2&gt;Gulp&lt;/h2&gt; &lt;p&gt;What if you could have a pipeline (think: build engine) that could do some tasks such as concatenation and minification (and other tasks) on client-side scripts? Turns out there is a tool for that – it’s called &lt;a href="http://gulpjs.com/" target="_blank"&gt;Gulp&lt;/a&gt; (there are several other tools in this space too). I’m not going to cover Gulp in much detail in this post – you can look to &lt;a href="http://www.hanselman.com/blog/IntroducingGulpGruntBowerAndNpmSupportForVisualStudio.aspx" target="_blank"&gt;Scott Hanselman’s excellent intro post&lt;/a&gt;. There are also some excellent tools for Visual Studio that support Gulp – notably &lt;a href="https://visualstudiogallery.msdn.microsoft.com/8e1b4368-4afb-467a-bc13-9650572db708" target="_blank"&gt;Task Runner Explorer Extension&lt;/a&gt; (soon to be baked into VS 2015).&lt;/p&gt; &lt;h2&gt;Configurations for Gulp&lt;/h2&gt; &lt;p&gt;After a bit of learning curve, we finally got our Gulp file into a good place – we were able to compile TypeScript to JavaScript, concat the files preserving ordering for dependencies, minify, include source maps and output to the correct directories. We even got this process kicked off as part of our TFS Team build for our web application.&lt;/p&gt; &lt;p&gt;However, I did run into a hitch – configurations. It’s easy enough to specify a configuration (or environment) for Gulp using the NODE_ENV setting from the command line. Just set the value in the CLI you’re using (so “set NODE_ENV Release” for DOS prompt, and “$env:NODE_ENV = ‘Release’” for PowerShell) and invoke gulp. However, it seems that configurations are not yet supported within Visual Studio. I wanted to minify only for Release configurations – and I found there was no obvious way to do this.&lt;/p&gt; &lt;p&gt;I even managed to find a reply to a question on the Task Runner Explorer on VS Gallery where &lt;a href="http://madskristensen.net/" target="_blank"&gt;Mads Krisensen&lt;/a&gt; states there is no configuration support for the extension yet – he says it’s coming though (see &lt;a href="https://visualstudiogallery.msdn.microsoft.com/8e1b4368-4afb-467a-bc13-9650572db708/view/Discussions/2" target="_blank"&gt;here&lt;/a&gt; – look for the question titled “Passing build configuration into Gulp”).&lt;/p&gt; &lt;p&gt;The good news is I managed to find a passable workaround.&lt;/p&gt; &lt;h2&gt;The Workaround&lt;/h2&gt; &lt;p&gt;In my gulp file I have the following lines:&lt;/p&gt;&lt;pre class="brush: js; toolbar: false;"&gt;// set a variable telling us if we're building in release
+var isRelease = true;
+if (process.env.NODE_ENV &amp;amp;&amp;amp; process.env.NODE_ENV !== 'Release') {
+    isRelease = false;
+}
+&lt;/pre&gt;
+&lt;p&gt;This is supposed to grab the value of the NODE_ENV from the environment for me. However, running within the Task Runner Explorer quickly showed me that it was not able to read this value from anywhere.&lt;/p&gt;
+&lt;p&gt;At the top of the Gulp file, there is a /// comment that allows you to bind VS events to the Gulp file – so if you want a task executed before a build, you can set BeforeBuild=’default’ inside the ///. At first I tried to set the environment using “set ENV_NODE $(Configuration)” in the pre-build event for the project, but no dice.&lt;/p&gt;
+&lt;p&gt;Here’s the workaround:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Remove the BeforeBuild binding from the Gulp file (i.e. when you build your solution, the Gulp is not triggered). You can see your bindings in the Task Runner Explorer – you want to make sure “Before Build” and “After Build” are both showing 0:&lt;/li&gt;&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/52d9d0d7-57d9-4c1e-bd63-87e51fe08c0b.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ffdc4f2a-2252-4913-a7d0-ad319441e07d.png" width="212" height="148"&gt;&lt;/a&gt; &lt;/p&gt;&lt;/blockquote&gt;
+&lt;ul&gt;
+&lt;li&gt;Add the following into the Pre-Build event on your Web project Build Events tab:&lt;/li&gt;
+&lt;ul&gt;
+&lt;li&gt;set NODE_ENV=$(ConfigurationName)&lt;/li&gt;
+&lt;li&gt;gulp&lt;/li&gt;&lt;/ul&gt;&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/7708bf5c-ba1a-48b0-add0-2442734925a8.png" width="244" height="117"&gt; &lt;/p&gt;&lt;/blockquote&gt;
+&lt;p&gt;That’s it! Now you can just change your configuration from “Debug” to “Release” in the configuration dropdown in VS and when you build, Gulp will find the correct environment setting. Here you can see I set the config to Debug, the build executes in Debug and Gulp is correctly reading the configuration setting:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b6e9a620-1c68-4d7b-a65a-705f3ec21f79.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/4ed9d16f-af16-4f65-9e4c-1c884c49472b.png" width="461" height="156"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;h3&gt;Caveats&lt;/h3&gt;
+&lt;p&gt;There are always some – in this case only two that I can think of:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;You won’t see the Gulp output in the Task Runner Explorer Window on builds – however, if you use the Runner to invoke tasks yourself, you’ll still see the output. The Gulp output will now appear in the Build output console when you build.&lt;/li&gt;
+&lt;li&gt;If you’ve set a Watch task (to trigger Gulp when you change a TypeScript file, for example) it won’t read the environment setting. For me it’s not a big deal since build is invoked prior to debugging from VS anyway. Also, for our build process I default the value to “release” just in case.&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;Happy gulping!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="6637f185-cac7-4e5f-9119-8015d4155805">
+      <author>CJW</author>
+      <email>charlesjwalker@Hotmail.com</email>
+      <website></website>
+      <ip>104.207.204.2</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.94 Safari/537.36</userAgent>
+      <date>2016-05-16 21:21:16</date>
+      <content>Here&amp;#39;s an alternative that _does_ work with the task runner!&lt;br /&gt;&lt;br /&gt;Step 1:  Add a Pre Build Event to your project, with the following command:&lt;br /&gt;&lt;br /&gt;      echo $(ConfigurationName)&amp;gt;&amp;quot;$(ProjectDir)BuildConfiguration.txt&amp;quot;&lt;br /&gt;&lt;br /&gt;This will create a file in your project dir named &amp;quot;BuildConfiguration.txt&amp;quot;, which will contain the selected build configuration.&lt;br /&gt;&lt;br /&gt;Step 2: Read the first line of BuildConfiguration.txt file at the top of your gulpfile.js&lt;br /&gt;&lt;br /&gt;     var fs = require(&amp;#39;fs&amp;#39;);&lt;br /&gt;     &lt;br /&gt;     // Read the first line from &amp;quot;BuildConfiguration.txt&amp;quot;.&lt;br /&gt;     var buildConfiguration = fs.readFileSync(&amp;quot;BuildConfiguration.txt&amp;quot;, &amp;#39;ascii&amp;#39;).split(/[\n\r] /)[0];</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="610dedf1-6067-4131-9dc6-a9c11948e811">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 08:53:20</date>
+      <content>Thanks @CJW. I generally don&amp;#39;t advise using pre- or post-build steps in the project file since these typically fail or mess up in automated builds on the build server.</content>
+    </comment>
+  </comments>
+  <viewCount>5538</viewCount>
+</post>

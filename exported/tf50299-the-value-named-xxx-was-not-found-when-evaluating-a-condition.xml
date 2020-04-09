@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>d63df9b7-5cc6-4091-b42a-3a8c0c548517</id>
+  <title>TF50299: The value named ‘xxx’ was not found when evaluating a condition</title>
+  <slug>tf50299-the-value-named-xxx-was-not-found-when-evaluating-a-condition</slug>
+  <shortUrl>http://bit.ly/1mfnAql</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-08-15 21:31:00</pubDate>
+  <lastModified>2020-04-04 21:27:24</lastModified>
+  <content>&lt;p&gt;Recently while working at a customer, we configured mail alerts for TFS. We checked that the SMTP server was correct and that we could send mail from the application tiers – everything looked correct, but still there were no mails. &lt;p&gt;In the event log, we found this “helpful” error (note the sarcasm): &lt;p&gt;&lt;font face="Courier New"&gt;ResultMessage : Job extension had an unhandled error: System.Exception: TF50299: The value named '070001' was not found when evaluating a condition.&lt;/font&gt; &lt;p&gt;Unfortunately, there was woefully little information about this error. &lt;p&gt;The Team Project Collection was upgraded from a TFS2008 server, so it inherited a lot of “old” notifications. We eventually scanned the notifications, and found one that had a rather strange clause in it: &lt;p&gt;&lt;font face="Courier New"&gt;… AND ‘070001’ = ‘MyProject’…&lt;/font&gt; &lt;p&gt;It seemed strange to me that there appeared to be value parameters on the left and the right of the = operator – more usual conditions look like &lt;p&gt;&lt;font face="Courier New"&gt;… AND TeamProject = ‘MyProject’…&lt;/font&gt; &lt;p&gt;So we deleted this notification, and suddenly all the mails started coming through. It seems like this exception crashes the notification job completely – it would be nice if it just skipped this notification clause and then continued with the other notifications! &lt;p&gt;Moral of the story – make sure your notifications have properly formed condition clauses!   </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>tfs config</category>
+  </categories>
+  <comments></comments>
+  <viewCount>741</viewCount>
+</post>

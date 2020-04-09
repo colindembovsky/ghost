@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Azure Outage – I was a victim too, dear Reader</title>
+  <slug>azure-outage--i-was-a-victim-too-dear-reader</slug>
+  <shortUrl>http://bit.ly/1yyCsly</shortUrl>
+  <author></author>
+  <pubDate>2014-11-21 14:35:02</pubDate>
+  <lastModified>2015-07-21 11:58:29</lastModified>
+  <content>&lt;p&gt;This morning I went to check on my blog – the very blog you’re busy reading – and I was greeted with a dreaded YSOD (Yellow Screen of Death). What? That can’t be! I haven’t deployed anything since about 10 days ago, so I know it wasn’t my code! What gives?&lt;/p&gt; &lt;p&gt;It turns out that I had some garbled post files. My blog is built on &lt;a href="https://github.com/madskristensen/MiniBlog"&gt;MiniBlog&lt;/a&gt; which stores all posts as xml files. One of the changes I made to my engine is to increment a view counter on each post so that I can track which posts are being hit. I suppose there is some risk in doing this, since there is a lot of writing to the files. Turns out about 6 files in my posts directory were either empty or partially empty – I suspect that IIS was writing the files when &lt;a href="http://azure.microsoft.com/blog/2014/11/19/update-on-azure-storage-service-interruption/"&gt;the outage happened a couple of days ago&lt;/a&gt;. Anyway, turns out MiniBlog isn’t that resilient when the xml files it’s reading are not well-formed xml! That just goes to show you that even though your code has been stable for months, stuff can still go wrong!&lt;/p&gt; &lt;p&gt;So I applied a fix (which moves the broken file out the way and sends me an email with the exception information) and it looks like the site is up again. Although at time of writing, the site is dog slow and I can’t seem to WebDeploy – I’ve had to use FTP to fix the posts and update my code, and I can’t see the files using the Azure SDK File Explorer (though I am able to see the logs, fortunately). I suspect there are still Azure infrastructure problems.&lt;/p&gt; &lt;p&gt;So other than having my counts go wonky, I may have lost a couple of comments. If one of your comments disappeared, Dear Reader, I humbly apologize.&lt;/p&gt; &lt;p&gt;Also, this is my first post from my Surface 3 Pro! Woot!&lt;/p&gt; &lt;p&gt;Happy reading-as-long-as-Azure-stays-up!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>news</category>
+  </categories>
+  <comments></comments>
+  <viewCount>6242</viewCount>
+  <id>877ccf49-570e-4250-8cc4-8be24114dfc2</id>
+</post>

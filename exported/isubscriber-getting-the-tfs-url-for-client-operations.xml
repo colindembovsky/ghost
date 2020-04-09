@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>f3e022ef-88c7-4982-ae2d-1358ded549a9</id>
+  <title>ISubscriber: Getting the TFS Url for Client Operations</title>
+  <slug>isubscriber-getting-the-tfs-url-for-client-operations</slug>
+  <shortUrl>http://bit.ly/1meDCAK</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-12-29 21:03:00</pubDate>
+  <lastModified>2020-04-08 06:36:33</lastModified>
+  <content>&lt;p&gt;Responding to TFS events can be done in (at least) 2 ways: create a SOAP webservice and register with &lt;a href="http://msdn.microsoft.com/en-us/magazine/cc507647.aspx" target="_blank"&gt;bissubscribe&lt;/a&gt; (this works in a “client” fashion) or implement the &lt;a href="http://msdn.microsoft.com/en-us/library/microsoft.teamfoundation.framework.server.isubscriber.aspx" target="_blank"&gt;ISubscriber interface&lt;/a&gt; (in the &lt;a href="http://msdn.microsoft.com/en-us/library/microsoft.teamfoundation.framework.server.aspx" target="_blank"&gt;Microsoft.TeamFoundation.Framework.Server&lt;/a&gt; namespace).&lt;/p&gt; &lt;p&gt;The advantage to the ISubscriber interface implementation is that the plugin can be installed on the TFS server and can also be used to allow or disallow a change (such as a check-in policy). One disadvantage of ISubscribers is that you only get access to a &lt;a href="http://msdn.microsoft.com/en-us/library/microsoft.teamfoundation.framework.server.teamfoundationrequestcontext.aspx" target="_blank"&gt;TeamFoundationRequestContext&lt;/a&gt; object, not a TfsTeamProjectCollection object. This can limit what operations you can perform.&lt;/p&gt; &lt;p&gt;I was working with an ISubscriber and wanted to update a Global List, so I needed a reference to the &lt;a href="http://msdn.microsoft.com/en-us/library/microsoft.teamfoundation.workitemtracking.client.workitemstore.aspx" target="_blank"&gt;WorkItemStore&lt;/a&gt; object. Unfortunately, there was no obvious way to do this from the TeamFoundationRequestContext. I could have hard-coded a TFS url into a config file, but this felt like a cop out to me. So I dug around a little bit more and came up with a solution: the TeamFoundationLocationService (see &lt;a href="http://msdn.microsoft.com/en-us/library/ms252473.aspx" target="_blank"&gt;this article&lt;/a&gt; about TFS services).&lt;/p&gt; &lt;h2&gt;The TeamFoundationLocationService&lt;/h2&gt; &lt;p&gt;You can easily get the TeamFoundationLocationService from the TeamFoundationRequestContext. You can then query the location service to get the url of the TFS server and collection. Once you have that, you can then instantiate a TfsTeamProjectCollection object and use that to get the WorkItemStore. Here’s the code:&lt;/p&gt;&lt;pre class="brush: xml; ruler: true;"&gt;private Uri GetTFSUri(TeamFoundationRequestContext requestContext)&lt;br /&gt;{&lt;br /&gt;    var locationService = requestContext.GetService&lt;TeamFoundationLocationService&gt;();&lt;br /&gt;    return new Uri(locationService.ServerAccessMapping.AccessPoint + "/" + requestContext.ServiceHost.Name);&lt;br /&gt;}&lt;br /&gt;&lt;br /&gt;private WorkItemStore GetWorkItemStore(TeamFoundationRequestContext requestContext)&lt;br /&gt;{&lt;br /&gt;    var uri = GetTFSUri(requestContext);&lt;br /&gt;    var tpc = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(uri);&lt;br /&gt;    return tpc.GetService&lt;WorkItemStore&gt;();&lt;br /&gt;}&lt;br /&gt;&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;Happy subscribing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>ALM</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="3c41e27c-534e-4360-8ea1-3c363cb28af5">
+      <author>Subodh Sohoni</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.ssgsonline.com/aboutus.aspx</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-02-17 22:41:08</date>
+      <content>I was looking for this and did not find it elsewhere. Thanks</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a1e75d95-738d-4289-872a-a4d3d0a44a34">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-06-20 12:50:42</date>
+      <content>Thanks :)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="3d60ae24-3f84-4d3d-b4bc-721fb8886924">
+      <author>Joseph Skeen</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/16242794866947710140</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-08-07 00:32:02</date>
+      <content>I believe this works as well:&lt;br /&gt;&lt;br /&gt;var hyperlinkService = requestContext.GetService&lt;TswaServerHyperlinkService&gt;();&lt;br /&gt;hyperlinkService.GetHomeUrl();</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="0992952c-f148-4c64-8549-75e6081352d6">
+      <author>Anonymous</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-08-21 15:1:36</date>
+      <content>great</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="61eec85a-a2dd-4007-b36b-fb89f68a989d">
+      <author>Pankaj B</author>
+      <email>noreply@blogger.com</email>
+      <website></website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2012-11-02 12:28:14</date>
+      <content>Thanks a lot... this is what I was looking for from past 2 days..... :)</content>
+    </comment>
+  </comments>
+  <viewCount>41460</viewCount>
+</post>

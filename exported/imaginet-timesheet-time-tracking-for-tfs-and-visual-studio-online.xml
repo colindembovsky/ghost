@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Imaginet Timesheet: Time Tracking for TFS and Visual Studio Online</title>
+  <slug>imaginet-timesheet-time-tracking-for-tfs-and-visual-studio-online</slug>
+  <shortUrl>http://bit.ly/1hhfgEQ</shortUrl>
+  <author></author>
+  <pubDate>2014-05-29 19:33:06</pubDate>
+  <lastModified>2015-07-21 09:45:54</lastModified>
+  <content>&lt;p&gt;We’ve been working on a rewrite of our Timetracking tool (formerly Notion Timesheet) and it’s going live today – &lt;a href="http://www.imaginet.com/imaginettimesheet" target="_blank"&gt;Imaginet Timesheet&lt;/a&gt;! Timesheet lets you log time against TFS work items using a web interface. The web site can be installed on any IIS server (if you want to host it on-premises) or even onto Windows Azure Web Sites (WAWS) if you have a public-facing TFS or are using Visual Studio Online. Once you’ve installed it, just log in, select a date-range (week) and a query and start logging time.&lt;/p&gt; &lt;p&gt;It’s free for up to 5 users so you can try it out to see if it works for you and your organization. There are some report samples out-the-box and you can also easily create your own reports using PowerPivot.&lt;/p&gt; &lt;p&gt;We used Entity Framework, MVC, Bootstrap and Knockout to make the site. Most of our JavaScript is typed using TypeScript. Of course we have unit tests (.NET and JavaScript) and a build that builds the installer (Wix) package. It was a fun project to work on and I think we’ve turned out a great product. Download your copy today!&lt;/p&gt; &lt;p&gt;Here’s the overview video:&lt;/p&gt;&lt;iframe height="220" src="http://www.youtube.com/embed/3Z0tSdjnBbY" frameborder="0" width="300" allowfullscreen&gt;&lt;/iframe&gt; &lt;p&gt;&amp;nbsp;&lt;/p&gt; &lt;p&gt;Happy timetracking!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>news</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="d2de019f-2685-4c1a-b606-d3dbd8e69480">
+      <author>Shaunt Kojabashian</author>
+      <email>kojabashians@pacificdentalservices.com</email>
+      <website></website>
+      <ip>207.8.40.130</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2078.0 Safari/537.36</userAgent>
+      <date>2014-07-03 00:4:57</date>
+      <content>I&amp;#39;m having trouble getting the timesheet tracking to work. Everything says it completes fine however, no database is created and i get errors when i visit the page. I&amp;#39;m assuming this is a 64-bit app correct?&lt;br /&gt;&lt;br /&gt;Any ideas... using windows server 2008 R2. IIS 7.&lt;br /&gt;&lt;br /&gt;Thanks.&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;Could not load file or assembly &amp;#39;Microsoft.TeamFoundation.WorkItemTracking.Client.DataStoreLoader&amp;#39; or one of its dependencies. An attempt was made to load a program with an incorrect format. &lt;br /&gt;Description: An unhandled exception occurred during the execution of the current web request. Please review the stack trace for more information about the error and where it originated in the code. &lt;br /&gt;&lt;br /&gt;Exception Details: System.BadImageFormatException: Could not load file or assembly &amp;#39;Microsoft.TeamFoundation.WorkItemTracking.Client.DataStoreLoader&amp;#39; or one of its dependencies. An attempt was made to load a program with an incorrect format.&lt;br /&gt;&lt;br /&gt;Source Error: &lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;An unhandled exception was generated during the execution of the current web request. Information regarding the origin and location of the exception can be identified using the exception stack trace below.&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;Assembly Load Trace: The following information can be helpful to determine why the assembly &amp;#39;Microsoft.TeamFoundation.WorkItemTracking.Client.DataStoreLoader&amp;#39; could not be loaded.&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;WRN: Assembly binding logging is turned OFF.&lt;br /&gt;To enable assembly bind failure logging, set the registry value [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD) to 1.&lt;br /&gt;Note: There is some performance penalty associated with assembly bind failure logging.&lt;br /&gt;To turn this feature off, remove the registry value [HKLM\Software\Microsoft\Fusion!EnableLog].&lt;br /&gt; &lt;br /&gt;&lt;br /&gt;Stack Trace: &lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;[BadImageFormatException: Could not load file or assembly &amp;#39;Microsoft.TeamFoundation.WorkItemTracking.Client.DataStoreLoader&amp;#39; or one of its dependencies. An attempt was made to load a program with an incorrect format.]&lt;br /&gt;   System.Reflection.RuntimeAssembly._nLoad(AssemblyName fileName, String codeBase, Evidence assemblySecurity, RuntimeAssembly locationHint, StackCrawlMark</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ce610d96-a5dd-40c3-9d7e-502b2041b419">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://www.colinsalmcorner.com/</website>
+      <ip>105.226.39.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.143 Safari/537.36</userAgent>
+      <date>2014-08-26 17:44:17</date>
+      <content>Hi Shaunt&lt;br /&gt;&lt;br /&gt;This was a bug in one of our early deployment packages - if you download the latest setup from the site, you will no longer get this error. (By the way, you can run the installer in-place to upgrade your existing install).&lt;br /&gt;&lt;br /&gt;Also, in future email timesheetsupport@imaginet.com for more immediate support!</content>
+    </comment>
+  </comments>
+  <viewCount>7548</viewCount>
+  <id>ddead0a8-9793-4305-aaa9-2f1ee2abb58c</id>
+</post>

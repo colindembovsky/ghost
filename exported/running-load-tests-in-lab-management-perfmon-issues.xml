@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>c4d7be22-4772-4cfc-b912-c41a9d9dcaba</id>
+  <title>Running Load Tests in Lab Management: Perfmon Issues</title>
+  <slug>running-load-tests-in-lab-management-perfmon-issues</slug>
+  <shortUrl>http://bit.ly/1meJc6d</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-05-16 16:59:00</pubDate>
+  <lastModified>2020-04-02 09:04:34</lastModified>
+  <content>&lt;p&gt;I am preparing for the demo at DevDays, and we wanted to run a Load Test using our Lab environment. However, when trying to access the performance counters on the lab machines, I got “Access Denied” errors. That lead to some searching on why this is the case.&lt;/p&gt; &lt;p&gt;To access performance counters on the lab machines, you have to have 2 things in place:&lt;/p&gt; &lt;p&gt;1. The Remote Registry service must be running on each lab machine you want to monitor&lt;/p&gt; &lt;p&gt;2. The user that you’re running VS out of (or the identity of the Test Controller) needs to be an administrator on the lab machines.&lt;/p&gt; &lt;h2&gt;Remote Registry Service&lt;/h2&gt; &lt;p&gt;This one’s easy – open the services snap-in and start the service (set it to start automatically if you want to).&lt;/p&gt; &lt;h2&gt;Permissions&lt;/h2&gt; &lt;p&gt;This one was a little harder. In my lab, I have the computers connecting to a workgroup, so I couldn’t just add notiontraining\colind as an administrator (since the lab machines aren’t on the notiontraining domain, which is the domain I am running on). So I created a local user on each lab machine with the name “colind” and the same password as notiontraining\colind. I then added the local colind user into the local admin group.&lt;/p&gt; &lt;p&gt;Now I can fire up VS on my box (logged in as notiontraining\colind) and can add the performance counters to each lab machine without any issues.&lt;/p&gt; &lt;p&gt;Happy Load Testing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Lab Management</category>
+  </categories>
+  <comments></comments>
+  <viewCount>817</viewCount>
+</post>

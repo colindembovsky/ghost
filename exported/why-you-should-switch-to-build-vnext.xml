@@ -1,0 +1,274 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>6e9734a0-0b2e-4127-8f0d-c5339ea01d47</id>
+  <title>Why You Should Switch to Build VNext</title>
+  <slug>why-you-should-switch-to-build-vnext</slug>
+  <shortUrl>http://bit.ly/1Sn5ss0</shortUrl>
+  <author></author>
+  <pubDate>2015-05-22 13:38:39</pubDate>
+  <lastModified>2017-03-28 05:50:19</lastModified>
+  <content>&lt;p&gt;Now that &lt;a href="http://vsalmdocs.azurewebsites.net/library/vs/alm/build/overview" target="_blank"&gt;VNext builds&lt;/a&gt; are in Preview, you should be moving your build definitions over from the “old” XAML definitions to the new VNext definitions. Besides the fact that I suspect at some point that XAML builds will be deprecated, the VNext builds are just much better, in almost every respect.&lt;/p&gt; &lt;h2&gt;Why Switch?&lt;/h2&gt; &lt;p&gt;There are several great reasons to switch to (or start using) the new VNext builds. Here’s a (non-exhaustive) list of some of my favorites:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;&lt;strong&gt;Build is now an orchestrator, not another build engine.&lt;/strong&gt;This is important – VNext build is significantly different in architecture from the old XAML engine. Build VNext is basically just an orchestrator. That means you can orchestrate whatever build engine (or mechanism) you already have – no need to lose current investments in engines like Ant, CMake, Gradle, Gulp, Grunt, Maven, MSBuild, Visual Studio, Xamarin, XCode or any other existing engine. “Extra” stuff – like integrating with work items, publishing drops and test results and other “plumbing” is handled by Build.VNext.  &lt;li&gt;&lt;strong&gt;Edit build definitions in the Web&lt;/strong&gt;. You no longer have to download, edit or – goodness – learn a new DSL. You can stitch together fairly complex builds right in Web Access.  &lt;li&gt;&lt;strong&gt;Improved Build Reports&lt;/strong&gt;. The build reports are much improved – especially Test Results, which are now visible on the Web (with nary a Visual Studio in sight).  &lt;li&gt;&lt;strong&gt;Improved logging&lt;/strong&gt;. Logging in VNext builds is significantly better – the logs are presented in a console window, and not hidden somewhere obscure.  &lt;li&gt;&lt;strong&gt;Improved Triggers&lt;/strong&gt;. The triggers have been improved – you can have multiple triggers for the same build, including CI triggers (where a checkin/commit triggers the build) and scheduled triggers.  &lt;li&gt;&lt;strong&gt;Improved Retention Policies&lt;/strong&gt;. Besides being able to specify multiple rules, you can now also use “days” to keep builds, rather than “number” of builds. This is great when a build is being troublesome and produces a number of builds – if you were using “number of builds” you’d start getting drop-offs that you don’t really want.  &lt;li&gt;&lt;strong&gt;Composability&lt;/strong&gt;. Composing builds from the Tasks is as easy as drag and drop. Setting properties is a snap, and properties such as “Always Run” make the workflow easy to master.  &lt;li&gt;&lt;strong&gt;Simple Customization&lt;/strong&gt;. Have scripts that you want to invoke? No problem – drag on a “PowerShell” or “Bat” Task. Got a one-liner that needs to execute? No problem – use the “Command Line” task and you’re done. No mess, no fuss.  &lt;li&gt;&lt;strong&gt;Deep Customization&lt;/strong&gt;. If the Tasks aren’t for you, or there isn’t a Task to do what you need, then you can easily create your own.  &lt;li&gt;&lt;strong&gt;Open Source Toolbox&lt;/strong&gt;. Don’t like the way an out-of-the-box Task works? Simply download its source code from the &lt;a href="https://github.com/Microsoft/vso-agent-tasks/" target="_blank"&gt;vso-agent-tasks Github repo&lt;/a&gt;, and fix it! Of course you can share your awesome Tasks once you’ve created them so that the community benefits from your genius (or madness, depending on who you ask!)  &lt;li&gt;&lt;strong&gt;Cross Platform&lt;/strong&gt;. The &lt;a href="https://github.com/Microsoft/vso-agent" target="_blank"&gt;cross-platform agent&lt;/a&gt; will run on Mac or Linux. There’s obviously a windows agent too. That means you can build on whatever platform you need to.  &lt;li&gt;&lt;strong&gt;Git Policies&lt;/strong&gt;. Want to make sure that a build passes before accepting merges into a branch? No problem – set up a VNext build, and then add a Policy to your branch that forces the build to run (and pass) before merges are accepted into the branch (via Pull Requests). Very cool.  &lt;li&gt;&lt;strong&gt;Auditing&lt;/strong&gt;. Build definitions are now stored as JSON objects. Every change to the build (including changing properties) is kept in a history. Not only can you see who changed what when, but you can do side-by-side comparisons of the changes. You can even enter comments as you change the build to help browse history.  &lt;li&gt;&lt;strong&gt;Templating&lt;/strong&gt;. Have a brilliant build definition that you want to use as a template for other builds? No problem – just save your build definition as a template. When you create a new build next time, you can start from the template.  &lt;li&gt;&lt;strong&gt;Deployment&lt;/strong&gt;. You can now easily deploy your assets. This is fantastic for Continuous Delivery – not only can you launch a build when someone checks in (or commits) but you can now also include deployment (to your test rigs, obviously!). Most of the deployment love is for Azure – but since you can create your own Tasks, you can create any deployment-type Task you want.  &lt;li&gt;&lt;strong&gt;Auto-updating agents&lt;/strong&gt;. Agents will auto-update themselves – no need to update every agent in your infrastructure.  &lt;li&gt;&lt;strong&gt;Build Pools and Queues&lt;/strong&gt;. No more limitations on “1 TPC per Build Controller and 1 Controller per build machine”. Agents are xcopyable, and live in a folder. That means you can have as many agents (available to as many pools, queues and TPCs as you want) on any machine. The security and administration of the pools, queues and agents is also better in build vNext.  &lt;li&gt;&lt;strong&gt;Capabilities and Demands&lt;/strong&gt;. Agents will report their “capabilities” to TFS (or VSO). When you create builds, the sum of the capabilities required for each Task is the list of “demands” that the build requires. When a build is queued, TFS/VSO will find an agent that has capabilities that match the demands. A ton of capabilities are auto-discovered, but you can also add your own. For example, I added “gulp = 0.1.3” to my build agent so that any build with a “Gulp” task would know it could run on my agent. This is a far better mechanism of matching agents to builds than the old “Agent Tags”.&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Hopefully you can see that there are several benefits to switching. Just do it! It’s worth noting that there are also Hosted VNext agents, so you can run your VNext builds on the “Hosted” queue too. Be aware though that the image for the agent is “stock”, so it may not work for every build. For example, we’re using TypeScript 1.5 beta, and the hosted agent build only has TypeScript extensions 1.4, so our builds don’t work on the Hosted agents.&lt;/p&gt; &lt;h2&gt;Environment Variables Name Change&lt;/h2&gt; &lt;p&gt;When you use a PowerShell script Task, the script is invoked in a context that includes a number of &lt;a href="http://vsalmdocs.azurewebsites.net/library/vs/alm/build/scripts/variables" target="_blank"&gt;predefined environment variables&lt;/a&gt;. Need access to the build number? No problem – just look up $env.BUILD_BUILDNUMBER. It’s way easier to use the environment variables that to remember how to pass parameters to the scripts. Note – the prefix “TF_” has been dropped – so if you have PowerShell scripts that you were invoking as pre- or post-build or test scripts in older XAML builds, you’ll have to update the names.&lt;/p&gt; &lt;p&gt;Just a quick tip: if you directly access $env.BUILD_BUILDNUMBER in your script, then you have to set the variable yourself before testing the script in a PowerShell console. I prefer to use the value as a default for a parameter – that way you can easily invoke the script outside of Team Build to test it. Here’s an example:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$pathToSearch = $env:BUILD_SOURCESDIRECTORY,
+  [string]$buildNumber = $env:BUILD_BUILDNUMBER,
+  [string]$searchFilter = "VersionInfo.",
+  [regex]$pattern = "\d+\.\d+\.\d+\.\d+"
+)
+ 
+if ($buildNumber -match $pattern -ne $true) {
+    . . .
+}
+&lt;/pre&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;See how I default the $pathToSearch and $buildNumber parameters using the $env variable? Invoking the script myself when testing is then easy – just supply values for the variables explicitly.&lt;/p&gt;
+&lt;h2&gt;Node Packages – Path too Long&lt;/h2&gt;
+&lt;p&gt;I have become a fan of node package manager – npm. Doing some web development recently, I have used it a log. The one thing I have against it (admittedly this is peculiar only to npm on Windows), is that the node_modules path can get very deep – way longer than good ol’ 260 character limit.&lt;/p&gt;
+&lt;p&gt;This means that any Task that does a wild-char search on folders is going to error when there’s a node_modules folder in the workspace. So you have to explicitly specify the paths to files like sln or test (for the VSBuild and VSTest Tasks) respectively – you can’t use the “**/*.sln” path wildcard (**) because it will try to search in the node_modules folder, and will error out when the path gets too long. No big deal – I just specify the path using the repo browser dialog. I was also forced to check “Continue on Error” on the VSBuild Task – the build actually succeeds (after writing a “Path too long” error in the log), but because the Task outputs the “Path too long” error to stderr, the Task fails.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/c44d3dfa-16c9-4752-b24c-05238e17949e.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/8cc692f7-904d-459c-8091-b19b18bde139.png" width="358" height="182"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;EDIT: If you are using npm and run into this problem, you can uncheck “Restore NuGet Packages” (the VSBuild Task internally does a wild-card search for package.config, and this is what is throwing the path too long error as it searches the node_modules folder). You’ll then need to add a “Nuget installer” Task before the VSBuild task and explicitly specify the path to your sln file.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/9e6ee14f-69ca-461a-9072-3d2adb4b363e.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/6b058cfb-ede4-4b1a-a91d-b99b0943517d.png" width="289" height="182"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d398df7e-511d-470d-8ca7-9afcc17026ec.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b7c8345d-5e98-4863-89e8-fb9ddb921303.png" width="304" height="222"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;h2&gt;Migrating from XAML Builds&lt;/h2&gt;
+&lt;p&gt;Migrating may be too generous – you have to re-create your builds. Fortunately, trying to move our build from XAML to VNext didn’t take all that long, even with the relatively large customizations we had – but I was faced with Task failures due to the path limit, and so I had to change the defaults and explicitly specify paths wherever there was a “**/” folder. Also, the npm Task itself has a bug that will soon be fixed – for now I’m getting around that by invoking “npm install” as part of a “Command Line” Task (don’t forget to set the working directory):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d8b0cc35-039e-498d-ab21-95bf5e7a8b88.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/80812162-c566-43a4-b073-7fec889fce6c.png" width="388" height="146"&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;h3&gt;No PreGet Tasks&lt;/h3&gt;
+&lt;p&gt;At first I had npm install before my “UpdateVersion” script – however, the UpdateVersion script searches for files with a matching pattern using Get-ChildItem. Unfortunately, this errors out with “path too long” when it goes into the node_modules directory. No problem, I thought to myself – I’ll just run UpdateVersion before npm install. That worked – but the build still failed on the VSBuild Task. So I set “Continue on Error” on the VSBuild Task – and I got a passing build!&lt;/p&gt;
+&lt;p&gt;I then queued a new build – and the build failed. The build agent couldn’t even get the sources because – well, “Path too long”. Our XAML build actually had a “pre-Pull” script hook so that we could delete the node_modules folder (using RoboCopy which can handle too long paths). However, VNext builds cannot execute Tasks before getting sources. Fortunately Chris Patterson, the build PM, suggested that I run the delete at the end of the build.&lt;/p&gt;
+&lt;p&gt;Initially I thought this was a good idea – but then I thought, “What if the build genuinely fails – like failed tests? Then the ‘delete’ task won’t be run, and I won’t be able to build again until I manually delete the agent’s working folder”. However, when I looked at the Tasks, I saw that there is a “Run Always” checkbox on the Task! So I dropped a PowerShell Task at the end of my build that invokes the “CleanNodeDirs.ps1” script, and check “Always Run” so that even if something else in the build fails, the CleanNodeDirs script always runs. Sweet!&lt;/p&gt;
+&lt;h3&gt;CleanNodeDirs.ps1&lt;/h3&gt;
+&lt;p&gt;To clean the node_modules directory, I initially tried “rm –rf node_modules”. But it fails – guess why? “Path too long”. After searching around a bit, I came across a way to use RoboCopy to delete folders. Here’s the script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$srcDir = $env:BUILD_SOURCESDIRECTORY
+)
+
+try {
+    if (Test-Path(".\empty")) {
+        del .\empty -Recurse -Force
+    }
+    mkdir empty
+
+    robocopy .\empty "$srcDir\src\Nwc.Web\node_modules" /MIR &amp;gt; robo.log
+    del .\empty -Recurse -Force
+    del robo.log -Force
+
+    Write-Host "Successfully deleted node_modules folder"
+    exit 0
+} catch {
+    Write-Error $_
+    exit 1
+}
+&lt;/pre&gt;
+&lt;h2&gt;Build.VNext Missing Tasks&lt;/h2&gt;
+&lt;p&gt;There are a couple of critical Tasks that are still missing:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;No “Associate Work Items” Task 
+&lt;li&gt;No “Create Work Item on Build Failure” Task 
+&lt;li&gt;No “Label sources” Tasks&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;These will no doubt be coming soon. It’s worth working on converting your builds over anyway – when the Tasks ship, you can just drop them into your minty-fresh builds!&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;You really need to be switching over to BuildVNext – even though it’s still in preview, it’s still pretty powerful. The authoring experience is vastly improved, and the Task library is going to grow rapidly – especially since it’s open source. I’m looking forward to what the community is going to come up with.&lt;/p&gt;
+&lt;p&gt;Happy building!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="ea01bf8f-ee26-4aeb-bf40-a9cbf0941aa9">
+      <author>Luke</author>
+      <email>luke.barnett@enlighten.co.nz</email>
+      <website></website>
+      <ip>203.190.215.223</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36</userAgent>
+      <date>2015-06-07 20:30:05</date>
+      <content>How are you getting gulp tasks to run on the windows build agents? The current build agent for windows does&amp;#39;t seem to have a node handler?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="1ea68ada-2346-4878-adc2-3afba2da4986">
+      <author>Mick Letofsky</author>
+      <email>mletofsky@envisiontechnology.com</email>
+      <website></website>
+      <ip>64.207.26.14</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36</userAgent>
+      <date>2015-06-09 17:51:53</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;We are trying to implement a build of an SSIS solution using the Visual Studio Build task. The solution is built in VS 2012 because we have to deploy to SSIS 2012 at a minimum for our various customers. I&amp;#39;ve got the configuration set to point to the VS 2012 location (&amp;quot;C:\Program Files (x86)\Microsoft Visual Studio 11.0\&amp;quot;); however, the build still fails to complete. The errors I see in the log relate to TFS Build.Preview still trying to execute MSBUILD even though I have selected a Visual Studio build. Do you know why this might be happening?&lt;br /&gt;&lt;br /&gt;Thanks!&lt;br /&gt;Mick</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="24ee9555-0898-4d99-8411-92649c000712">
+      <author>perreaultd</author>
+      <email>perreaultd@grics.ca</email>
+      <website></website>
+      <ip>199.84.132.4</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.61 Safari/537.36</userAgent>
+      <date>2015-06-26 17:36:25</date>
+      <content>Great Post! We had a lot of customization within out XAML build process to and encoutered the same &amp;quot;Variable Names changed&amp;quot; with the TF_ removed.&lt;br /&gt;&lt;br /&gt;What&amp;#39;s really missing is to be able to interact with the build past the Staging and Dropping build dont you think?&lt;br /&gt;&lt;br /&gt;It&amp;#39;s way easy to launch scripts during the build process but it doesn&amp;#39;t seem to be a way to launch scripts after the build is dropped in the DropFolder. For deployement for exemple...&lt;br /&gt;&lt;br /&gt;Just the way TfvcTemplate.12.2.xaml would allow with the Pre and PostDrop powershell scripts.&lt;br /&gt;&lt;br /&gt;Have you found a way to do so?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="80d572b2-a076-4ca2-9373-322f7cd99476">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:11:15</date>
+      <content>@Luke - the new build agent definitely can run gulp or any node-based tech. Of course you need to install node on the build machine. The hosted build agent has node as well. You can see the capabilities of the new agent if you view it in the &amp;quot;Build Pool&amp;quot; tab of a Team Project Collection.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5e92e080-149b-4fb2-bdca-b2883a166b18">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:14:06</date>
+      <content>@Mick - if you expand the &amp;quot;Advanced&amp;quot; section of the Visual Studio Build task, there&amp;#39;s a dropdown for the version of VS. Set that to VS2012. You may want to change the version of MSBuild to MSBuild 12.0 as well - I&amp;#39;ve never tried this, so I don&amp;#39;t know for sure.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="d5638e86-b873-4721-a4ca-1465a368adb0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:16:29</date>
+      <content>@perreaultd - You can add a PowerShell script or any other task after &amp;quot;Publish Build Artifacts&amp;quot;. I&amp;#39;ve done this in one of my builds - in fact, once you&amp;#39;ve published build artifacts, the folder &amp;quot;$(agent.BuildDirectory)\artifacts&amp;quot; contains everything that you published - so you can use that folder as a &amp;quot;source&amp;quot; folder to do whatever deployment or post-publish task you need to.&lt;br /&gt;&lt;br /&gt;Good luck!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="40f1fc3b-b707-4e03-9ab4-029bcc697fb8">
+      <author>Matt W</author>
+      <email>mawa316@rcn.com</email>
+      <website></website>
+      <ip>65.78.44.131</ip>
+      <userAgent>Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; WOW64; Trident/6.0)</userAgent>
+      <date>2015-09-29 22:26:02</date>
+      <content>Drawback to VNext...  You can&amp;#39;t control the working folders.  You can set them during the configuration of the Agent, but the process will create various subfolders and not work where you tell it.&lt;br /&gt;&lt;br /&gt;For example, I set the working directory to C:\Src\MyApp, expecting all the work to be done there, mirroring processes if I had compiled through VS itself.  However, what I end up with is something like C:\Src\MyApp\Agent\0324579\...  or something to that effect.&lt;br /&gt;&lt;br /&gt;That hurts and has forced me to stick with XAML for now.  I sure did like what I saw with VNext, it looked much simpler.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="1db57fd6-3a6d-419e-9cd6-03041222b4a5">
+      <author>Aslam</author>
+      <email>mohd.aslam1@gmail.com</email>
+      <website></website>
+      <ip>147.1.28.23</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-10-12 08:12:10</date>
+      <content>TFS 2015 retention not working....&lt;br /&gt;&lt;br /&gt;It is deleting entry from the build summary table but not from the drop location...Please help...</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="d1cae7f3-64fc-4052-bd32-869615e872b9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.233.245</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36</userAgent>
+      <date>2015-10-23 07:43:55</date>
+      <content>Hi @Matt W&lt;br /&gt;&lt;br /&gt;TFS 2015 Update 1 RC 1 allows you to specify the mapping - though it is relative to the working folder of the agent. However, when you install the agent, you can specify the root working folder.&lt;br /&gt;&lt;br /&gt;Also, it&amp;#39;s best practice to ensure that all paths in a solution/project/script are relative, rather than absolute. That way, the absolute path of the root doesn&amp;#39;t matter.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="466b5b0a-4bab-4487-ac40-42fede2d8038">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.233.245</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36</userAgent>
+      <date>2015-10-23 07:44:43</date>
+      <content>Hi @Aslam&lt;br /&gt;&lt;br /&gt;Not sure what else to suggest - you&amp;#39;ll have to try support if you don&amp;#39;t come right.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e3d19ffe-0e0e-4a59-94e1-9239bb723549">
+      <author>Mike</author>
+      <email>mwmorris@crutchfield.com</email>
+      <website></website>
+      <ip>104.129.194.108</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36</userAgent>
+      <date>2015-10-29 13:50:20</date>
+      <content>Hi Colin, thanks for the excellent blog. &lt;br /&gt;&lt;br /&gt;Hope you can give some guidance with an issue I am having.  &lt;br /&gt;&lt;br /&gt;We are switching from TFS2010 to TFS2015 and using the new Build System.  I have been able to use a VS Build task to successfully build a Web site solution using the same .sln file used in VS2015, but I can&amp;#39;t properly orchestrate the VS2015 &amp;#39;Publish Web App&amp;#39; step for the Web app.  The &amp;#39;Publish Web App&amp;#39; works great from VS2015 in deploying to a file share and transforming the Web.config for our development website.&lt;br /&gt;&lt;br /&gt;Thanks for any help you can provide.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="dd10b6e5-48a4-4db5-9963-3fb25dce4931">
+      <author>Suresh Tadisetty</author>
+      <email>sureshtadisetty@hotmail.com</email>
+      <website></website>
+      <ip>167.220.236.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36</userAgent>
+      <date>2015-11-10 13:51:58</date>
+      <content>Hi Colin,&lt;br /&gt;We can add a PowerShell task after PublishArtifacts task, but build status will still be InProgress right? &lt;br /&gt;Previously in XAML builds, status would&amp;#39;ve been updated appropriately Succeeded or WithFailures.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="390dd443-40b8-4fda-bf52-382c2d8fa4bc">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-11-23 08:18:13</date>
+      <content>@Mike&lt;br /&gt;&lt;br /&gt;Thanks for the positive feedback!&lt;br /&gt;&lt;br /&gt;I&amp;#39;m not exactly sure what isn&amp;#39;t working about your web app publishing. You can of course just include some args to MSBuild in the Visual Studio compile step that will publish the web app to a folder. Even better, tell it to use a publish profile and configure that profile in the manner you need. This will include the config transforms. The args will be something like /p:DeployOnBuild=true /p:PublishProfile=pathToProfile.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ff5e556e-0f3f-4780-abfa-b897f0fdecac">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-02 11:21:49</date>
+      <content>Hi @Suresh&lt;br /&gt;&lt;br /&gt;There is no (simple) way to find the test status - you&amp;#39;ll have to actually query the Test Results using the REST API if you want to know what the test status is. See this page: https://www.visualstudio.com/en-us/integrate/api/test/runs&lt;br /&gt;&lt;br /&gt;You&amp;#39;ll want to get all automated runs for the build uri. Then you&amp;#39;ll want to look at the &amp;quot;Get test run statistics&amp;quot; to determine the state of each run.&lt;br /&gt;&lt;br /&gt;I wish there was an easier way!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5edf30ca-b283-47ce-aae2-ce2c5f107e36">
+      <author>David Kuhl</author>
+      <email>dkuhl@olenick.com</email>
+      <website>http://www.olenick.com/</website>
+      <ip>198.232.63.61</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36</userAgent>
+      <date>2016-03-09 22:48:21</date>
+      <content>The problem with vNext is that in TFS 2015 there is a bug.  If you create a vNext build for a CodedUI test it will build just fine.  The build will be created and placed on the share location configured.  The problem is that the Test Lab cannot reach that location.  No matter what the location is, it cannot be reached.  The test agents cannot reach any build created via the vNext build process.  I had this confirmed with Microsoft support.  &lt;br /&gt;&lt;br /&gt;So it&amp;#39;s back to XAML builds for us.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2f857b93-ae5e-4909-9e07-b6b9cde382e2">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:33:46</date>
+      <content>Hi David&lt;br /&gt;&lt;br /&gt;TFS 2015 Update 2 (and VSTS) now have a &amp;quot;Functional Test&amp;quot; task that you can use to run tests (included Coded UI Tests) against machine groups. I&amp;#39;d recommend that you investigate that task. Here&amp;#39;s a link: https://blogs.msdn.microsoft.com/visualstudioalm/2016/03/31/executing-automated-tests-in-build-vnext-using-test-plan-test-suites/</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a7c0a355-5b01-45f5-ad18-a1daeea1d1b7">
+      <author>Link</author>
+      <email>domlinkgos@gmail.com</email>
+      <website></website>
+      <ip>62.48.170.201</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-06 12:1:41</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;First of all, EXCELLENT Blog (no, really, is one of the most useful If not THE most useful font of information for everything regarding tfs2015 and Builds vNext)&lt;br /&gt;&lt;br /&gt;I have a question that, I hope, you can answer with your experience: As @Matt W commented earlier, some of us used to have builds depend on Paths and now it doesn&amp;#39;t seem to be an option.&lt;br /&gt;&lt;br /&gt;However, that doesn&amp;#39;t bother me as I do want to have our paths and builds as &amp;quot;portable&amp;quot; as possible, so it&amp;#39;s cool. Thing is, in XAML we have a separate build that &amp;quot;downloads&amp;quot; the files that other builds will need (as we have a set of &amp;quot;global&amp;quot; files that every build uses (SNK, Code Analysis Rules, etc)) and then the second build (the actual SLN build) will compile with the paths for those files. As we use an environment variable, the paths are the same as the TFS source control one and exactly the same as the Developer&amp;#39;s machine ones.&lt;br /&gt;&lt;br /&gt;Is there a way to implement those &amp;quot;globally used files&amp;quot; in the vNext builds? The &amp;quot;easy&amp;quot; way is to have those files in every team project/solution, but then the updating process of those rules and stuff will be a pain. Maybe a pre-step downloading the files to the root folder of the SLN to be compiled?&lt;br /&gt;&lt;br /&gt;Am I missing an option for this kind of scenarios? Is there a &amp;quot;clean&amp;quot; way of doing this? Or is our approach completely wrong all together?&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;Thanks!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="6b13690a-30dc-42d7-9c0d-502d1203c759">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.115.228</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-04-06 14:4:24</date>
+      <content>Hi @Link&lt;br /&gt;&lt;br /&gt;There are 2 ways to do this: if the files are in the same TPC, then you can simply map the files appropriately in the source mapping (which has improved vastly since 2015 RTM - now in Update 2 you can specify path mappings very granularly just like XAML builds).&lt;br /&gt;&lt;br /&gt;The second method is required if the &amp;quot;common files&amp;quot; are in a separate TPC - you&amp;#39;d need to create a script that you execute as the first step of the build. The script will need to:&lt;br /&gt;1. Create a workspace&lt;br /&gt;2. Map the folders appropriately&lt;br /&gt;3. Check out the files&lt;br /&gt;&lt;br /&gt;You could also parameterize the script to take credentials or source folder or any other parameters that might change from build to build - otherwise just hardcode the script.&lt;br /&gt;&lt;br /&gt;Hope that helps - and thanks for the support!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="18c0ebb4-3c61-4d2c-a72f-ae02a743b076">
+      <author>Jan</author>
+      <email>jw@lundk.de</email>
+      <website></website>
+      <ip>87.184.184.192</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.82 Safari/537.36</userAgent>
+      <date>2016-07-22 14:24:25</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;after reading your article and a few others I decided to try out the new build system. It&amp;#39;s nice but I have a little problem: Our XAML Build did things you need Administrator rights for, i.e. creating Registry Keys in HKLM. I tried to do this with Powershell, but I get AccessDenied errors. Do you know what to do to get elevated rights in Powershell scripts?&lt;br /&gt;&lt;br /&gt;Bye and greetings from germany&lt;br /&gt;Jan</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="a07d18cb-1d6d-432c-b265-40326040e202">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.48.68</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-07-22 14:40:08</date>
+      <content>Hi @Jan&lt;br /&gt;&lt;br /&gt;You simply have to run the agent using an identity with admin privileges. If you don&amp;#39;t want all your builds to do this, then you can create two agents (one privileged and one not) and use &amp;quot;capabilities&amp;quot; and &amp;quot;demands&amp;quot; to route the builds accordingly (like tags in the XAML world). Remember that the new agent is fully self-contained within a folder, so you can install as many as you like on a single machine.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="adbbf0a0-9ec0-4526-b3dc-0c3cbd1b7340">
+      <author>Riant KR</author>
+      <email>riant.kr@gmail.com</email>
+      <website></website>
+      <ip>198.241.159.102</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2016-11-21 14:57:00</date>
+      <content>can we run typemock unit testing in vNext?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="bc45e15f-f8a5-4602-b72a-66816faaa000">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:50:17</date>
+      <content>Hi @Riant&lt;br /&gt;&lt;br /&gt;Yes you certainly can. You can invoke via a script - or you can try this marketplace extension (I haven&amp;#39;t, so I can&amp;#39;t vouch for it): https://marketplace.visualstudio.com/items?itemName=Typemock.Typemock-Tasks</content>
+    </comment>
+  </comments>
+  <viewCount>2937</viewCount>
+</post>

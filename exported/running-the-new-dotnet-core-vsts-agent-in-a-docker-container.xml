@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>73e616a4-0a4a-47a1-a97c-80ecba1f7319</id>
+  <title>Running the New DotNet Core VSTS Agent in a Docker Container</title>
+  <slug>running-the-new-dotnet-core-vsts-agent-in-a-docker-container</slug>
+  <shortUrl>http://bit.ly/2axIC34</shortUrl>
+  <author></author>
+  <pubDate>2016-07-28 18:12:06</pubDate>
+  <lastModified>2017-09-04 07:50:05</lastModified>
+  <content>&lt;p&gt;This week I finally got around to updating my &lt;a href="https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks" target="_blank"&gt;VSTS extension&lt;/a&gt; (which bundle x-plat &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/VersionAssemblies" target="_blank"&gt;VersionAssembly&lt;/a&gt; and &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/ReplaceTokens" target="_blank"&gt;ReplaceTokens&lt;/a&gt; tasks) to use the new &lt;a href="https://github.com/Microsoft/vsts-task-lib" target="_blank"&gt;vsts-task-lib&lt;/a&gt;, which is used by the new &lt;a href="https://github.com/Microsoft/vsts-agent/blob/master/README.md" target="_blank"&gt;DotNet Core vsts-agent&lt;/a&gt;. One of the bonuses of the new agent is that it can run in a DotNet Core Docker container! Since I am running &lt;a href="https://docs.docker.com/docker-for-windows/" target="_blank"&gt;Docker for Windows&lt;/a&gt;, I can now (relatively) easily spin up a test agent in a container to run test – a precursor to running the agent in a container as the &lt;em&gt;de-facto&lt;/em&gt; method of running agents!&lt;/p&gt; &lt;p&gt;All you need to do this is a Dockerfile with a couple of commands that do the following:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Install Git  &lt;li&gt;Create a non-root user and switch to it (since the agent won’t run as root)  &lt;li&gt;Copy the agent tar.gz file and extract it  &lt;li&gt;Configure the agent to connect it to VSTS&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;Pretty simple.&lt;/p&gt; &lt;h2&gt;The Dockerfile&lt;/h2&gt; &lt;p&gt;Let’s take a look at the Dockerfile (which you can find &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/docker" target="_blank"&gt;here in Github&lt;/a&gt;) for an agent container:&lt;/p&gt;&lt;pre&gt;FROM microsoft/dotnet:1.0.0-core
+
+# defaults - override them using --build-arg
+ARG AGENT_URL=://github.com/Microsoft/vsts-agent/releases/download/v2.104.0/vsts-agent-ubuntu.14.04-x64-2.104.0.tar.gz
+ARG AGENT_NAME=docker
+ARG AGENT_POOL=default
+
+# you must supply these to the build command using --build-arg
+ARG VSTS_ACC
+ARG PAT
+
+# install git
+#RUN apt-get update &amp;amp;&amp;amp; apt-get -y install software-properties-common &amp;amp;&amp;amp; apt-add-repository ppa:git-core/ppa
+RUN apt-get update &amp;amp;&amp;amp; apt-get -y install git
+
+# create a user
+RUN useradd -ms /bin/bash agent
+USER agent
+WORKDIR /home/agent
+
+# download the agent tarball
+#RUN curl -Lo agent.tar.gz $AGENT_URL &amp;amp;&amp;amp; tar xvf agent.tar.gz &amp;amp;&amp;amp; rm agent.tar.gz
+COPY *.tar.gz .
+RUN tar xzf *.tar.gz &amp;amp;&amp;amp; rm -f *.tar.gz
+RUN bin/Agent.Listener configure --url https://$VSTS_ACC.visualstudio.com --agent $AGENT_NAME --pool $AGENT_POOL --acceptteeeula --auth PAT --token $PAT --unattended
+
+ENTRYPOINT ./run.sh&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 1: We start with the DotNet Core 1.0.0 image 
+&lt;li&gt;Lines 4-6: We create some arguments and set defaults 
+&lt;li&gt;Lines 9-10: We create some args that don’t have defaults 
+&lt;li&gt;Line 14: Install Git 
+&lt;ul&gt;
+&lt;li&gt;This installs Git 2.1.4 from the official Jesse packages. We should be installing Git 2.9, but the only way to install it from a package source is to add a package source (line 13, which I commented out). Unfortunately apt-add-repository is inside the package software-properties-common, which introduces a lot of bloat to the container which I decided against. The VSTS agent will work with Git 2.1.4 (at least at present) so I was happy to leave it at that.&lt;/li&gt;&lt;/ul&gt;
+&lt;li&gt;Line 17: create a user called agent 
+&lt;li&gt;Line 18: switch to the agent user 
+&lt;li&gt;Line 19: switch to the agent home directory 
+&lt;li&gt;Line 23: Use this to download the tarball as part of building the container. Do it if you have enough bandwidth. I ended up downloading the tarball and putting it in the same directory as the Dockerfile and using Line 24 to copy it to the container 
+&lt;li&gt;Line 24: Extract the tarball and then delete it 
+&lt;li&gt;Line 25: Run the command to configure the agent in an unattended mode. This uses the args supplied through the file or from the docker build command to correctly configure the agent. 
+&lt;li&gt;Line 27: Set an entrypoint – this is the command that will be executed when you run the container.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Pretty straightforward. To build the image, just cd to the Dockerfile folder and download the agent tarball (from &lt;a href="https://github.com/Microsoft/vsts-agent/releases" target="_blank"&gt;here&lt;/a&gt;) if you’re going to use Line 23 (otherwise if you use Line 22, just make sure Line 4 has the latest release URL for Ubuntu 14.04 or use the AGENT_URL arg to supply it when building the image). Then run the following command:&lt;/p&gt;&lt;pre&gt;docker build . --build-arg VSTS_ACC=myVSTSAcc --build-arg PAT=abd64… --build-arg AGENT_POOL=docker –t colin/agent
+&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Mandatory: VSTS_ACC (which is the 1st part of your VSTS account URL – so for &lt;a href="https://myVSTSAcc.visualstudio.com"&gt;https://myVSTSAcc.visualstudio.com&lt;/a&gt; the VSTS_ACC is myVSTSAcc. 
+&lt;li&gt;Mandatory: PAT – your Personal Auth Token 
+&lt;li&gt;Optional: AGENT_POOL – the name of the agent pool you want the agent to register with 
+&lt;li&gt;Optional: AGENT_NAME – the name of the agent 
+&lt;li&gt;Optional: AGENT_URL – the URL to the Ubuntu 14.04 agent (if using Line 22) 
+&lt;li&gt;The –t is the tag argument. I use colin/agent.&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;This creates a new image that is registered with your VSTS account!&lt;/p&gt;
+&lt;p&gt;Now that you have an image, you can simply run it whenever you need your agent:&lt;/p&gt;&lt;pre&gt;&amp;gt; docker run -it colin/agent:latest
+
+Scanning for tool capabilities.
+Connecting to the server.
+2016-07-28 17:56:57Z: Listening for Jobs
+
+&lt;/pre&gt;
+&lt;p&gt;After the docker run command, you should see the agent listening for jobs.&lt;/p&gt;
+&lt;h2&gt;Gotcha – Self-Updating Agent&lt;/h2&gt;
+&lt;p&gt;One issue I did run into is that I had downloaded agent 2.104.0. When the first build runs, the agent checks to see if there’s a new version available. In my case, 2.104.1 was available, so the agent updated itself. It also restarts – however, if it’s running in a container, when the agent stops, the container stops. The build fails with this error message:&lt;/p&gt;
+&lt;p&gt;&lt;font face="Courier New"&gt;The job has been abandoned because agent docker did not renew the lock. Ensure agent is running, not sleeping, and has not lost communication with the service.&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;Running the container again starts it with the older agent again, so you get into a loop. Here’s how to break the loop:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Run &lt;font face="Courier New"&gt;docker run -it --entrypoint=/bin/bash colin/agent:latest&lt;/font&gt; 
+&lt;ol&gt;
+&lt;li&gt;This starts the container but just creates a prompt instead of starting the agent&lt;/li&gt;&lt;/ol&gt;
+&lt;li&gt;In the container, run “&lt;font face="Courier New"&gt;./run.sh&lt;/font&gt;”. This will start the agent. 
+&lt;li&gt;Start a build and wait for the agent to update. Check the version in the capabilities pane in the Agent Queue page in VSTS. The first build will fail with the above “renew lock” error. 
+&lt;li&gt;Run a second build to make sure the agent is working correctly. 
+&lt;li&gt;Now exit the container (by pressing Cntr-C and then typing exit). 
+&lt;li&gt;Commit the container to a new image by running &lt;font face="Courier New"&gt;docker commit --change='ENTRYPOINT ./run.sh' &amp;lt;containerId&amp;gt;&lt;/font&gt; (you can get the containerId by running &lt;font face="Courier New"&gt;docker ps&lt;/font&gt;) 
+&lt;li&gt;Now when you run the container using &lt;font face="Courier New"&gt;docker run –it colin/agent:latest&lt;/font&gt; your agent will start and will be the latest version. From there on, you’re golden!&lt;/li&gt;&lt;/ol&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Overall, I was happy with how (relatively) easy it was to get an agent running in a container. I haven’t yet tested actually compiling a DotNet Core app – that’s my next exercise.&lt;/p&gt;
+&lt;p&gt;Happy Dockering!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>docker</category>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="false" id="2501c3e1-53fd-4b0a-b889-4eb78ec025ab">
+      <author>Dean Proxenos</author>
+      <email>deanp@jse.co.za</email>
+      <website></website>
+      <ip>196.37.61.18</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36</userAgent>
+      <date>2017-09-04 07:50:05</date>
+      <content>How would one go about setting up Test Agent In Docker on-premise TFS not Team Services?</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

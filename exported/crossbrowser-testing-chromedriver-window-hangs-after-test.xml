@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>c50beb53-e089-4ab2-9bde-d0eb2a91c82e</id>
+  <title>CrossBrowser Testing: ChromeDriver Window Hangs after Test</title>
+  <slug>crossbrowser-testing-chromedriver-window-hangs-after-test</slug>
+  <shortUrl>http://bit.ly/1iJaD4R</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2014-01-31 14:07:00</pubDate>
+  <lastModified>2020-04-06 11:44:35</lastModified>
+  <content>&lt;p&gt;I have been doing some coded UI testing and running tests using Chrome (via the &lt;a href="http://visualstudiogallery.msdn.microsoft.com/11cfc881-f8c9-4f96-b303-a2780156628d" target="_blank"&gt;Selenium components&lt;/a&gt;). However, I noticed that when my test completed successfully, the Selenium (ChromeDriver) window stayed open and never terminated. Here’s a code snippet of my original code:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;[TestMethod]
+public void TestTimesheetIsDeployedChrome()
+{
+    BrowserWindow.CurrentBrowser = "chrome";
+
+    var testUrl = ConfigurationManager.AppSettings["TimesheetUrl"];
+    Assert.IsFalse(string.IsNullOrEmpty(testUrl), "Could not find testUrl in App Settings");
+    var window = BrowserWindow.Launch(testUrl);
+
+    UIMap.Login();
+    UIMap.ValidateLogonSuccess();
+    // ...
+    UIMap.LogOff();
+    UIMap.ValidateLogoffSucceeded();
+
+    window.Close();
+}
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;Pretty straight forward. Except that the call to “window.Close();” closed the browser, but not the ChromeDriver command window – so the test never terminated.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-4hs5IJmraW8/UuuSFTZDWzI/AAAAAAAABOI/XdqQxWeJumg/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-vG1XGLrHts8/UuuSGdgHH7I/AAAAAAAABOQ/wTnFZ5Ewv1k/image_thumb%25255B1%25255D.png?imgmax=800" width="321" height="175"&gt;&lt;/a&gt; &lt;/p&gt;&lt;br /&gt;&lt;p&gt;So even though the test passes, I have to manually close the command window before the test run itself terminates.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;After playing around a bit, I came up with this code to kill the command window (this works for Chrome – haven’t tested it for Firefox). Just replace “window.Close()” with this code:&lt;/p&gt;&lt;pre class="brush: csharp;"&gt;// kill the process so we don't lock up - for some reason window.Close() locks
+window.Process.Kill();
+
+var procs = Process.GetProcesses().Where(p =&gt; p.ProcessName.ToLower().Contains("chromedriver"));
+foreach (var p in procs)
+{
+    p.Kill();
+}
+&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;That did it nicely for me (and made my Build-Deploy-Test workflows in my lab terminate correctly).&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Happy (cross-browser) testing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Testing</category>
+  </categories>
+  <comments></comments>
+  <viewCount>7382</viewCount>
+</post>

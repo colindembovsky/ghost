@@ -1,0 +1,297 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>2dd3eb55-32b7-482e-8f05-0091807c8040</id>
+  <title>Aurelia – Debugging from within Visual Studio</title>
+  <slug>aurelia--debugging-from-within-visual-studio</slug>
+  <shortUrl>http://bit.ly/1CUytpV</shortUrl>
+  <author></author>
+  <pubDate>2015-03-24 12:18:06</pubDate>
+  <lastModified>2017-09-23 14:22:04</lastModified>
+  <content>&lt;p&gt;In my last couple of posts I’ve spoken about the amazing Javascript framework, &lt;a href="http://aurelia.io/" target="_blank"&gt;Aurelia&lt;/a&gt;, that I’ve been coding in. Visual Studio is my IDE of choice – not only because I’m used to it but because it’s just a brilliant editor – even for Javascript, Html and other web technologies. If you’re using VS for web development, make sure that you install &lt;a href="http://vswebessentials.com/" target="_blank"&gt;Web Essentials&lt;/a&gt; – as the name implies, it’s essential!&lt;/p&gt; &lt;h2&gt;Debugging&lt;/h2&gt; &lt;p&gt;One of the best things about doing web development in VS – especially if you have a lot of Javascript – is the ability to debug from within VS. You set breakpoints in your script, run your site in IE, and presto! you’re debugging. You can see call-stack, autos, set watches – it’s really great. Unfortunately, until recently I haven’t been able to debug Aurelia projects in VS. We’ll get to why that is shortly – but I want to take a small tangent to talk about console logging in Aurelia. It’s been the lifesaver I’ve needed while I work out why debugging Aurelia wasn’t working.&lt;/p&gt; &lt;h3&gt;Console&lt;/h3&gt; &lt;p&gt;Few developers actually make use of the browser console while developing – which is a shame, since the console is really powerful. The easiest way to see it in action is to open an Aurelia project, locate app.ts (yes, I’m using &lt;a href="http://www.typescriptlang.org" target="_blank"&gt;TypeScript&lt;/a&gt; for my Aurelia development) and add a “console.debug(“hi there!”) to the code:&lt;/p&gt;&lt;pre class="brush: js; highlight: [8];"&gt;import auf = require("aurelia-framework");
+import aur = require("aurelia-router");
+
+export class App {
+    static inject = [aur.Router];
+
+    constructor(private router: aur.Router) {
+        console.log("in constructor");
+        this.router.configure((config: aur.IRouterConfig) =&amp;gt; {
+            config.title = "Aurelia VS/TS";
+            config.map([
+                { route: ["", "welcome"], moduleId: "./views/welcome", nav: true, title: "Welcome to VS/TS" },
+                { route: "flickr", moduleId: "./views/flickr", nav: true },
+                { route: "child-router", moduleId: "./views/child-router", nav: true, title: "Child Router" }
+            ]);
+        });
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;Line 8 is where I add the call to console.log. Here it is in IE’s console when I run the solution:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/bde471f7-6b43-4667-beb3-e268b058e445.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/0325ab1e-3f02-409e-b9b2-049ae6853314.png" width="280" height="315"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;(To access the console in Chrome or in IE, press F12 to bring up “developer tools” – then just open the console tab). Here’s the same view in Chrome:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/4c2d13a9-a1d7-4b06-b070-15b1ab78a389.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/ff0a1081-0847-4f56-8918-de4dd90e43cc.png" width="242" height="368"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;There are a couple of logging methods: log(), info(), warn(), error() and debug(). You can also group entries together and do &lt;a href="https://developer.mozilla.org/en-US/docs/Web/API/Console" target="_blank"&gt;host of other useful debugging tricks&lt;/a&gt;, like timing or logging stack traces.&lt;/p&gt;
+&lt;h3&gt;Logging an Object&lt;/h3&gt;
+&lt;p&gt;Beside simply logging a string message you can also log an object. I found this really useful to inspect objects I was working with – usually VS lets you inspect objects, but since I couldn’t access the object in VS, I did it in the console. Let’s change the “console.log” line to “console.log(“In constructor: %O”, this);” The “%O” argument tells the console to log a hyperlink to the object that you can then use to inspect it. Here is the same console output, this time with “%O” (Note: you have to have the console open for this link to actually expand – otherwise you’ll just see a log entry, but won’t be able to inspect the object properties):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/3265a898-218c-47f5-85a9-549b39c535d1.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/6780660b-6a5c-42e8-95c5-3d9b89e0a879.png" width="239" height="352"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;You can now expand the nodes in the object tree to see the properties and methods of the logged object.&lt;/p&gt;
+&lt;h2&gt;Aurelia Log Appenders&lt;/h2&gt;
+&lt;p&gt;If you’re doing a lot of debugging, then you may end up with dozens of view-models. Aurelia provides a LogManager class – and you can add any LogAppender implementation you want to create custom log collectors. (I do this for &lt;a href="https://github.com/colindembovsky/aurelia-appInsights" target="_blank"&gt;Application Insights&lt;/a&gt; so that you can have Aurelia traces sent up to App Insights). Aurelia also provides an out-of-the-box ConsoleLogAppender. Here’s how you can add it (and set the logging level) – I do this in main.ts just before I bootstrap Aurelia:&lt;/p&gt;&lt;pre class="brush: js;"&gt;auf.LogManager.addAppender(new aul.ConsoleAppender());
+auf.LogManager.setLevel(auf.LogManager.levels.debug);
+&lt;/pre&gt;
+&lt;p&gt;Now we can change the app.ts file to create a logger specifically for the class – anything logged to this will be prepended by the class name:&lt;/p&gt;&lt;pre class="brush: js; highlight: [5,10,13];"&gt;import auf = require("aurelia-framework");
+import aur = require("aurelia-router");
+
+export class App {
+    private logger: auf.Logger = auf.LogManager.getLogger("App");
+
+    static inject = [aur.Router];
+
+    constructor(private router: aur.Router) {
+        this.logger.info("Constructing app");
+
+        this.router.configure((config: aur.IRouterConfig) =&amp;gt; {
+            this.logger.debug("Configuring router");
+            config.title = "Aurelia VS/TS";
+            config.map([
+                { route: ["", "welcome"], moduleId: "./views/welcome", nav: true, title: "Welcome to VS/TS" },
+                { route: "flickr", moduleId: "./views/flickr", nav: true },
+                { route: "child-router", moduleId: "./views/child-router", nav: true, title: "Child Router" }
+            ]);
+        });
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;On line 5 I set up a logger for the class – which I then use in lines 10 and 13. Here’s the console output:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/bac13628-73c8-4136-a409-5369b3fef335.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/54c286ee-544e-41f8-bdf4-8df04426652d.png" width="229" height="312"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;
+&lt;p&gt;You can see how the “info” and the “debug” are colored differently (and info has a little info icon in the left gutter) and both entries are prepended with “[App]” – this makes wading through the logs a little bit easier. Also, when I want to switch the log level, I just set it down to LogManager.levels.error and no more info or debug messages will appear in the console – no need to remove them from the code.&lt;/p&gt;
+&lt;h2&gt;Why Can’t VS Debug Aurelia?&lt;/h2&gt;
+&lt;p&gt;Back to our original problem: debugging Aurelia in Visual Studio. Here’s what happens when you set a breakpoint using the skeleton app:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/8e75e9b7-74fc-4f8f-ab73-2dcc956e5013.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/1b8a2aac-c262-4a71-8665-5e63e70ae9e1.png" width="362" height="225"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Visual Studio says that “No symbols have been loaded for this document”. What gives?&lt;/p&gt;
+&lt;p&gt;The reason is that Visual Studio cannot debug modules loaded using system.js. Let’s look at how Aurelia is bootstrapped in index.html:&lt;/p&gt;&lt;pre class="brush: xml; highlight: [6,7,16];"&gt;&amp;lt;body aurelia-app&amp;gt;
+    &amp;lt;div class="splash"&amp;gt;
+        &amp;lt;div class="message"&amp;gt;Welcome to Aurelia&amp;lt;/div&amp;gt;
+        &amp;lt;i class="fa fa-spinner fa-spin"&amp;gt;&amp;lt;/i&amp;gt;
+    &amp;lt;/div&amp;gt;
+    &amp;lt;script src="jspm_packages/system.js"&amp;gt;&amp;lt;/script&amp;gt;
+    &amp;lt;script src="config.js"&amp;gt;&amp;lt;/script&amp;gt;
+
+    &amp;lt;!-- jquery layout scripts --&amp;gt;
+    &amp;lt;script src="Content/scripts/jquery-1.8.0.min.js"&amp;gt;&amp;lt;/script&amp;gt;
+    &amp;lt;script src="Content/scripts/jquery-ui-1.8.23.min.js"&amp;gt;&amp;lt;/script&amp;gt;
+    &amp;lt;script src="Content/scripts/jquery.layout.min.js"&amp;gt;&amp;lt;/script&amp;gt;
+
+    &amp;lt;script&amp;gt;
+    //System.baseUrl = 'dist';
+    System.import('aurelia-bootstrapper');
+    &amp;lt;/script&amp;gt;
+&amp;lt;/body&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;You can see that system.js is being used to load Aurelia and all its modules – it will also be the loader for your view-models. I’ve pinged the VS team about this – but haven’t been able to get an answer from anyone as to why this is the case.&lt;/p&gt;
+&lt;h2&gt;Switching the Loader to RequireJS&lt;/h2&gt;
+&lt;p&gt;Aurelia (out of the box) uses &lt;a href="http://jspm.io/" target="_blank"&gt;jspm&lt;/a&gt; to load its packages – and it’s a great tool. Unfortunately, for anyone who wants to debug with VS you’ll have to find another module loader. Fortunately Aurelia allows you to swap out your loader! I got in touch with Mike Graham via the &lt;a href="https://gitter.im/Aurelia/Discuss" target="_blank"&gt;Aurelia gitter discussion page&lt;/a&gt; – and he was kind enough to point me in the right direction – thanks Mike!&lt;/p&gt;
+&lt;p&gt;Following some &lt;a href="https://github.com/cmichaelgraham/aurelia-typescript" target="_blank"&gt;examples by Mike Graham&lt;/a&gt;, I was able to switch from system.js to requirejs. The switch is fairly straight-forward – here they are:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Create a bundled require-compatible version of aurelia using &lt;a href="https://github.com/cmichaelgraham/aurelia-typescript/tree/master/aurelia-require-bundle" target="_blank"&gt;Mike’s script&lt;/a&gt; and add it to the solution as a static script file. Updating the file means re-running the script and replacing the aurelia-bundle. Unfortunately this is not as clean an upgrade path as jspm, where you’d just run “jspm update” to update the jspm packages automatically. 
+&lt;li&gt;Change the index.html page to load require.js and then configure it. 
+&lt;li&gt;Make a call to load the Aurelia run-time using requirejs.
+&lt;li&gt;Fix relative paths to views in router configurations – though this may not be required for everyone, depending on how you’re referencing your modules when you set up your routes.&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;Here’s an update index page that uses requirejs:&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;body aurelia-main&amp;gt;
+    &amp;lt;div class="splash"&amp;gt;
+        &amp;lt;div class="message"&amp;gt;Welcome to Aurelia AppInsights Demo&amp;lt;/div&amp;gt;
+        &amp;lt;i class="fa fa-spinner fa-spin"&amp;gt;&amp;lt;/i&amp;gt;
+    &amp;lt;/div&amp;gt;
+
+    &amp;lt;script src="Content/scripts/core-js/client/core.js"&amp;gt;&amp;lt;/script&amp;gt;
+    &amp;lt;script src="Content/scripts/requirejs/require.js"&amp;gt;&amp;lt;/script&amp;gt;
+    &amp;lt;script&amp;gt;
+        var baseUrl = window.location.origin
+        console.debug("baseUrl: " + baseUrl);
+        require.config({
+            baseUrl: baseUrl + "/dist",
+            paths: {
+                aurelia: baseUrl + "/Content/scripts/aurelia",
+                webcomponentsjs: baseUrl + "/Content/scripts/webcomponentsjs",
+                dist: baseUrl + "/dist",
+                views: baseUrl + "/dist/views",
+                resources: baseUrl + "/dist/resources",
+            }
+        });
+
+        require(['aurelia/aurelia-bundle-latest']);
+    &amp;lt;/script&amp;gt;
+&amp;lt;/body&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Now instead of loading system.js, you need to load core.js and require.js. Then I have a script (this could be placed into its own file) which configures requirejs (lines 9-24). I set the baseUrl for requirejs as well as some paths. You’ll have to play with these until requirejs can successfully locate all or your dependencies and view-models. Line 23 then loads the Aurelia runtime bundle via requirejs – this then calls your main or app class, depending on how you configure the &amp;lt;body&amp;gt; tag (either as aurelia-main or aurelia-app).&lt;/p&gt;
+&lt;p&gt;Now that you’re loading Aurelia using requirejs, you can set breakpoints in your ts file (assuming that you’re generating symbols through VS or &lt;a href="https://github.com/colindembovsky/aurelia-appInsights/blob/master/Aurelia-AppInsights/build/tasks/build.js" target="_blank"&gt;through Gulp&lt;/a&gt;/Grunt):&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/7ae8ed76-6aeb-4bd1-8e97-fd9cbf4fc0e8.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; border-bottom: 0px; float: none; margin-left: auto; border-left: 0px; display: block; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/6c81a550-05d3-44ab-887c-3e531eebd888.png" width="448" height="198"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Voila – you can now debug Aurelia using VS!&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;When you’re doing Aurelia development using Visual Studio, you’re going to have to decide between the ease of package update (using jspm) or debugging ability (using requirejs). Using requirejs requires (ahem) a bit more effort since you need to bundle Aurelia manually, and I found getting the requirejs paths correct proved a fiddly challenge too. However, the ability to set breakpoints in your code in VS and debug is, in my opinion, worth the effort. I figure you’re probably not going to be updating the Aurelia framework that often (once it stabilizes after release) but you’ll be debugging plenty. Also, don’t forget to use the console and log appenders! Every tool in your arsenal makes you a better developer.&lt;/p&gt;
+&lt;p&gt;Happy debugging!&lt;/p&gt;
+&lt;p&gt;P.S. If you know how to debug modules that are loaded using system.js from VS, please let the rest of us know!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>development</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="39fae07e-b780-481e-a82e-9be01d8d25c8">
+      <author>Mike Graham</author>
+      <email>mgraham@technicalmedia.com</email>
+      <website>http://github.com/cmichaelgraham</website>
+      <ip>75.145.125.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36</userAgent>
+      <date>2015-03-24 17:12:48</date>
+      <content>nice post, colin !!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="42a9e840-c32a-45ac-bf0e-1d78352765d0">
+      <author>behzad88</author>
+      <email>behzad88.2012@gmail.com</email>
+      <website></website>
+      <ip>37.255.89.121</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0</userAgent>
+      <date>2015-04-03 08:32:14</date>
+      <content>pretty cool , colin ;)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="655cd48d-acb4-4be2-abd8-f581b7c038e0">
+      <author>Veikko Eeva</author>
+      <email>veikko_e@hotmail.com</email>
+      <website></website>
+      <ip>80.223.244.93</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36</userAgent>
+      <date>2015-04-09 19:24:31</date>
+      <content>Excellent! These Aurelia posts with TypeScript and VS are gold with practicalities for web development n00bies! Please, do provide a VS 2013/2015 project sometime too to fiddle around with.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a70e5514-9dd4-436e-8698-69a0223ef454">
+      <author>Veikko Eeva</author>
+      <email>veikko_e@hotmail.com</email>
+      <website></website>
+      <ip>80.223.244.93</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36</userAgent>
+      <date>2015-04-09 19:57:39</date>
+      <content>Ah, I see it&amp;#39;s located at https://github.com/colindembovsky/aurelia-appInsights.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="c02d956f-a3f6-4f78-a7eb-a8e3a5ff1a27">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.229.33.11</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-04-09 20:21:17</date>
+      <content>Glad you&amp;#39;re enjoying the posts @Viekko - and I see you found the github repo! Also make sure you look at Mike Graham&amp;#39;s repos: https://github.com/cmichaelgraham/aurelia-typescript</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="87d981d6-6ae1-4680-b73d-37715efd83f6">
+      <author>Onur</author>
+      <email>onur@outlook.com.tr</email>
+      <website></website>
+      <ip>89.37.97.11</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-05-14 12:57:53</date>
+      <content>Is this post still up to date ? especially  below part of the code?&lt;br /&gt; var baseUrl = window.location.origin&lt;br /&gt;        console.debug(&amp;quot;baseUrl: &amp;quot;   baseUrl);&lt;br /&gt;        require.config({&lt;br /&gt;            baseUrl: baseUrl   &amp;quot;/dist&amp;quot;,&lt;br /&gt;            paths: {&lt;br /&gt;                aurelia: baseUrl   &amp;quot;/Content/scripts/aurelia&amp;quot;,&lt;br /&gt;                webcomponentsjs: baseUrl   &amp;quot;/Content/scripts/webcomponentsjs&amp;quot;,&lt;br /&gt;                dist: baseUrl   &amp;quot;/dist&amp;quot;,&lt;br /&gt;                views: baseUrl   &amp;quot;/dist/views&amp;quot;,&lt;br /&gt;                resources: baseUrl   &amp;quot;/dist/resources&amp;quot;,&lt;br /&gt;            }&lt;br /&gt;        });</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="baf57749-b042-4cb5-9625-57b94715577c">
+      <author>Mark Stega</author>
+      <email>mark@optimiumhealth.com</email>
+      <website>http://www.optimiumhealth.com/</website>
+      <ip>173.67.23.253</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.65 Safari/537.36</userAgent>
+      <date>2015-05-26 20:48:35</date>
+      <content>I found this post referenced from Mike Graham&amp;#39;s aurelia-typescript repo. I am using VS2015RC and TS 1.5 Beta; I thought I was going to solve my inability to debug following the switch to RequireJS. Unfortunately not to be; I still get the &amp;quot;No symbols loaded&amp;quot;.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a2696a91-6a7b-4ed0-adca-510aecea25bf">
+      <author>Thomas Darling</author>
+      <email>mail@thda.dk</email>
+      <website></website>
+      <ip>94.191.184.20</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-06-06 19:56:06</date>
+      <content>For those interrested, this issue is still open over at the system.js github page&lt;br /&gt;https://github.com/systemjs/systemjs/issues/450</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="5202863d-a027-4a37-80e3-79f5524905c5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:18:05</date>
+      <content>@Onur - this post used Aurelia 0.9, so if you have a later version of Aurelia the require config may not be 100%. You&amp;#39;ll have to adjust it.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="ab931fd5-d344-4c5a-b2cb-3e36fc231be1">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:19:08</date>
+      <content>@Mark - the only thing I can recommend is that you check that you&amp;#39;re producing .map files, and then open F12 tools in IE when you debug and make sure that they are being loaded.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="cdd884f4-f996-4899-9c51-9ecc7e41dad6">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:19:19</date>
+      <content>@Thomas - thanks for the link!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e7d39098-12dd-4e32-8ec2-b0a37f1cc4ea">
+      <author>Jeremy</author>
+      <email>jmwnoble@yahoo.co.uk</email>
+      <website></website>
+      <ip>118.209.56.225</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.80 Safari/537.36</userAgent>
+      <date>2015-11-01 07:49:44</date>
+      <content>Reporting here that the issue with VS debugging is now fixed - you can command System.js to load modules via script tags using &amp;quot;meta: { &amp;quot;path/tosource/files&amp;quot;: { scriptLoad: true }} to systemjs config.js.  And as a result scripts are loaded and break points are hit in VS.  Also now  Wallaby.js continuous test-runner uses this functionality to display inline test results and errors.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="fc48da9b-1491-4044-a845-86cea4c2868a">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-11-23 08:30:35</date>
+      <content>Thanks for the great news @Jeremy! Hopefully that means no more hacks to support debugging!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5780b5c7-a110-4d90-a289-44478a95c43a">
+      <author>jesper</author>
+      <email>jkristia@outlook.com</email>
+      <website></website>
+      <ip>99.37.191.142</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10240</userAgent>
+      <date>2015-11-28 14:36:21</date>
+      <content>Do you have a sample app where this is working ?.&lt;br /&gt;&lt;br /&gt;I have tried with the simple angular2 app from angular.io, and when I add the meta tage I get &amp;#39;require is undefined&amp;#39;&lt;br /&gt;&lt;br /&gt;Thanks&lt;br /&gt;Jesper</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9b231189-190c-48f1-9586-d62821b37a59">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-02 11:24:53</date>
+      <content>Hi @Jesper - see Jeremy&amp;#39;s comments on how to configure debugging for VS. I haven&amp;#39;t played with this for some time, and Aurelia is on a far later update than when I posted this article. Try the https://github.com/aurelia/skeleton-navigation repo for a sample, and then use Jeremy&amp;#39;s settings.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="ae6ba66c-88e6-4c9c-adb4-d78cb451ab3d">
+      <author>Eric Doherty</author>
+      <email>nisanempire@yahoo.com</email>
+      <website></website>
+      <ip>24.18.96.119</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36</userAgent>
+      <date>2015-12-17 05:31:41</date>
+      <content>I added the meta section in the config as well and I can debug my Typescript files in Visual studio using IE11 now.  However when I have the meta section in the config.js I get the following error from System.js almost every other time I run the application.  I can run it 5 times in a row and get this error 2-3 times, and no error the other 2 times.&lt;br /&gt;&lt;br /&gt;Error:Module http://localhost:52404/AppTS/Main.js interpreted as amd module format, but called System.register.&lt;br /&gt;&lt;br /&gt;It is weird that the error is not consistent.  Anyone else experiencing this and know of a solution?  Here is a Gist of some of the relevant files https://gist.github.com/anonymous/8cc442d3ee263efa3203.  Also note that my TS.config is set to System.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="0bc35015-c07d-4d67-a370-74f703278d0c">
+      <author>Aurelia developer</author>
+      <email>pr@mobilunity.com</email>
+      <website>https://mobilunity.com/blog/hire-aurelia-developer-in-europe/</website>
+      <ip>77.90.198.86</ip>
+      <userAgent>Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.79 Safari/537.36</userAgent>
+      <date>2017-09-23 14:22:04</date>
+      <content>Great guide, thank you. Aurelia is relevantly a new framework and it’s nice to see there are articles like this one. In addition to this guide, I would like to share a post about the framework. There is not only an overview of Aurelia, but also samples of good CVs and listings of useful skills for such developers. To be able to understand completely what kind of a framework it is and what employers expect from such a developer, you are welcome to read that post. Good luck.</content>
+    </comment>
+  </comments>
+  <viewCount>5090</viewCount>
+</post>

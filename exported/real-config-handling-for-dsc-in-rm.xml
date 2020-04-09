@@ -1,0 +1,339 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <title>Real Config Handling for DSC in RM</title>
+  <slug>real-config-handling-for-dsc-in-rm</slug>
+  <shortUrl>http://bit.ly/1wIxOSY</shortUrl>
+  <author></author>
+  <pubDate>2014-10-30 10:35:49</pubDate>
+  <lastModified>2015-07-21 11:58:29</lastModified>
+  <content>&lt;p&gt;In my &lt;a href="http://colinsalmcorner.com/post/using-webdeploy-in-vnext-releases" target="_blank"&gt;previous post&lt;/a&gt; I showed you how to use PowerShell DSC and Release Management to configure machines and deploy an application. There was one part of the solution that I wasn’t satisfied with, and in the comments section you’ll see that @BigFan picks it up: the configuration is hard-coded.&lt;/p&gt; &lt;h2&gt;cScriptWithParams Resource&lt;/h2&gt; &lt;p&gt;The primary reason I’ve had to hard-code the configuration is that I use the Script resource heavily. Unfortunately the Script resource cannot utilize configuration (or parameters)! I do explain this in my previous post (see the section headed “A Note on Script Resource Parameters”). For a while I tried to write my own custom resource, but eventually abandoned that project. However, after completing my previous post, I decided to have another stab at the problem. And voila! I created a custom Script resource that (elegantly, I think) can be parameterized. You can get it from &lt;a href="https://github.com/colindembovsky/DSC_ColinsALMCorner.com" target="_blank"&gt;GitHub&lt;/a&gt;.&lt;/p&gt; &lt;p&gt;Let’s first look at how to utilize the new resource – I’ll discuss how I created the resource after that.&lt;/p&gt; &lt;h2&gt;Parameterized Scripts&lt;/h2&gt; &lt;p&gt;In my previous solution, the Script resource that executed the Webdeploy command (which deploys my web application) looks like this:&lt;/p&gt; &lt;p&gt;&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Script SetConStringDeployParam
+{
+    GetScript = { @{ Name = "SetDeployParams" } }
+    TestScript = { $false }
+    SetScript = {
+        $paramFilePath = "c:\temp\Site\FabrikamFiber.Web.SetParameters.xml"
+
+        $paramsToReplace = @{
+            "__FabFiberExpressConStr__" = "data source=fabfiberdb;database=FabrikamFiber-Express;User Id=lab;Password=P2ssw0rd"
+            "__SiteName__" = "Default Web Site\FabrikamFiber"
+        }
+
+        $content = gc $paramFilePath
+        $paramsToReplace.GetEnumerator() | % {
+            $content = $content.Replace($_.Key, $_.Value)
+        }
+        sc -Path $paramFilePath -Value $content
+    }
+    DependsOn = "[File]CopyWebDeployFiles"
+}
+&lt;/pre&gt;
+&lt;p&gt;You can see how lines 9 and 10 are hard-coded. Ideally these values should be read from a configuration somewhere.&lt;/p&gt;
+&lt;p&gt;Here’s what the script looks like when you use the cScriptWithParams resource:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;cScriptWithParams SetConStringDeployParam
+{
+    GetScript = { @{ Name = "SetDeployParams" } }
+    TestScript = { $false }
+    SetScript = {
+        $paramFilePath = "c:\temp\Site\FabrikamFiber.Web.SetParameters.xml"
+
+        $paramsToReplace = @{
+            "__FabFiberExpressConStr__" = $conStr
+            "__SiteName__" = $siteName
+        }
+
+        $content = gc $paramFilePath
+        $paramsToReplace.GetEnumerator() | % {
+            $content = $content.Replace($_.Key, $_.Value)
+        }
+        sc -Path $paramFilePath -Value $content
+    }
+    cParams =
+    @{
+        conStr = $conStr;
+        siteName = $siteName;
+    }
+    DependsOn = "[File]CopyWebDeployFiles"
+}
+&lt;/pre&gt;
+&lt;p&gt;Some notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 1: The name of the resource is “cScriptWithParams” – the custom Script resource I created. In order to use this custom resource, you need the line “Import-DscResource -Name cScriptWithParams” at the top of your Configuration script (above the first Node element). 
+&lt;li&gt;Lines 9/10: The values for the connection string and site name are now variables instead of hard-coded 
+&lt;li&gt;Lines 19-23: This is the property that allows you to “pass in” values for the variables. It’s a hash-table of string key-value pairs, where the key is the name of the variable used in any of the Get, Set or Test scripts and the value is the value you want to set the variable to. We could get the values from anywhere – a DSC config file (where we would have $Node.ConStr for example) – in this case it’s from 2 global variables called $conStr and $siteName (we’ll see later where these get specified).&lt;/li&gt;&lt;/ul&gt;
+&lt;h2&gt;Removing Config Files Altogether&lt;/h2&gt;
+&lt;p&gt;Now that we can (neatly) parameterize the custom scripts we want to run, we can use the &lt;a href="http://colinsalmcorner.com/post/new-vnext-config-variable-options-in-rm-update-4-rc" target="_blank"&gt;new config variable options in RM&lt;/a&gt; to completely remove the need for a config file. Of course you could still use the config file if you wanted to. Here’s the final script for deploying my web application:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration FabFibWeb_Site
+{
+    Import-DscResource -Name cScriptWithParams
+
+    Node $ServerName
+    {
+        Log WebServerLog
+        {
+            Message = "Starting Site Deployment. AppPath = $applicationPath."
+        }
+
+        #
+        # Deploy a website using WebDeploy
+        #
+        File CopyWebDeployFiles
+        {
+            Ensure = "Present"         
+            SourcePath = "$applicationPath\_PublishedWebsites\FabrikamFiber.Web_Package"
+            DestinationPath = "c:\temp\Site"
+            Recurse = $true
+            Force = $true
+            Type = "Directory"
+        }
+
+        cScriptWithParams SetConStringDeployParam
+        {
+            GetScript = { @{ Name = "SetDeployParams" } }
+            TestScript = { $false }
+            SetScript = {
+                $paramFilePath = "c:\temp\Site\FabrikamFiber.Web.SetParameters.xml"
+
+                $paramsToReplace = @{
+                    "__FabFiberExpressConStr__" = $conStr
+                    "__SiteName__" = $siteName
+                }
+
+                $content = gc $paramFilePath
+                $paramsToReplace.GetEnumerator() | % {
+                    $content = $content.Replace($_.Key, $_.Value)
+                }
+                sc -Path $paramFilePath -Value $content
+            }
+            cParams =
+            @{
+                conStr = $ConStr;
+                siteName = $SiteName;
+            }
+            DependsOn = "[File]CopyWebDeployFiles"
+        }
+        
+        Script DeploySite
+        {
+            GetScript = { @{ Name = "DeploySite" } }
+            TestScript = { $false }
+            SetScript = {
+                &amp;amp; "c:\temp\Site\FabrikamFiber.Web.deploy.cmd" /Y
+            }
+            DependsOn = "[cScriptWithParams]SetConStringDeployParam"
+        }
+    }
+}
+
+# command for RM
+FabFibWeb_Site
+
+&amp;lt;# 
+#test from command line
+$ServerName = "fabfiberserver"
+$applicationPath = "\\rmserver\builddrops\__ReleaseSite\__ReleaseSite_1.0.0.3"
+$conStr = "testing"
+$siteName = "site Test"
+FabFibWeb
+Start-DscConfiguration -Path .\FabFibWeb -Verbose -Wait
+#&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 3: Importing the custom resource (presumes the custom resource is “installed” locally – see next section for how to do this) 
+&lt;li&gt;Line 5: I leverage the $ServerName variable that RM sets – I don’t have to hard-code the node name 
+&lt;li&gt;Lines 15-23: Copy the Webdeploy files from the build drop location to a local folder (again I use an RM parameter, $applicationPath, which is the drop folder) 
+&lt;li&gt;Lines 25-49: Almost the same Script resource we had before, but subtly changed to handle variables by changing it to a cScriptWithParams resource. 
+&lt;li&gt;Lines 33/34: The hard-coded values have been replaced with variables. 
+&lt;li&gt;Lines 43-47: We need to supply a hash-table of key/value pairs for our parameterized scripts. In this case, we need to supply conStr and siteName. For the values, we pass in $conStr and $siteName, which RM will feed in for us (we’ll specify these on the Release Template itself) 
+&lt;li&gt;Line 64: “Compile” the configuration (into a .mof file) for RM to push to the target server 
+&lt;li&gt;Lines 66-74: If you test this script from the command line, you just create the variables required and execute it. This is exactly what RM does under the hood when executing this script.&lt;/li&gt;&lt;/ul&gt;
+&lt;h3&gt;Using the Script in a Release Template&lt;/h3&gt;
+&lt;p&gt;Now that we have the script, let’s see how we consume it. (Of course it’s checked into source control, along with the Custom Resource, and part of a build so that it ends up in the build drop folder with our application. Of course – goes without saying!)&lt;/p&gt;
+&lt;p&gt;We define the vNext Component the same way we did last time:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/9c1fe5be-55bb-49c4-b51b-eeb6588e82b2.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/3afcf23f-dd5f-4ad5-bbbd-44b91f8da5c2.png" width="489" height="393"&gt;&lt;/a&gt; Nothing magical here – this really just defines the root folder of the build drop for use in the deployment.&lt;/p&gt;
+&lt;p&gt;Next we create the vNext template using our desired vNext release path. On the designer, you’ll see the major difference: we’re defining the variables on the surface itself:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/d1fc2e69-c46c-49a9-8f2c-2ff2e22062ed.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/449bb9ac-2243-451e-945c-160302f3a9ed.png" width="433" height="292"&gt;&lt;/a&gt; Our script uses $ServerName (which you can see is set to fabfiberserver). It also uses ConStr and SiteName (these are the parameter values we specified in lines 44/45 of the above script – $ConStr&amp;nbsp; and $SiteName). Of course if we deploy to another server (say in our production environment) we would simply specify other values for that server.&lt;/p&gt;
+&lt;h2&gt;Deploying a Custom Resource&lt;/h2&gt;
+&lt;p&gt;The final trick is how you deploy the custom resource. To import it using Import-DSCResource, you need to have it in ProgramFiles\WindowsPowerShell\Modules. If you’re testing the script from you workstation, you’ll need to copy it to this path on your workstation. You’ll also need to copy it to that folder on the target server. Sounds like a job for a DSC script with a File resource! Unfortunately it can’t be part of the web application script we created above since it needs to be on the server before you run the Import-DscResource command. No problem – we’ll run 2 scripts on the template. Here’s the script to deploy the custom resource:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Configuration CopyCustomResource
+{
+    Node $ServerName
+    {
+        File CopyCustomResource
+        {
+            Ensure = "Present"
+            SourcePath = "$applicationPath\$modSubFolder\$modName"
+            DestinationPath = "$env:ProgramFiles\WindowsPowershell\Modules\$modName"
+            Recurse = $true
+            Force = $true
+            Type = "Directory"
+        }
+    }
+}
+
+&amp;lt;#
+# test from command line
+$ServerName = "fabfiberserver"
+$applicationPath = "\\rmserver\builddrops\__ReleaseSite\__ReleaseSite_1.0.0.3"
+$modSubfolder = "CustomResources"
+$modName = "DSC_ColinsALMCorner.com"
+#&amp;gt;
+
+# copy the resource locally
+#cp "$applicationPath\$modSubFolder\$modName" $env:ProgramFiles\WindowsPowerShell\Modules -Force -Recurse
+
+# command for RM
+CopyCustomResource
+
+&amp;lt;#
+# test from command line
+CopyCustomResource
+Start-DscConfiguration -Path .\CopyCustomResource -Verbose -Wait
+#&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;This is very straight-forward:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Line 3: Again we’re using RM’s variable so that don’t have to hard-code the node name 
+&lt;li&gt;Lines 5-13: Copy the resource files to the PowerShell modules folder 
+&lt;li&gt;Line 26: Use this to copy the resource locally to your workstation for testing it 
+&lt;li&gt;Line 29: This “compiles” this config file before RM deploys it (and executes it) on the target server 
+&lt;li&gt;Lines 17-23 and 31-35: Uncomment these to run this from the command line for testing&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Here’s how to use the script in a release template:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/3a7e1710-d951-4208-a764-5c178e547b36.png" target="_blank"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/d2e3a8e8-83e9-4c55-9f79-c31ccd2a3b73.png" width="436" height="294"&gt;&lt;/a&gt; By now you should be able to see how this designer is feeding values to the script!&lt;/p&gt;
+&lt;h2&gt;cScriptWithParams: A Look Inside&lt;/h2&gt;
+&lt;p&gt;To make the cScriptWithParams custom resource, I copied the out-of-the-box script and added the cParams hash-table parameter to the Get/Set/Test TargetResource functions. I had some issues with type conversions, so I eventually changed the HashTable to an array of Microsoft.Management.Infrastructure.CimInstance. I then make sure this gets passed to the common function that actually invokes the script (ScriptExecutionHelper). Here’s a snippet from the Get-TargetResource function:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;function Get-TargetResource 
+{
+    [CmdletBinding()]
+     param 
+     (         
+       [parameter(Mandatory = $true)]
+       [ValidateNotNullOrEmpty()]
+       [string]
+       $GetScript,
+  
+       [parameter(Mandatory = $true)]
+       [ValidateNotNullOrEmpty()]
+       [string]$SetScript,
+
+       [parameter(Mandatory = $true)]
+       [ValidateNotNullOrEmpty()]
+       [string]
+       $TestScript,
+
+       [Parameter(Mandatory=$false)]
+       [System.Management.Automation.PSCredential] 
+       $Credential,
+
+       [Parameter(Mandatory=$false)]
+       [Microsoft.Management.Infrastructure.CimInstance[]]
+       $cParams
+     )
+
+    $getTargetResourceResult = $null;
+
+    Write-Debug -Message "Begin executing Get Script."
+ 
+    $script = [ScriptBlock]::Create($GetScript);
+    $parameters = $psboundparameters.Remove("GetScript");
+    $psboundparameters.Add("ScriptBlock", $script);
+    $psboundparameters.Add("customParams", $cParams);
+
+    $parameters = $psboundparameters.Remove("SetScript");
+    $parameters = $psboundparameters.Remove("TestScript");
+
+    $scriptResult = ScriptExecutionHelper @psboundparameters;
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lines 24-26: the extra parameter I added 
+&lt;li&gt;Line 36: I add the $cParams to the $psboundparameters that will be passed to the ScriptExecutionHelper function 
+&lt;li&gt;Line 41: this is the original call to the ScriptExecutionHelper function&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Finally, I customized the ScriptExecutionHelper function to utilize the parameters:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;function ScriptExecutionHelper 
+{
+    param 
+    (
+        [ScriptBlock] 
+        $ScriptBlock,
+    
+        [System.Management.Automation.PSCredential] 
+        $Credential,
+
+        [Microsoft.Management.Infrastructure.CimInstance[]]
+        $customParams
+    )
+
+    $scriptExecutionResult = $null;
+
+    try
+    {
+        $executingScriptMessage = "Executing script: {0}" -f ${ScriptBlock} ;
+        Write-Debug -Message $executingScriptMessage;
+
+        $executingScriptArgsMessage = "Script params: {0}" -f $customParams ;
+        Write-Debug -Message $executingScriptArgsMessage;
+
+        # bring the cParams into memory
+        foreach($cVar in $customParams.GetEnumerator())
+        {
+            Write-Debug -Message "Creating value $($cVar.Key) with value $($cVar.Value)"
+            New-Variable -Name $cVar.Key -Value $cVar.Value
+        }
+
+        if($null -ne $Credential)
+        {
+           $scriptExecutionResult = Invoke-Command -ScriptBlock $ScriptBlock -ComputerName . -Credential $Credential
+        }
+        else
+        {
+           $scriptExecutionResult = &amp;amp;$ScriptBlock;
+        }
+        Write-Debug -Message "Completed script execution"
+        $scriptExecutionResult;
+    }
+    catch
+    {
+        # Surfacing the error thrown by the execution of Get/Set/Test script.
+        $_;
+    }
+}
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lines 11/12: The new “hashtable” of variables 
+&lt;li&gt;Lines 25-30: I use New-Variable to create global variables for each key/value pair in $customParams 
+&lt;li&gt;The remainder of the script is unmodified &lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;The only limitation I hit was the the values &lt;u&gt;must be strings&lt;/u&gt; – I am sure this has to do with the way the values are serialized when a DSC configuration script is “compiled” into a .mof file.&lt;/p&gt;
+&lt;p&gt;As usual, happy deploying!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="9bf2bd37-e643-4f40-9d0e-7719c5c98ca9">
+      <author>BigFan</author>
+      <email>smcfay@gmail.com</email>
+      <website></website>
+      <ip>205.143.205.150</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2014-10-30 13:31:15</date>
+      <content>Awesome work! I&amp;#39;m always amazed by how quick you turn around these solutions. If you haven&amp;#39;t already you should definitely look into submitting this custom resource to the Powershell dot Org DSC community. On top of solving the parameter issue with the Script resource you also solved the issue of how to deploy custom resources to agentless deployers. Thanks and keep up the good work!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e8a418e4-edb2-42ed-bbd1-bf0de319c63d">
+      <author>BiggerFan</author>
+      <email>darren.hull@t-mac.co.uk</email>
+      <website></website>
+      <ip>82.68.224.214</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36</userAgent>
+      <date>2015-01-08 12:47:24</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;Do you know how you could configure a web deploy deployment with DSC for multiple servers using tags?&lt;br /&gt;&lt;br /&gt;Thanks.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="8f42f64e-9d2a-4a56-9473-ccc4cf36f2c7">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:5:28</date>
+      <content>Hi BiggerFan&lt;br /&gt;&lt;br /&gt;To deploy to multiple nodes, you can use PowerShell DSC ConfigurationData. You&amp;#39;d configure a file with nodes, where each node has a role. Then you can target any node with a particular role in your main DSC script rather than targeting a specific node. You&amp;#39;d have to configure the whole deployment (including the WebDeploy) in a DSC script for this to work.&lt;br /&gt;&lt;br /&gt;Here&amp;#39;s a link for you to look at: https://technet.microsoft.com/en-us/library/dn249925.aspx</content>
+    </comment>
+  </comments>
+  <viewCount>6259</viewCount>
+  <id>2f651e25-6374-4511-979b-c23a9fb6406b</id>
+</post>

@@ -1,0 +1,235 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>48fe61fa-9328-4d5c-8f32-e2156fce53e2</id>
+  <title>JSPM, NPM, Gulp and WebDeploy in a TeamBuild</title>
+  <slug>jspm-npm-gulp-and-webdeploy-in-a-teambuild</slug>
+  <shortUrl>http://bit.ly/1DvMGtb</shortUrl>
+  <author></author>
+  <pubDate>2015-03-17 10:00:27</pubDate>
+  <lastModified>2017-05-19 10:30:48</lastModified>
+  <content>&lt;p&gt;I’ve been coding a web project using &lt;a href="http://aurelia.io" target="_blank"&gt;Aurelia&lt;/a&gt; for the last couple of weeks (more posts about what I’m actually doing to follow soon!). Aurelia is an amazing SPA framework invented by Rob Eisenberg (&lt;a href="https://twitter.com/eisenbergeffect" target="_blank"&gt;@EisenbergEffect&lt;/a&gt;).&lt;/p&gt; &lt;h2&gt;JSPM&lt;/h2&gt; &lt;p&gt;Aurelia utilizes &lt;a href="https://www.npmjs.com/" target="_blank"&gt;npm (Node Package Manager)&lt;/a&gt; as well as the relatively new &lt;a href="http://jspm.io/" target="_blank"&gt;jspm&lt;/a&gt; – which is like npm for “browser package management”. In fact Rob and his Aurelia team are working very closely with the jspm team in order to add in functionality that will improve how Aurelia is bundled and packaged – but I digress.&lt;/p&gt; &lt;p&gt;To utilize npm and jspm, you need to specify the dependencies that you have on any npm/jspm packages in a packages.json file. Then you can run “npm install” and “jspm install” and the package managers spring into action pulling down all your dependencies. This works great while you’re developing – but can be a bit strange when you’re deploying with &lt;a href="http://www.hanselman.com/blog/WebDeploymentMadeAwesomeIfYoureUsingXCopyYoureDoingItWrong.aspx" target="_blank"&gt;WebDeploy&lt;/a&gt; (and you should be!)&lt;/p&gt; &lt;p&gt;WebDeploy (out of the box) only packages files that are included in your project. This is what you want for any of your source (or content) files. But you really don’t want to include dependencies in your project (or in source control for that matter) since the package managers are going to refresh the dependencies during the build anyway. That’s the whole point of using Package Managers in the first place! The problem is that when you package your website, none of the dependencies will be included in the package (since they’re not included in the VS project).&lt;/p&gt; &lt;p&gt;There are a couple solutions to this problem:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;You could execute the package manager install commands after you’ve deployed your site via WebDeploy. However, if you’re deploying to &lt;a href="http://azure.microsoft.com/en-us/services/websites/" target="_blank"&gt;WAWS&lt;/a&gt; (or don’t have access to running scripts on the server where your site is hosted) you won’t be able to – and you are going to end up with missing dependencies.  &lt;li&gt;You could include the packages folder in your project. The problem with this is that if you upgrade a package, you’ll end up having to exclude the old package (and its dependencies) and include the new package (and any of its dependencies). You lose the value of using the Package Manager in the first place.  &lt;li&gt;Customize WebDeploy to include the packages folder when creating the deployment package. Now we’re talking!&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;Including Package Folders in WebDeploy&lt;/h2&gt; &lt;p&gt;Of course as I considered this problem I was not happy with either running the Package Manager commands on my hosting servers (in the case of WAWS this isn’t even possible) or including the package files in my project. I then searched out &lt;a href="http://sedodream.com" target="_blank"&gt;Sayed Ibrahim Hashimi’s site&lt;/a&gt; to see what guidance he could offer (he’s a build guru!). I found an old post that explained how to include &lt;a href="http://sedodream.com/2010/03/10/WebDeploymentToolIncludingOtherFiles.aspx" target="_blank"&gt;“extra folders” in web deployment&lt;/a&gt; – however, that didn’t quite work for me. I had to apply the slightly more up-to-date property group specified in &lt;a href="http://www.asp.net/mvc/overview/deployment/visual-studio-web-deployment/deploying-extra-files" target="_blank"&gt;this post&lt;/a&gt;. Sayed had a property group for &amp;lt;CopyAllFilesToSingleFolderFor&lt;u&gt;Package&lt;/u&gt;DependsOn&amp;gt; but you need the same property group for &amp;lt;CopyAllFilesToSingleFolderFor&lt;u&gt;Msdeploy&lt;/u&gt;DependsOn&amp;gt;.&lt;/p&gt; &lt;p&gt;My final customized target to include the jspm package folder in WebDeploy actions is as follows (you can add this to the very bottom of your web project file, just before the closing &amp;lt;/Project&amp;gt; tag):&lt;/p&gt;&lt;pre class="brush: xml;"&gt;&amp;lt;!-- Include the jspm_packages folder when packaging in webdeploy since they are not included in the project --&amp;gt;
+&amp;lt;PropertyGroup&amp;gt;
+  &amp;lt;CopyAllFilesToSingleFolderForPackageDependsOn&amp;gt;
+    CustomCollectFiles;
+    $(CopyAllFilesToSingleFolderForPackageDependsOn);
+  &amp;lt;/CopyAllFilesToSingleFolderForPackageDependsOn&amp;gt;
+
+  &amp;lt;CopyAllFilesToSingleFolderForMsdeployDependsOn&amp;gt;
+    CustomCollectFiles;
+    $(CopyAllFilesToSingleFolderForPackageDependsOn);
+  &amp;lt;/CopyAllFilesToSingleFolderForMsdeployDependsOn&amp;gt;
+&amp;lt;/PropertyGroup&amp;gt;
+
+&amp;lt;Target Name="CustomCollectFiles"&amp;gt;
+  &amp;lt;ItemGroup&amp;gt;
+    &amp;lt;_CustomFiles Include=".\jspm_packages\**\*"&amp;gt;
+      &amp;lt;DestinationRelativePath&amp;gt;%(RecursiveDir)%(Filename)%(Extension)&amp;lt;/DestinationRelativePath&amp;gt;
+    &amp;lt;/_CustomFiles&amp;gt;
+    &amp;lt;FilesForPackagingFromProject Include="%(_CustomFiles.Identity)"&amp;gt;
+      &amp;lt;DestinationRelativePath&amp;gt;jspm_packages\%(RecursiveDir)%(Filename)%(Extension)&amp;lt;/DestinationRelativePath&amp;gt;
+    &amp;lt;/FilesForPackagingFromProject&amp;gt;
+  &amp;lt;/ItemGroup&amp;gt;
+&amp;lt;/Target&amp;gt;
+&lt;/pre&gt;
+&lt;p&gt;Now when I package my site, I get all the jspm packages included.&lt;/p&gt;
+&lt;h2&gt;TeamBuild with Gulp, NPM, JSPM and WebDeploy&lt;/h2&gt;
+&lt;p&gt;The next challenge is getting this all to work on a TeamBuild. Let’s quickly look at what you need to do manually to get a project like this to compile:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Pull the sources from source control 
+&lt;li&gt;Run “npm install” to install the node pacakges 
+&lt;li&gt;Run “jspm install –y” to install the jspm packages 
+&lt;li&gt;(Optionally) Run gulp – in our case this is required since we’re using TypeScript. We’ve got gulp set up to transpile our TypeScript source into js, do minification etc. 
+&lt;li&gt;Build in VS – for our WebAPI backend 
+&lt;li&gt;Publish using WebDeploy (could just be targeting a deployment package rather than pushing to a server)&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;Fortunately, once you’ve installed npm and jspm and gulp globally (using –g) you can create a simple PowerShell script to do steps 2 – 4. The out of the box build template does the rest for you. Here’s my Gulp.ps1 script, which I specify in the “Pre-build script path” property of my TeamBuild Process:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;param(
+    [string]$sourcesDirectory = $env:TF_BUILD_SOURCESDIRECTORY
+)
+
+$webDirectory = $sourcesDirectory + "\src\MyWebProject"
+Push-Location
+
+# Set location to MyWebProject folder
+Set-Location $webDirectory
+
+# refresh the packages required by gulp (listed in the package.json file)
+$res = npm install 2&amp;gt;&amp;amp;1
+$errs = ($res | ? { $_.gettype().Name -eq "ErrorRecord" -and $_.Exception.Message.ToLower().Contains("err") })
+if ($errs.Count -gt 0) {
+    $errs | % { Write-Error $_ }
+    exit 1
+} else {
+    Write-Host "Successfully ran 'npm install'"
+}
+
+# refresh the packages required by jspm (listed in the jspm section of package.json file)
+$res = jspm install -y 2&amp;gt;&amp;amp;1
+$errs = ($res | ? { $_.gettype().Name -eq "ErrorRecord" -and $_.Exception.Message.ToLower().Contains("err") })
+if ($errs.Count -gt 0) {
+    $errs | % { Write-Error $_ }
+    exit 1
+} else {
+    Write-Host "Successfully ran 'jspm install -y'"
+}
+
+# explicitly set the configuration and invoke gulp
+$env:NODE_ENV = 'Release'
+node_modules\.bin\gulp.cmd build
+
+Pop-Location
+&lt;/pre&gt;
+&lt;p&gt;One last challenge – one of the folders (a lodash folder) ends up having a path &amp;gt; 260 characters. TeamBuild can’t remove this folder before doing a pull of the sources, so I had to modify the build template in order to execute a “CleanNodeDirs” command (I implemented this as an optional “pre-pull” script). However, this is a chicken-and-egg problem – if the pull fails because of old folders, then you can’t get the script to execute to clean the folders before the pull… So the logic I wrap the “pre-pull” invocation in an If activity that first checks if the “pre-pull” script exists. If it does, execute it, otherwise carry on.&lt;/p&gt;
+&lt;p&gt;The logic for this is as follows:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;On a clean build (say a first build) the pre-pull script does not exist 
+&lt;li&gt;When the build checks for the pre-pull script, it’s not there – the build continues 
+&lt;li&gt;The build executes jspm, and the offending lodash folder is created 
+&lt;li&gt;The next build initializes, and detects that the pre-pull script exists 
+&lt;li&gt;The pre-pull script removes the offending folders 
+&lt;li&gt;The pull and the remainder of the build can now continue&lt;/li&gt;&lt;/ol&gt;
+&lt;p&gt;Unfortunately straight PowerShell couldn’t delete the folder (since the path is &amp;gt; 260 chars). I resorted to invoking cmd. I repeat it twice since the first time it complains that the folder isn’t empty – running the 2nd time completes the delete. Here’s the script:&lt;/p&gt;&lt;pre class="brush: ps;"&gt;Param(
+  [string]$srcDir = $env:TF_BUILD_SOURCESDIRECTORY
+)
+
+# forcefully remove left over node module folders
+# necessary because the folder depth means paths end up being &amp;gt; 260 chars
+# run it twice since it sometimes complains about the dir not being empty
+# supress errors
+$x = cmd /c "rd $srcDir\src\MyWebProject\node_modules /s /q" 2&amp;gt;&amp;amp;1
+$x = cmd /c "rd $srcDir\src\MyWebProject\node_modules /s /q" 2&amp;gt;&amp;amp;1
+&lt;/pre&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Getting NPM, JSPM, Gulp, WebDeploy and TeamBuild to play nicely is not a trivial exercise. Perhaps vNext builds will make this all easier – I’ve yet to play with it. For now, we’re happy with our current process.&lt;/p&gt;
+&lt;p&gt;Any build/deploy automation can be tricky to set up initially – especially if you’ve got as many moving parts as we have in our solution. However, the effort pays off, since you’ll be executing the build/deploy cycle many hundreds of times over the lifetime of an agile project – each time you can deploy from a single button-press is a win!&lt;/p&gt;
+&lt;p&gt;Happy packaging!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories></categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="3a2b692b-3961-4fc0-a257-cd0c6968279c">
+      <author>Steve Cadwallader</author>
+      <email>steve.cadwallader@gmail.com</email>
+      <website>http://www.codecadwallader.com/</website>
+      <ip>107.147.100.83</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36</userAgent>
+      <date>2015-03-18 01:2:44</date>
+      <content>Very cool post Colin, thanks for sharing. :)  Also thanks for your previous content, I&amp;#39;ve learned a lot through your previous articles.&lt;br /&gt;&lt;br /&gt;I have actually been tackling the same problem with gulp/npm on the build server and publishing via Web Deploy.  If you&amp;#39;re interested, I just published my own approach a couple days ago:&lt;br /&gt;&lt;br /&gt;http://www.codecadwallader.com/2015/03/15/integrating-gulp-into-your-tfs-builds-and-web-deploy/&lt;br /&gt;&lt;br /&gt;The main difference is I did it all through build targets in the .csproj file vs. including PowerShell.  It&amp;#39;s interesting to see your approach too, I hadn&amp;#39;t considered that.  I&amp;#39;d be curious to know what you think about the build targets only approach and if you see any pitfalls with it.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2c32c685-5fe2-4e8c-bff9-6ae5c895bbbc">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.187.16.54</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-18 04:49:30</date>
+      <content>Hi @Steve Cadwallader&lt;br /&gt;&lt;br /&gt;Very cool post - it&amp;#39;s interesting that we&amp;#39;re facing similar challenges :-).&lt;br /&gt;&lt;br /&gt;I think that the main difference in PowerShell vs csproj files is preference. I hate messing with csproj files - and programming in XML is always a pain! I usually have a versioning PowerShell script to match the assembly version to my build number, so since I am invoking a script anyway, that&amp;#39;s where I go for customizing build stuff. I find it easier to change (and test) PowerShell.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="d49da1a0-ffbb-4a10-8018-5149fffe638a">
+      <author>Steve Cadwallader</author>
+      <email>steve.cadwallader@gmail.com</email>
+      <website>http://www.codecadwallader.com/</website>
+      <ip>107.147.100.83</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.89 Safari/537.36</userAgent>
+      <date>2015-03-18 11:37:08</date>
+      <content>That&amp;#39;s a good point about further extensions to the build script and I very much agree.  The csproj file works for a quick and simple invocation of npm/gulp, but any real logic processing I would want to do in something richer like PowerShell as well. :)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="275d567f-f750-4c64-8875-168acae92d6d">
+      <author>Ahmed</author>
+      <email>ahmed.arcan@gmail.com</email>
+      <website></website>
+      <ip>63.174.212.27</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.81 Safari/537.36</userAgent>
+      <date>2015-05-27 16:40:01</date>
+      <content>I want to execute acceptance tests (specflow after deploying to staging environment from release management) any idea how to do that with release managment DSC and powershell ??</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="66816246-d663-4ffe-b526-4e41d3b042b9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.124.88</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-07-09 06:23:16</date>
+      <content>@Ahmed - you don&amp;#39;t want to use PowerShell DSC for running tests. Remember DSC is for state management. While you could use PowerShell to invoke MSTest, Release Management has a Task you can use to execute tests. Take a look at Martin&amp;#39;s post on how to do this: http://nakedalm.com/execute-tests-release-management-visual-studio-2013/</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="a8ba34ab-b1ce-4cca-bc64-45012e4e59ca">
+      <author>Forest</author>
+      <email>forest.marie@gmail.com</email>
+      <website></website>
+      <ip>70.196.141.119</ip>
+      <userAgent>Mozilla/5.0 (Linux; Android 5.1; XT1254 Build/SU3TL-39) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.133 Mobile Safari/537.36</userAgent>
+      <date>2015-08-08 20:26:42</date>
+      <content>Colin - very nicely done.  Was the TFS template you edited the default TFS Build 2013 template (TfvcTemplate 12)?  If so could you update this post with some guidance on modifying the template to run your prepull script?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="edbf2c61-4329-47b6-b61e-b5d4fd490b9b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.31.173</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.10240</userAgent>
+      <date>2015-08-10 06:23:32</date>
+      <content>Hi @Forest&lt;br /&gt;&lt;br /&gt;I just dropped an &amp;quot;Execute Script&amp;quot; task at the top of the workflow. Then execute the script at the end of this post. That should be it!&lt;br /&gt;&lt;br /&gt;Happy building!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="eaa61e4f-c790-4e34-bd25-e31e2ca2e115">
+      <author>Eric</author>
+      <email>nisanempire@yahoo.com</email>
+      <website></website>
+      <ip>198.239.77.118</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36</userAgent>
+      <date>2015-08-27 23:58:13</date>
+      <content>Colin, if you have tried this in the new vNext builds can you post something similar detailing your experiences with it?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="9ee463a6-169f-4dfa-93eb-45b44c9143c3">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.94.153</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-09-21 07:32:25</date>
+      <content>@Eric - I just reused the scripts that I created in build vNext. I even got to dispense with the &amp;quot;pre-pull&amp;quot; logic, since I do the delete of the node_modules folder at the end of the build (I flag it with &amp;quot;Always Run&amp;quot; so that even if compilation fails, the folder is still deleted).&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve also switched to npm 3.3.x which has a flat folder structure, so the &amp;quot;path too long&amp;quot; errors just go away.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="67a88226-efdf-4dd6-9f8d-e3a4642edce8">
+      <author>Steve</author>
+      <email>slandsaw@resurgent.com</email>
+      <website></website>
+      <ip>207.250.204.185</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36</userAgent>
+      <date>2016-08-30 19:30:16</date>
+      <content>Still struggling with how the command to remove the node modules folder is getting executed. I see the $x variable getting set, but I&amp;#39;m not understanding how it actually gets executed?</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="28ffc6a7-32ad-485a-ba17-ede8a6f36199">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>66.192.178.169</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36</userAgent>
+      <date>2016-09-06 15:32:34</date>
+      <content>Hi @Steve&lt;br /&gt;&lt;br /&gt;The $x is just to capture the output of the command. The &amp;quot;cmd /c&amp;quot; is executing (piping stderr to stdout) and then putting any results into the $x variable. This was an attempt to &amp;quot;silence&amp;quot; the output. Does that help?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e9242b2f-7a66-4583-b262-64b6ae57d4fd">
+      <author>Daniel</author>
+      <email>daniel@damar.nl</email>
+      <website></website>
+      <ip>80.113.177.62</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36</userAgent>
+      <date>2016-12-22 15:23:36</date>
+      <content>Is it also possible to run a gulp command when you &amp;#39;Publish&amp;#39; your website from Visual Studio 2015? I do need to be sure my &amp;#39;gulp -production&amp;#39; task always has been executed before I deploy my webproject. Any ideas? -Daniel-</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="6a9f4def-4e94-4f63-9471-4091edad76c5">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>50.106.22.57</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.110 Safari/537.36</userAgent>
+      <date>2017-03-28 05:52:49</date>
+      <content>Hi @Daniel&lt;br /&gt;&lt;br /&gt;In general you should never be publishing from Visual Studio - get your code into source control and use Build/Release to build and release your application. In that scenario, you&amp;#39;d execute a Gulp task as part of the build before invoking Visual Studio to package the website up as a webdeploy package. This package is then pushed to various environments using Release Management. See this post: http://colinsalmcorner.com/post/end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="690adb9c-6665-4cfd-aa46-54bf4d317286">
+      <author>Avinash</author>
+      <email>aninamoh@in.ibm.com</email>
+      <website></website>
+      <ip>125.16.236.151</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; rv:45.0) Gecko/20100101 Firefox/45.0</userAgent>
+      <date>2017-05-19 10:30:48</date>
+      <content>Hi Colin,&lt;br /&gt;I have added the code for npm packaging before &amp;lt;/project&amp;gt; tag in my .csproj file at the end. But, when the PowerShell script is used to deploy the code files to deployment server the gulp files are not uploaded into it. All the files are uploaded except type script and gulp files. Please help me for the same. &lt;br /&gt;&lt;br /&gt;Thanks and Regards,&lt;br /&gt;Avinash.</content>
+    </comment>
+  </comments>
+  <viewCount>4588</viewCount>
+</post>

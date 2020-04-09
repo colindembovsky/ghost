@@ -1,0 +1,361 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>370cc512-abdc-4eda-8df2-945babb088fd</id>
+  <title>Developing a Custom Build vNext Task: Part 2</title>
+  <slug>developing-a-custom-build-vnext-task-part-2</slug>
+  <shortUrl>http://bit.ly/1J78jjP</shortUrl>
+  <author></author>
+  <pubDate>2015-08-20 15:32:51</pubDate>
+  <lastModified>2016-09-06 15:33:25</lastModified>
+  <content>&lt;p&gt;In &lt;a href="http://colinsalmcorner.com/post/developing-a-custom-build-vnext-task-part-1" target="_blank"&gt;part 1&lt;/a&gt; I showed you how to scaffold a task using &lt;a href="https://github.com/microsoft/tfs-cli" target="_blank"&gt;tfx-cli&lt;/a&gt;, how to customize the manifest and how to implement the PowerShell script for my &lt;a href="https://github.com/colindembovsky/cols-agent-tasks/tree/master/Tasks/VersionAssemblies" target="_blank"&gt;VersionAssemblies task&lt;/a&gt;. In this post I’ll show you how I went about developing the Node version of the task and how I uploaded the completed task to my TFS server.&lt;/p&gt; &lt;h3&gt;VS Code&lt;/h3&gt; &lt;p&gt;I chose to use &lt;a href="https://code.visualstudio.com/" target="_blank"&gt;VS Code&lt;/a&gt; as the editor for my tasks. Partly because I wanted to become more comfortable using VS Code, and partly because the task doesn’t have a project file – it’s just some files in a folder – perfect for VS Code. If you’re unfamiliar with VS Code, then I highly recommend this &lt;a href="https://channel9.msdn.com/Events/Visual-Studio/Visual-Studio-2015-Final-Release-Event/Introducing-Visual-Studio-Code" target="_blank"&gt;great intro video by Chris Dias&lt;/a&gt;.&lt;/p&gt; &lt;h2&gt;Restructure and Initialize a Git Repo&lt;/h2&gt; &lt;p&gt;It was time to get serious. I wanted to publish the task to a &lt;a href="http://github.com/colindembovsky/cols-agent-tasks" target="_blank"&gt;Git repo&lt;/a&gt;, so I decided to reorganize a little. I wanted the root of my repo to have a README.md file and then have a folder per task. Each task should also have a markdown file. So I created a folder called cols-agent-tasks and moved the VersionAssemblies task into a subfolder called Tasks. Then I initialized the Git repo.&lt;/p&gt; &lt;p&gt;Next I right clicked on my cols-agent-tasks folder and selected “Open with Code” to open the folder. Here’s how it looked:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/92b3709e-e900-4c30-bb25-4436a22094a4.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/707326d1-4148-4914-b0e0-ccb05ad44da9.png" width="218" height="244"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;See the Git icon on the left? Clicking on it allows you to enter a commit message and commit. You can also diff files and undo changes. Sweet.&lt;/p&gt; &lt;h3&gt;Installing Node Packages&lt;/h3&gt; &lt;p&gt;I knew that the VSO agent has a client library (vso-task-lib) from looking at the out of the box tasks in the &lt;a href="http://github.com/microsoft/vso-agent-tasks" target="_blank"&gt;vso-agent-tasks repo&lt;/a&gt;. I wanted to utilize that in my node task. The task lib is a node package, and so I needed to pull the package down from npm. So I opened up a PowerShell prompt and did an “npm init” to initialize a package.json file (required for npm) and walked through the wizard:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/9b52599a-c895-44da-86c2-8a08ac9cf503.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/34b1890b-acdd-4e77-a7e1-742e2eb275c8.png" width="301" height="230"&gt;&lt;/a&gt;Since I chose MIT for the license, I added a license file too.&lt;/p&gt; &lt;p&gt;Now that the package.json file was initialized, I could run “npm install vso-task-lib –-save-dev” to install the vso-task-lib and save it as a dev dependency (since it’s not meant to be bundled with the completed task):&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/11c7de5b-945d-4e5a-ae50-b52ed1e28fcd.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/d82d3c94-4312-4e2a-aab7-afde0040c87e.png" width="370" height="33"&gt;&lt;/a&gt;The command also installed the q and shelljs libraries (which are dependencies for the vso-task-lib). I also noticed that a node_modules folder had popped up (where the packages are installed) and double checked that my .gitignore was in fact ignoring this folder (since I don’t want these packages committed into my repo). &lt;/p&gt; &lt;h3&gt;TypeScript Definitions Using tsd&lt;/h3&gt; &lt;p&gt;I was almost ready to start diving into the code – but I wanted to make sure that VS Code gave me intellisense for the task library (and other libs). So I decided to play with &lt;a href="https://www.npmjs.com/package/tsd" target="_blank"&gt;tsd&lt;/a&gt;, a node TypeScript definition manager utility. I installed it by running “npm install tsd –g” (the –g is for global, since its a system-wide util). Once its installed, you can run “tsd” to see what you can do with the tool.&lt;/p&gt; &lt;p&gt;I first ran “tsd query vso-task-lib” to see if there is a TypeScript definition for vso-agent-lib. The font color was a bit hard to see, but I saw “zero results”. Bummer – the definition isn’t on &lt;a href="https://github.com/borisyankov/DefinitelyTyped" target="_blank"&gt;DefinitelyTyped&lt;/a&gt; yet. So what about q and shelljs? Both of them returned results, so I installed them (using the –-save option to save the definitions I’m using to a json file):&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/0e2ce84a-8c85-4db7-aa2e-e5998c443c03.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/bff49cbf-5c12-4fee-8206-0b4087790bf6.png" width="355" height="178"&gt;&lt;/a&gt; &lt;/p&gt; &lt;p&gt;On disk I could see a couple new files:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;The “typings” folder with the definitions as well as a “global” definition file, tsd.d.ts, including q and shelljs (and node, which is installed when you install the type definition for shelljs)  &lt;li&gt;A tsd.json file in the root (which aggregates all the definitions)&lt;/li&gt;&lt;/ul&gt; &lt;p&gt;Opening the versionAssemblies.js file, I was able to see intellisense for q, shelljs and node:&lt;/p&gt; &lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/dc320053-6317-443b-9edd-27640386d955.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/f5450ec7-85d5-475c-a7ec-1a12311a4c6c.png" width="295" height="271"&gt;&lt;/a&gt;So what about the vso-task-lib? Since there was no definition on definitely typed, I had to import it manually. I copied the vso-task-lib.d.ts from the Microsoft repo into a folder called vso-task-lib in the typings folder and then updated the tsd.d.ts file adding another reference to this definition file. I also ended up declaring the vso-task-lib (since it doesn’t actaully declare an export) so that the imports worked correctly. Here’s the tsd.d.ts file:&lt;/p&gt;&lt;pre class="brush: js;"&gt;/// &amp;lt;reference path="q/Q.d.ts" /&amp;gt;
+/// &amp;lt;reference path="node/node.d.ts" /&amp;gt;
+/// &amp;lt;reference path="vso-task-lib/vso-task-lib.d.ts" /&amp;gt;
+/// &amp;lt;reference path="shelljs/shelljs.d.ts" /&amp;gt;
+
+declare module "vso-task-lib" {
+    export = VsoTaskLib;
+}
+&lt;/pre&gt;
+&lt;h3&gt;Coverting versionAssemblies.js to TypeScript&lt;/h3&gt;
+&lt;p&gt;Things were looking good! Now I wanted to convert the versionAssemblies.js file to TypeScript. I simply changed the extension from js to ts, and I was ready to start coding in TypeScript. But of course TypeScript files need to be transpiled to Javascript, so I hit “Ctrl-Shift-B” (muscle memory). To my surprise, VS Code informed me that there was “No task runner configured”.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/7c2d2b09-b024-4de1-83f1-5f8ef5a053fa.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/12b7971b-2895-41ed-9928-3bce045109fd.png" width="538" height="33"&gt;&lt;/a&gt;So I clicked on “Configure Task Runner” and VS Code created a .settings folder with a tasks.json file. There were some boilerplate examples of how to configure the task runner. After playing around a bit, I settled on the second example – which supposedly runs TypeScript using a tfconfig.json in the root folder:&lt;/p&gt;&lt;pre class="brush: js;"&gt;{
+    "version": "0.1.0",
+
+    // The command is tsc. Assumes that tsc has been installed using npm install -g typescript
+    "command": "tsc",
+
+    // The command is a shell script
+    "isShellCommand": true,
+
+    // Show the output window only if unrecognized errors occur.
+    "showOutput": "silent",
+
+    // Tell the tsc compiler to use the tsconfig.json from the open folder.
+    "args": ["-p", "."],
+
+    // use the standard tsc problem matcher to find compile problems
+    // in the output.
+    "problemMatcher": "$tsc"
+}
+&lt;/pre&gt;
+&lt;p&gt;Now I had to create a tsconfig.json file in the root, which I did. VS Code knows what to do with json files, so I just opened a { and was pleasantly surprised with schema intellisense for this file!&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/4809b3c0-27c8-43ed-af1d-c21049799a43.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/e8ab72b6-efd4-4a2a-bea1-3ef960d0de13.png" width="362" height="225"&gt;&lt;/a&gt; I configured the “compilerOptions” and set the module to “commonjs”. Now pressing “Ctrl-Shift-B” invokes the task runner which transpiles my TypeScript file to Javascript – I saw the .js file appear on disk. Excellent! Setting sourceMaps to true will provide source mapping so that I can later debug.&lt;/p&gt;
+&lt;p&gt;One caveat – the build doesn't automatically happen when you save a TypeScript file. You can configure &lt;a href="http://raathigesh.com/TypeScript-Development-in-VS-Code-with-Gulp/" target="_blank"&gt;gulp and then enable a watch&lt;/a&gt; so that when you change a TypeScript file the build kicks in – but I decided that was too complicated for this project. I just configured the keyboard shortcut “Ctrl-s” to invoke “workbench.action.tasks.build” in addition to saving the file (you can configure keyboard shortcuts by clicking File-&amp;gt;Preferences-&amp;gt;Keyboard Shortcuts. Surprise surprise it’s a json file…)&lt;/p&gt;
+&lt;h2&gt;Implementing the Build Task&lt;/h2&gt;
+&lt;p&gt;Everything I’d done so far was just setup stuff. Now I was ready to actually code the task!&lt;/p&gt;
+&lt;p&gt;Here’s the complete script:&lt;/p&gt;&lt;pre class="brush: js;"&gt;import * as tl from 'vso-task-lib';
+import * as sh from 'shelljs';
+
+tl.debug("Starting Version Assemblies step");
+
+// get the task vars
+var sourcePath = tl.getPathInput("sourcePath", true, true);
+var filePattern = tl.getInput("filePattern", true);
+var buildRegex = tl.getInput("buildRegex", true);
+var replaceRegex = tl.getInput("replaceRegex", false);
+
+// get the build number from the env vars
+var buildNumber = tl.getVariable("Build.BuildNumber");
+
+tl.debug(`sourcePath :${sourcePath}`);
+tl.debug(`filePattern : ${filePattern}`);
+tl.debug(`buildRegex : ${buildRegex}`);
+tl.debug(`replaceRegex : ${replaceRegex}`);
+tl.debug(`buildNumber : ${buildNumber}`);
+
+if (replaceRegex === undefined || replaceRegex.length === 0){
+    replaceRegex = buildRegex;
+}
+tl.debug(`Using ${replaceRegex} as the replacement regex`);
+
+var buildRegexObj = new RegExp(buildRegex);
+if (buildRegexObj.test(buildNumber)) {
+    var versionNum = buildRegexObj.exec(buildNumber)[0];
+    console.info(`Using version ${versionNum} in folder ${sourcePath}`);
+    
+    // get a list of all files under this root
+    var allFiles = tl.find(sourcePath);
+
+    // Now matching the pattern against all files
+    var filesToReplace = tl.match(allFiles, filePattern, { matchBase: true });
+    
+    if (filesToReplace === undefined || filesToReplace.length === 0) {
+        tl.warning("No files found");
+    } else {
+        for(var i = 0; i &amp;lt; filesToReplace.length; i++){
+            var file = filesToReplace[i];
+            console.info(`  -&amp;gt; Changing version in ${file}`);
+            
+            // replace all occurrences by adding g to the pattern
+            sh.sed("-i", new RegExp(replaceRegex, "g"), versionNum, file);
+        }
+        console.info(`Replaced version in ${filesToReplace.length} files`);
+    }
+} else {
+    tl.warning(`Could not extract a version from [${buildNumber}] using pattern [${buildRegex}]`);
+}
+
+tl.debug("Leaving Version Assemblies step");
+&lt;/pre&gt;
+&lt;p&gt;Notes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Lines 1-2: import the library references 
+&lt;li&gt;Line 4: using the task library to log to the console 
+&lt;li&gt;Lines 6-13: using the task library to get the inputs (matching names from the task.json file) as well as getting the build number from the environment 
+&lt;li&gt;Lines 15-19: more debug logging 
+&lt;li&gt;Lines 21-23: default the replace regex to the build regex if the value is empty 
+&lt;li&gt;Line 26: compile the regex pattern into a regex object 
+&lt;li&gt;Line 27: test the build number to see if we can extract a version number using the regex pattern 
+&lt;li&gt;Lines 28-29: extract the version number from the build number and write the value to the console 
+&lt;li&gt;Line 32: get a list of all files in the sourcePath (recursively) using the task library method 
+&lt;li&gt;Line 35: filter the files to match the filePattern input, again using a task library method 
+&lt;li&gt;Lines 37-38: check if there are files that match – warn if there aren’t any 
+&lt;li&gt;Line 40: for each file that matches, 
+&lt;li&gt;Lines 41-45: use shelljs’s sed() method to do the regex replacement inline 
+&lt;li&gt;Line 45: I use the “g” option when compiling the regex to indicate that all matches should be replaced (as opposed to just the 1st match) 
+&lt;li&gt;Line 47: log to the console how many files were updated 
+&lt;li&gt;The remainder is just logging&lt;/li&gt;&lt;/ul&gt;
+&lt;p&gt;Using the task library really made developing the task straightforward. The setup involved in getting intellisense to work was worth the effort!&lt;/p&gt;
+&lt;h3&gt;Debugging from VS Code&lt;/h3&gt;
+&lt;p&gt;Now that I had the code written, I wanted to test it. VS Code to the rescue again! Click on the “debug” icon on the left, and then click the gear icon at the top of the debug pane:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b67e1e31-d578-4db5-928e-686b99c6f489.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b0fbe679-4cab-44de-ac8c-542958f03f95.png" width="324" height="231"&gt;&lt;/a&gt;That creates a new file called launch.json in the .settings folder. What – a json file? Who would have guessed! Here’s my final file:&lt;/p&gt;&lt;pre class="brush: js; highlight: [8,12,24,25,26,27,28,29,30,32,34];"&gt;{
+    "version": "0.1.0",
+    // List of configurations. Add new configurations or edit existing ones.
+    // ONLY "node" and "mono" are supported, change "type" to switch.
+    "configurations": [
+        {
+            // Name of configuration; appears in the launch configuration drop down menu.
+            "name": "Launch versionAssemblies.js",
+            // Type of configuration. Possible values: "node", "mono".
+            "type": "node",
+            // Workspace relative or absolute path to the program.
+            "program": "Tasks/VersionAssemblies/versionAssemblies.ts",
+            // Automatically stop program after launch.
+            "stopOnEntry": false,
+            // Command line arguments passed to the program.
+            "args": [],
+            // Workspace relative or absolute path to the working directory of the program being debugged. Default is the current workspace.
+            "cwd": ".",
+            // Workspace relative or absolute path to the runtime executable to be used. Default is the runtime executable on the PATH.
+            "runtimeExecutable": null,
+            // Optional arguments passed to the runtime executable.
+            "runtimeArgs": ["--nolazy"],
+            // Environment variables passed to the program.
+            "env": { 
+                "BUILD_BUILDNUMBER": "1.0.0.5",
+                "INPUT_SOURCEPATH": "C:\\data\\ws\\col\\ColinsALMCornerCheckinPolicies",
+                "INPUT_FILEPATTERN": "AssemblyInfo.*",
+                "INPUT_BUILDREGEX": "\\d+\\.\\d+\\.\\d+\\.\\d+",
+                "INPUT_REPLACEREGEX": ""
+            },
+            // Use JavaScript source maps (if they exist).
+            "sourceMaps": true,
+            // If JavaScript source maps are enabled, the generated code is expected in this directory.
+            "outDir": "."
+        },
+        {
+            "name": "Attach",
+            "type": "node",
+            // TCP/IP address. Default is "localhost".
+            "address": "localhost",
+            // Port to attach to.
+            "port": 5858,
+            "sourceMaps": false
+        }
+    ]
+}
+&lt;/pre&gt;
+&lt;p&gt;The changes I made have been highlighted. I changed the name and program settings. I also added some environment variables to simulate the values that the build agent is going to pass into the task. Finally, I changed “sourceMaps” to true and the output dir to “.” so that I could debug my TypeScript files. Now I just press F5:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/c9a466e6-795c-4836-8a70-e10ea8a09f68.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/56cf0266-19da-45a2-814f-89ee1fd2b920.png" width="320" height="284"&gt;&lt;/a&gt;The debugger is working – but my code isn’t! Looks like I’m missing a node module – minimatch. No problem – just run “npm install minimatch -–save-dev” to add the module in and run again. Another module not found – this time shelljs. Run “npm install shelljs –-save-dev” and start again. Success! I can see watches in the left window, hover over variables to see their values, and start stepping through my code. 
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/4fa466de-f864-4287-a314-3b8a7bfdfec6.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/d1c5c01e-38b4-4b57-b9e5-7a679bba85e9.png" width="355" height="318"&gt;&lt;/a&gt;My code ended up being perfect. Just kidding – I had to sort out some errors, but at least debugging made it a snap.&amp;nbsp; &lt;h2&gt;Uploading the Task&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="http://colinsalmcorner.com/post/developing-a-custom-build-vnext-task-part-1" target="_blank"&gt;part 1&lt;/a&gt; I introduced &lt;a href="http://github.com/microsoft/tfs-cli" target="_blank"&gt;tfx-cli&lt;/a&gt;. I now returned to the command line in order to test uploading the task. I changed to the cols-agent-tasks\Tasks directory and ran&lt;/p&gt;
+&lt;p&gt;&lt;font size="2" face="Courier New"&gt;tfx-cli build tasks upload .\VersionAssemblies&lt;/font&gt;&lt;/p&gt;
+&lt;p&gt;I got a success, and so now I could test it in a build!&lt;/p&gt;
+&lt;h3&gt;Testing a Windows Build&lt;/h3&gt;
+&lt;p&gt;Testing the windows build was fairly simple. I opened up an existing hosted build and replaced the PowerShell task that called my original PowerShell version assemblies task, and added in a brand new shiny “VersionAssemblies” task:&lt;/p&gt;
+&lt;p&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/4816b75a-0511-4e88-b12c-08ee59ae9e8c.png" width="344" height="293"&gt;&lt;/p&gt;
+&lt;p&gt;The run worked perfectly too – I was able to see the version change in the build output. Just a tip – setting “system.debug” to “true” in the build variables caused the task to log verbose.&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/32bddc88-1e06-44f0-ad43-bc902e1f9a77.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/6e34eb6e-e1fd-4bcf-90c2-dd6c9e794078.png" width="326" height="123"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;h3&gt;Testing a Linux build using Docker&lt;/h3&gt;
+&lt;p&gt;Now I wanted to test the task in a Linux build. I’ve installed a couple of Ubuntu vms before, so I was prepared to spin one up when I came across an excellent post by my friend and fellow ALM MVP &lt;a href="http://roadtoalm.com/about/" target="_blank"&gt;Rene van Osnabrugge&lt;/a&gt;. Rene shows how you can quickly spin up a &lt;a href="http://roadtoalm.com/2015/08/07/running-a-visual-studio-build-vnext-agent-in-a-docker-container/" target="_blank"&gt;cross-platform build agent in a docker container&lt;/a&gt; – and even provides the &lt;a href="https://github.com/renevanosnabrugge/vsobuild-docker/blob/master/Dockerfile" target="_blank"&gt;Dockerfile&lt;/a&gt; to be able to do it in 1 line! The timing was perfect – I downloaded &lt;a href="https://www.docker.com/toolbox" target="_blank"&gt;Docker Toolbox&lt;/a&gt; and installed a docker host (I couldn’t get the Hyper-V provider to work, so I had to resort to VirtualBox), then grabbed Rene’s Dockerfile and in no time at all I had a build agent on Ubuntu ready to test!&lt;/p&gt;
+&lt;p&gt;Here’s my x-plat agent in the default pool:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/b06d383b-1f27-4716-a841-d27ad8930c19.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/b95cc9b7-d3e2-4790-958a-769b43031c59.png" width="320" height="158"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Note the Agent.OS “capability”. In order to target this agent, I’m going to add it as a demand for the build:&lt;/p&gt;
+&lt;p&gt;&lt;a href="http://colinsalmcorner.com/posts/files/aa04348e-4299-45a1-9d2f-301d066a2588.png"&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/fdc584a6-fdd3-47eb-ad1b-69e68473df78.png" width="287" height="186"&gt;&lt;/a&gt; &lt;/p&gt;
+&lt;p&gt;Here’s the successful run:&lt;/p&gt;
+&lt;p&gt;&lt;img title="image" style="border-left-width: 0px; border-right-width: 0px; border-bottom-width: 0px; float: none; margin-left: auto; display: block; border-top-width: 0px; margin-right: auto" border="0" alt="image" src="http://colinsalmcorner.com/posts/files/c1c33021-940f-4229-91a7-f11afa0898f1.png" width="395" height="183"&gt;I committed, pushed to &lt;a href="http://github.com/colindembovsky/cols-agent-tasks" target="_blank"&gt;Github&lt;/a&gt; and now I can rest my weary brain!&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;&lt;/p&gt;
+&lt;p&gt;Creating a custom task is, if not simple, at least easy. The agent architecture has been well thought out and overall custom task creation is a satisfying process, both for PowerShell and for Node. I look forward to seeing what custom tasks start creeping out of the woodwork. Hopefully task designers will follow Microsoft’s lead and make them open source.&lt;/p&gt;
+&lt;p&gt;Happy building!&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>teambuild</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="04304a53-cf64-4c10-aa9e-502ec5fe08fc">
+      <author>pbloechl</author>
+      <email>pbl@wpint.net</email>
+      <website></website>
+      <ip>157.161.114.253</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.86 Safari/537.36</userAgent>
+      <date>2015-11-30 14:36:27</date>
+      <content>Hi Colin&lt;br /&gt;&lt;br /&gt;thX for that interesting intro! &lt;br /&gt;Just a small question regarding the Powershell and Javascript-scripts included in your task - I dont&amp;#39; find the link where you assign and execute the final js.-file. Currently when I upload your task to tfs, only the Powershell-script get executed. What&amp;#39;s todo to invoke that js-file instead of the ps1-file on the build-agent ?&lt;br /&gt;&lt;br /&gt;Regards&lt;br /&gt;Peter</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="b4683677-f902-4d63-81c2-fe33ffc4974e">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-12-02 11:15:57</date>
+      <content>Hi @Peter&lt;br /&gt;&lt;br /&gt;The json file to invoke is defined in the task.json. There you can specify a PowerShell implementation, a Node implementation or both. The latest version of the agent always tries the Node first (unless you force it to use PowerShell) on Windows.&lt;br /&gt;&lt;br /&gt;Hope that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="aeae23d7-4dcc-4c65-9b44-9970b0f8d839">
+      <author>pbloechl</author>
+      <email>pbl@wpint.net</email>
+      <website></website>
+      <ip>157.161.114.253</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-03 22:13:22</date>
+      <content>Hi Colin&lt;br /&gt;hmm... still get an error when invoke a build on my visualstudio.com tfs instance with my task when I only define the &amp;quot;Node&amp;quot;-execution part&lt;br /&gt;&amp;quot;&lt;br /&gt;System.Exception: The definition for the task does not have a handler that matches any supported by this agent. Supported handlers: AzurePowerShell, AzurePowerShellHandler, PowerShell, PowerShellHandler, PowerShellExe, PowerShellExeHandler, Process, ProcessHandler&lt;br /&gt;&lt;br /&gt;at Microsoft.TeamFoundation.DistributedTask.Agent.Common.TaskDefinitionHelper.GetPreferredHandler(ITaskDefinitionFile definition, List`1 handlersByPriority)&lt;br /&gt;&lt;br /&gt;at Microsoft.TeamFoundation.DistributedTask.Worker.JobRunner.EnsureTaskLoaded(IJobContext context, IJobExtension jobExtension, TaskWrapper task, Dictionary`2 taskDefinitions, Dictionary`2 handlers)&lt;br /&gt;&lt;br /&gt;at Microsoft.TeamFoundation.DistributedTask.Worker.JobRunner.LoadTasks(IJobContext context, IJobExtension jobExtension, IJobRequest job)&lt;br /&gt;&lt;br /&gt;at Microsoft.TeamFoundation.DistributedTask.Worker.JobRunner.Run(IJobContext jobContext, IJobRequest job, IJobExtension jobExtension, CancellationTokenSource tokenSource)&lt;br /&gt;&amp;quot;&lt;br /&gt;which is also reproducable on our on-premise instance.  Some other dependencies to be installed on the build-server ?  &lt;br /&gt;For me it looks more, that the build-agent still don&amp;#39;t know how to handle that  Node-target javascriptfile :-( &lt;br /&gt;&lt;br /&gt;Thanks for your patience&lt;br /&gt;Peter</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="a1eee006-6967-4cd9-ba74-d344dfd2bc02">
+      <author>Colin Dembovskky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.225.217.162</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.73 Safari/537.36</userAgent>
+      <date>2015-12-08 08:28:25</date>
+      <content>@Peter&lt;br /&gt;&lt;br /&gt;It looks like you don&amp;#39;t have Node installed. Can you try install Node.js and see if that resolves the issue?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="5ec220f5-5854-445e-8617-ab1d2dc64780">
+      <author>James</author>
+      <email>james.leeper@denvergov.org</email>
+      <website></website>
+      <ip>169.133.140.5</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.125 Safari/537.36</userAgent>
+      <date>2015-12-30 19:10:16</date>
+      <content>Colin, have you confirmed that node tasks will run under the Windows agent?  I&amp;#39;m seeing the same error as Peter and I do have node installed on the build server - &amp;quot;node.js&amp;quot; shows up as a system capability of the agent.  I hope I&amp;#39;m missing something because I really don&amp;#39;t want to write every build task twice!&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;James</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="07236667-44f3-4e4c-b4c1-2cf099c1360c">
+      <author>Christian Artin</author>
+      <email>cartin@genetec.com</email>
+      <website></website>
+      <ip>68.67.62.2</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36</userAgent>
+      <date>2016-01-05 22:32:44</date>
+      <content>Hi,&lt;br /&gt;&lt;br /&gt;First, thanks a lot for your tutorial! It really helped out a lot. The lack of documentation can be frustrating sometimes.&lt;br /&gt;&lt;br /&gt;Second: I am having issues doing the following. Any ideas? I know they recently renamed the library from vso to vsts, so I have no clue what I&amp;#39;m doing wrong...&lt;br /&gt;declare module &amp;quot;vsts-task-lib&amp;quot; {&lt;br /&gt;    export = VstsTaskLib;&lt;br /&gt;}&lt;br /&gt;It says Cannot find name &amp;#39;VstsTaskLib&amp;#39;&lt;br /&gt;&lt;br /&gt;and in my code, the import doesn&amp;#39;t work either.&lt;br /&gt;import * as tl from &amp;#39;vsts-task-lib&amp;#39;;&lt;br /&gt;Gives me: Module &amp;#39;&amp;quot;vsts-task-lib&amp;quot;&amp;#39; resolves to a non-module entity and cannot be imported using this construct.&lt;br /&gt;&lt;br /&gt;I know I have installed it correctly (npm install vsts-task-lib).&lt;br /&gt;Any help would be appreciated!&lt;br /&gt;&lt;br /&gt;PS: Here is the list of errors when I run CTRL-SHIFT-B:&lt;br /&gt;Tasks/BuildNumberGenerator/BuildNumberGenerator.ts(1,21): error TS2497: Module &amp;#39;&amp;quot;vsts-task-lib&amp;quot;&amp;#39; resolves to a non-module entity and cannot be imported using this construct.&lt;br /&gt;typings/tsd.d.ts(9,14): error TS2304: Cannot find name &amp;#39;VstsTaskLib&amp;#39;.&lt;br /&gt;typings/vsts-task-lib/vsts-task-lib.d.ts(1,1): error TS6053: File &amp;#39;typings/definitions/node.d.ts&amp;#39; not found.&lt;br /&gt;typings/vsts-task-lib/vsts-task-lib.d.ts(2,1): error TS6053: File &amp;#39;typings/definitions/Q.d.ts&amp;#39; not found.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="e6ee5590-8054-4de2-9b7c-2272fb80ef6a">
+      <author>Colin Dembovskky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>24.22.233.21</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36</userAgent>
+      <date>2016-01-13 01:47:40</date>
+      <content>@James - I started seeing this error on the hosted build agent for some reason. It seemed to work on my &amp;quot;on-premises&amp;quot; build agent. Are you using a hosted agent?&lt;br /&gt;&lt;br /&gt;Also, you should prefer the node implementation - that&amp;#39;s the one the build agent runs even when it&amp;#39;s on Windows (if there are 2 implementations).</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="1f700c92-db3b-4469-afc2-af643762c2b0">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>24.22.233.21</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36</userAgent>
+      <date>2016-01-13 01:51:17</date>
+      <content>@Christian - sorry it took a while to respond - been busy!&lt;br /&gt;&lt;br /&gt;I&amp;#39;ve just done some more work on custom tasks, and the definitions and libraries are in flux since the team is releasing so frequently. I just played around with the paths and d.ts files until it stopped complaining. Check out my source repo here https://github.com/colindembovsky/cols-agent-tasks to see how I structured the latest code.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="e1db5430-cce1-43fa-bdf7-5bdc74f7e0bd">
+      <author>Christian Artin</author>
+      <email>cartin@genetec.com</email>
+      <website></website>
+      <ip>68.67.62.2</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36</userAgent>
+      <date>2016-01-13 14:46:08</date>
+      <content>@Colin Don&amp;#39;t worry about, I didn&amp;#39;t mean to spam or rush, I didn&amp;#39;t know comments had to be approved to be published :)&lt;br /&gt;&lt;br /&gt;Thanks for your github, really helped me a lot! VS Code actually stopped complaining and it just works now :)&lt;br /&gt;&lt;br /&gt;Take care and keep up the good posts, they&amp;#39;re very informative and interesting to read!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="f118c775-2e14-4c84-9456-247531e20126">
+      <author>Christopher Haws</author>
+      <email>cribs2@gmail.com</email>
+      <website></website>
+      <ip>172.91.213.112</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.109 Safari/537.36</userAgent>
+      <date>2016-02-15 00:47:32</date>
+      <content>@Colin, I was wondering if you could explain how task dependencies work. I noticed that you include minimatch and shelljs as dev dependencies. Aren&amp;#39;t these runtime dependencies of the task, not only at dev time? When you go to publish the task, how do those dependencies get published to VSTS and how are they loaded at runtime?&lt;br /&gt;&lt;br /&gt;Great post by the way!</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="8144b11a-2a84-4cae-93f1-86f3e2eb2507">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:31:18</date>
+      <content>Hi @Christopher&lt;br /&gt;&lt;br /&gt;You need to ship your dependencies with your task. What I do is &amp;quot;npm install&amp;quot; before I publish the task - that way the npm packages are included in the node_packages folder when the task is published. The build engine doesn&amp;#39;t provide any dependencies at all, so you have to make sure you ship all of yours with your tasks.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="24628f51-aa64-4053-9624-e1e954dcbe08">
+      <author>Rod Hall</author>
+      <email>rodhall@hotmail.co.uk</email>
+      <website></website>
+      <ip>83.244.197.36</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-05 14:7:14</date>
+      <content>Hi Colin,&lt;br /&gt;&lt;br /&gt;We&amp;#39;ve been using this for a while and love it. we&amp;#39;re having an issue since updating to TFS 2015 Update 2. When trying to run the Version Assemblies step we get the following error:&lt;br /&gt;&lt;br /&gt;Logs&lt;br /&gt;2016-04-05T13:30:17.1244961Z Set workingFolder to default: E:\FrontEndAgent2\tasks\VersionAssemblies\0.1.1&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z module.js:338&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     throw err;&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z           ^&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z Error: Cannot find module &amp;#39;vso-task-lib&amp;#39;&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Function.Module._resolveFilename (module.js:336:15)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Function.Module._load (module.js:278:25)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Module.require (module.js:365:17)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at require (module.js:384:17)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Object.&amp;lt;anonymous&amp;gt; (E:\FrontEndAgent2\tasks\VersionAssemblies\0.1.1\versionAssemblies.js:1:72)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Module._compile (module.js:460:26)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Object.Module._extensions..js (module.js:478:10)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Module.load (module.js:355:32)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Function.Module._load (module.js:310:12)&lt;br /&gt; &lt;br /&gt;2016-04-05T13:30:17.3744983Z     at Function.Module.runMain (module.js:501:10)&lt;br /&gt;&lt;br /&gt;&lt;br /&gt;Any pointers? &lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;Rod</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="d6478c9f-9ac2-4dd7-a89c-f741b868958b">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.115.228</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-05 14:50:26</date>
+      <content>Hi @Rod&lt;br /&gt;&lt;br /&gt;Yep, that&amp;#39;s an expected problem. In Update 2 TFS changes the way that it deals with task dependencies - to make a long story short, you have to supply them with you custom task! I see that you&amp;#39;re using version 0.1.1 which is quite old.&lt;br /&gt;&lt;br /&gt;The good news is that you can download my extension (which includes this task) from the VS MarketPlace: https://marketplace.visualstudio.com/items?itemName=colinsalmcorner.colinsalmcorner-buildtasks&lt;br /&gt;&lt;br /&gt;Then install the extension and you&amp;#39;ll have the latest and greatest Version Assemblies task! A bit easier this way than mucking with basic auth in IIS and tfx etc. etc.&lt;br /&gt;&lt;br /&gt;Let me know if that helps!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="f8a66c94-73bb-42f1-8d20-88e0bb4b6ccd">
+      <author>Rod Hall</author>
+      <email>rodhall@hotmail.co.uk</email>
+      <website></website>
+      <ip>83.244.197.36</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-07 04:41:40</date>
+      <content>@Colin thanks, this worked a treat and is a much simpler way to install! Cheers :)</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="70efe0b1-3540-413e-8217-2ee47bac14e9">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.115.228</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36</userAgent>
+      <date>2016-04-07 06:8:10</date>
+      <content>No problem @Rod! Happy to help!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="2343f91d-c134-4549-a667-941ebe539967">
+      <author>Chetan Yanamandra</author>
+      <email>ychetankumarsarma@gmail.com</email>
+      <website></website>
+      <ip>173.73.147.52</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.75 Safari/537.36</userAgent>
+      <date>2016-04-20 15:8:56</date>
+      <content>Hello Colin,&lt;br /&gt;&lt;br /&gt;Thanks for the wonderful post !!&lt;br /&gt;&lt;br /&gt;I had a question. Is it possible to provide dropdowns to userinput variables?&lt;br /&gt;Right now, I have setup a build definition which takes inputs for a powershell script.&lt;br /&gt;Some Inputs have multiple fixed values, so instead of typing each time, Can I customize the variables tab to have a dropdown?&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;Chetan</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="70c9454c-7703-40b9-b890-a5997e501231">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.114.247</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36</userAgent>
+      <date>2016-05-14 13:37:25</date>
+      <content>Hi @Chetan&lt;br /&gt;&lt;br /&gt;Yes, you can provide a picklist! Here&amp;#39;s an example:&lt;br /&gt;        {&lt;br /&gt;            &amp;quot;name&amp;quot;: &amp;quot;scriptType&amp;quot;,&lt;br /&gt;            &amp;quot;type&amp;quot;: &amp;quot;pickList&amp;quot;,&lt;br /&gt;            &amp;quot;label&amp;quot;: &amp;quot;Type&amp;quot;,&lt;br /&gt;            &amp;quot;defaultValue&amp;quot;: &amp;quot;filePath&amp;quot;,&lt;br /&gt;            &amp;quot;required&amp;quot;: true,&lt;br /&gt;            &amp;quot;helpMarkDown&amp;quot;: &amp;quot;Type of the script: File Path or Inline Script&amp;quot;,&lt;br /&gt;            &amp;quot;options&amp;quot;: {&lt;br /&gt;                &amp;quot;inlineScript&amp;quot;: &amp;quot;Inline Script&amp;quot;,&lt;br /&gt;                &amp;quot;filePath&amp;quot;: &amp;quot;File Path&amp;quot;&lt;br /&gt;            }&lt;br /&gt;        }</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="4b57b6bd-babc-4b41-8150-6510b03d977c">
+      <author>Jeff Bowman</author>
+      <email>jeff.bowman@intexx.com</email>
+      <website>http://www.intexx.com/</website>
+      <ip>209.193.47.239</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36</userAgent>
+      <date>2016-08-14 06:0:58</date>
+      <content>Hi Colin, never mind that last question.&lt;br /&gt;&lt;br /&gt;I figured it out, here: http://stackoverflow.com/a/38939474/722393&lt;br /&gt;&lt;br /&gt;Thanks,&lt;br /&gt;Jeff Bowman&lt;br /&gt;Fairbanks, Alaska</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

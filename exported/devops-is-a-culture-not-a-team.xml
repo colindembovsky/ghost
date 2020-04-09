@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>b02f6455-0718-454f-887f-4a96b18f64ef</id>
+  <title>DevOps is a Culture, Not a Team</title>
+  <slug>devops-is-a-culture-not-a-team</slug>
+  <shortUrl>http://bit.ly/1Q3lC9J</shortUrl>
+  <author></author>
+  <pubDate>2016-02-18 14:33:28</pubDate>
+  <lastModified>2018-05-08 10:26:48</lastModified>
+  <content>&lt;p&gt;&lt;em&gt;This post was originally posted on our &lt;a href="http://blog.nwcadence.com/devops-culture-not-team/" target="_blank"&gt;Northwest Cadence blog&lt;/a&gt; – but I feel it’s a really important post, so I’m cross-posting it here!&lt;/em&gt;&lt;/p&gt; &lt;p&gt;I recently worked at a customer that had created a DevOps team in addition to their Ops and Development teams. While I appreciated the attempt to improve their processes, inwardly I was horrified. Just as DevOps is not a product, I think it is bad practice to create a DevOps team. DevOps is a &lt;em&gt;culture&lt;/em&gt; and a &lt;em&gt;mindset&lt;/em&gt; that should pervade every member of your organization – beyond even developers and operations.&lt;/p&gt; &lt;h2&gt;What is DevOps?&lt;/h2&gt; &lt;p&gt;So how do you define DevOps? &lt;a href="http://donovanbrown.com" target="_blank"&gt;Donovan Brown&lt;/a&gt;, a DevOps product manager at Microsoft, defines DevOps succinctly as follows: &lt;em&gt;DevOps is the union of people, process, and products to enable continuous delivery of value to end users&lt;/em&gt;. Unfortunately, since the name is an amalgamation of &lt;em&gt;development&lt;/em&gt; and &lt;em&gt;operations&lt;/em&gt;, most organizations get developers and ops to collaborate, and then boldly declare, “We do DevOps!”&lt;/p&gt; &lt;h2&gt;Wider than Dev and Ops&lt;/h2&gt; &lt;p&gt;However, true DevOps is a culture that should involve everyone that is involved in &lt;em&gt;delivery of value to end users&lt;/em&gt;. This means that business should understand their role in DevOps. Testers and Quality Assurance (QA) should understand their role in DevOps. Project Management Offices (PMOs), Human Resources (HR) and any other part of the organization that touches on the flow of value should be aware of their role in DevOps.&lt;/p&gt; &lt;p&gt;That’s why creating a DevOps team is a fundamentally bad decision. It distances people outside the “DevOps” team from being involved in the culture of DevOps. If there’s a DevOps team, and I’m not on it, why should I worry about DevOps? In the same manner, DevOps that is confined solely to dev and ops is indicative of the culture not pervading the organization. To fully benefit from DevOps, the entire organization needs to embrace the &lt;em&gt;mindset&lt;/em&gt; and &lt;em&gt;culture&lt;/em&gt; of DevOps.&lt;/p&gt; &lt;h2&gt;DevOps Values&lt;/h2&gt; &lt;p&gt;What then is a DevOps culture? What values should be upheld by people as they improve their processes and utilize tools to aid in implementing DevOps practices? Here are a few:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Whatever we do should ultimately deliver value to the end users  &lt;ol&gt; &lt;li&gt;This is absolutely key to good DevOps – everyone, from stakeholders to developers, to testers and ops should be thinking of how to &lt;em&gt;deliver value&lt;/em&gt;. If you can’t ship it, it’s not delivered value – so fix it until you can deliver.&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;There’s no such thing as a DevOps Hero  &lt;ol&gt; &lt;li&gt;DevOps is not the domain of a single individual or team. Everyone needs to buy in to the culture, and everyone needs to own it. And we need to build a culture of “team”, an &lt;a href="https://en.wikipedia.org/wiki/Ubuntu_(philosophy)" target="_blank"&gt;ubuntu&lt;/a&gt; for value, within the entire organization.&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;If we touch it, we own it  &lt;ol&gt; &lt;li&gt;If developers hand off their code to testers, then they ultimately assume “someone else” will check their code. If a developer is responsible for the after hours support calls, they’re more likely to ensure good quality. Of course enlisting the help of some testers will help that effort!&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;We should examine everything we do for efficiencies  &lt;ol&gt; &lt;li&gt;Sometimes we need to step back and examine why we do certain things. Before we automated our deployments, we needed a change control board to wade through pages of “installation instructions”. Now we’ve automated deployments – so we do we still need the documentation or the checkpoint? We could go faster if we removed the “legacy” processes.&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;We should be allowed to experiment  &lt;ol&gt; &lt;li&gt;Will automated deployment help us deliver value faster? Perhaps yes, perhaps no. We’ll never find out if we never have the permission (and time) to experiment. And we can learn from failed experiments too – so we should value experimentation&lt;/li&gt;&lt;/ol&gt;&lt;/li&gt;&lt;/ol&gt; &lt;h2&gt;Everyone has a responsibility in DevOps&lt;/h2&gt; &lt;p&gt;DevOps is more than just developers and ops getting together and automating a dew things. While this is certainly a fast-track to better DevOps, the DevOps mindset has to widen to include other teams not traditionally associated with DevOps – like HR, PMOs and Testers.&lt;/p&gt; &lt;h3&gt;Human Resources (HR)&lt;/h3&gt; &lt;p&gt;Human Resources should be looking for people who are &lt;em&gt;passionate about delivering value&lt;/em&gt;. DevOps culture is built faster when people have passion and care about their end users. Don’t just inspect a candidates technical competency – get a feel for how much of a team player they are and how much they will take responsibility for what they do. Don’t hire people who just want to clock in and out and do as little as possible. Also, you may have to “trim the fat” – get rid of positions that are not &lt;em&gt;delivering value&lt;/em&gt;.&lt;/p&gt; &lt;p&gt;A further boost for developing DevOps culture is the right working environment. Make your workplace a place people love – but make sure they don’t burn out too! Force them to go home and decompress with friends and family. If your teams are always working overtime, it’s an indication that something isn’t right. Find and improve the erroneous practice so that your team members can have a life – this will reinforce the passion and loyalty they have to delivering value.&lt;/p&gt; &lt;h3&gt;PMOs (Project Management Offices)&lt;/h3&gt; &lt;p&gt;The PMO needs to rethink in many areas – especially in &lt;em&gt;utilization&lt;/em&gt;. Most PMOs strive to make sure that every team member is running at 100% utilization. However, there are problems with this approach:&lt;/p&gt; &lt;ol&gt; &lt;li&gt;Humans don’t multitask  &lt;ol&gt; &lt;li&gt;Humans don’t multitask – they switch quickly. However, unlike computers that can switch context perfectly to give the illusion of multitasking, humans have fallible memories. Switching costs, since our memories are not perfect. If there are no gaps in our schedules, we will inevitably run late since we don’t usually account for the cost of switching&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;No time for thinking, discussion and experimenting  &lt;ol&gt; &lt;li&gt;If you’re at 100% utilization, you inevitably feel like you don’t have time to think. You can’t get involved in discussions with other team members about how to best solve a problem. And you can’t reflect on what is working and what is not. You certainly won’t have time to experiment. Over the long run, this will hamper delivery of value, since you won’t be innovating.&lt;/li&gt;&lt;/ol&gt; &lt;li&gt;High utilization increases wait-time  &lt;ol&gt; &lt;li&gt;The busier a resource is, the longer you have to wait to access it. A simple formula proves this – wait time = % busy / % idle. So if a resource is 50% utilized, wait time is 50/50 = 1 unit. If that same resource is 90% utilized, the wait time is 90/10 = 9 units. So you have to wait 9 times longer to access a resource that’s busy 90% of the time than when it’s busy 50% of the time. Long wait times means longer cycle times and lower throughput.&lt;/li&gt;&lt;/ol&gt;&lt;/li&gt;&lt;/ol&gt; &lt;p&gt;PMOs need to embrace the innovative nature of DevOps – and that means giving team members time in their schedules. And it means embracing uncertainty – don’t be afraid to trust the team.&lt;/p&gt; &lt;h3&gt;Testers&lt;/h3&gt; &lt;p&gt;As Infrastructure as Code, Continuous Integration (CI) and Continuous Deployment (CD) speed the delivery time, testers need to jump in and start automating their testing efforts. In fact, just as I think that a DevOps team is a bad idea, I think that a Testing team is just as bad. Testers should be part of the development/operations team, not a separate entity. And traditional “manual” testers need to beef up on their automation skills, since manual testing becomes a bottleneck in the delivery pipeline. Remember, testers that “find bugs” are not thinking DevOps – testers that aim to automate their tests so that results are faster and more accurate are thinking about real quality improvement – and that means they’re thinking about &lt;em&gt;delivering value&lt;/em&gt; to the end users.&lt;/p&gt; &lt;h2&gt;Conclusion&lt;/h2&gt; &lt;p&gt;DevOps is not a team or a product – it is a culture that needs to pervade everyone in the organization. Everyone – from HR to PMOs to Testers, not just developers and ops – needs to embrace DevOps values, making sure that value is being delivered continually to their end users.&lt;/p&gt;</content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>DevOps</category>
+    <category>ALM</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="e6cb4bf1-e0af-48b0-9fbd-5cf201b65b5d">
+      <author>JB</author>
+      <email>ppippenkimo@gmail.com</email>
+      <website></website>
+      <ip>61.57.26.120</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36</userAgent>
+      <date>2016-03-30 00:48:06</date>
+      <content>I had read this article three times and see further more and learn a lot from it. Thank you for sharing the nice article :)</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="58b73bd9-cb35-47f2-a197-55dc56e96438">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.227.13.133</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2016-03-31 17:24:02</date>
+      <content>Thanks for the feedback @JB!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="75499b81-1bf3-43aa-a6c6-1534754532b6">
+      <author>Samora</author>
+      <email>poswasm@gmail.com</email>
+      <website></website>
+      <ip>41.169.83.180</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2016-05-24 12:26:23</date>
+      <content>Interesting article...but I must say the culture is slowly creeping into most organisations! It&amp;#39;s amazing how the attitude of Exco members affects the adoption culture... when they don&amp;#39;t pass the buck, their teams follow suite</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="2e80c372-7adf-458d-8ca4-0ead8c1bd290">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.228.35.76</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36</userAgent>
+      <date>2016-06-27 06:46:08</date>
+      <content>@Samora - 100% correct! Everything rises and falls on leadership.</content>
+    </comment>
+    <comment isAdmin="false" isApproved="false" id="3d84d9d4-a2d3-4cba-8970-a1dab65f3d9b">
+      <author>Vicky</author>
+      <email>vikky.cmd@gmail.com</email>
+      <website>https://www.besanttechnologies.com/training-courses/other-training-courses/devops-training-institute-in-chennai</website>
+      <ip>210.18.164.149</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.139 Safari/537.36</userAgent>
+      <date>2018-05-08 10:26:48</date>
+      <content>Hi, Your post is good. Its so useful for me about Devops.Thank you for your post.&lt;br /&gt;Devops Training in Chennai: https://www.besanttechnologies.com/training-courses/other-training-courses/devops-training-institute-in-chennai</content>
+    </comment>
+  </comments>
+  <viewCount>0</viewCount>
+</post>

@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>6e265334-6093-4854-9cfb-4a0940406960</id>
+  <title>Fix: Release Management “Service Unavailable 503”</title>
+  <slug>fix-release-management-service-unavailable-503</slug>
+  <shortUrl>http://bit.ly/1iJ2o8W</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2014-02-07 09:01:00</pubDate>
+  <lastModified>2020-04-01 02:12:19</lastModified>
+  <content>&lt;p&gt;At a customer we installed Release Management for their TFS 2013 TFS Server. The server component installation went really smoothly – however, it was only when we installed the Client that we realized that the Release Management service was not right – we kept getting a 503 Service Unavailable error. I opened IIS and could see that the Release Management application pool was stopped. I started the app pool, but it immediately shut down. We checked the event log and saw a few obscure error messages about NullReferenceExceptions – nothing particularly helpful.&lt;/p&gt; &lt;h2&gt;The Problem: SharePoint&lt;/h2&gt; &lt;p&gt;It turns out that the problem was (surprise, surprise) SharePoint. The server we were using (for a small team) was a single server TFS – data and application tier on the same machine, as well as SSRS, SSAS and SharePoint. Unfortunately, SharePoint doesn’t play well with others – specifically with other 32-bit web applications. SharePoint’s install adds a global ISAPI module, but for some reason doesn’t add a bitness filter – so if you have a 32-bit web application (like Release Management) the 64-bit SharePoint module gets loaded anyway, and this causes the 32-bit application pool to crash.&lt;/p&gt; &lt;h2&gt;The Fix&lt;/h2&gt; &lt;ol&gt; &lt;li&gt;Log on to your TFS Server and open a command prompt as administrator. &lt;/li&gt; &lt;li&gt;cd to \windows\system32\inetsrv &lt;/li&gt; &lt;li&gt;Now enter:&lt;/li&gt;&lt;/ol&gt; &lt;blockquote&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;appcmd.exe set config -section:system.webServer/globalModules /[name='SPNativeRequestModule'].preCondition:integratedMode,bitness64&lt;/font&gt;&lt;/p&gt;&lt;/blockquote&gt; &lt;p&gt;Now restart your Release Management application pool, and you’ll be good to go.&lt;/p&gt; &lt;p&gt;Happy releasing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Release Management</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="6e4643d6-dee5-4ef6-8f81-b430936cf853">
+      <author>Theo Sherman</author>
+      <email>noreply@blogger.com</email>
+      <website>http://www.blogger.com/profile/11658571987565845593</website>
+      <ip></ip>
+      <userAgent></userAgent>
+      <date>2014-03-31 22:57:06</date>
+      <content>Thank you!!</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="f0631031-85f7-4e15-a5db-69b5bd66192f">
+      <author>Haresh</author>
+      <email>haresh.yadav@outlook.com</email>
+      <website></website>
+      <ip>123.63.183.117</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.130 Safari/537.36</userAgent>
+      <date>2015-06-26 13:29:14</date>
+      <content>Thanks a lot - its work for me</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="8d0a2d01-2495-4caa-a171-be68d6f5ae9d">
+      <author>Uwe Baumann</author>
+      <email>uwe.baumann@hotmail.com</email>
+      <website>http://www.artiso.com/</website>
+      <ip>2.173.106.221</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0</userAgent>
+      <date>2015-09-18 08:57:32</date>
+      <content>Hi Colin, cheers, saved me a lot of headache! Greetings form artiso (German ALM MVP partner) to Africa... Uwe</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="64f72392-7b2d-4d66-8ce8-1f06c1df4307">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.94.153</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-09-21 07:37:29</date>
+      <content>Hi @Uwe - thanks for the positive feedback - glad this helped you! I&amp;#39;m actually half-German on my mother&amp;#39;s side. I got to work in Wurzburg a few years ago and absolutely loved being in Germany!&lt;br /&gt;&lt;br /&gt;Alles gute!</content>
+    </comment>
+  </comments>
+  <viewCount>29663</viewCount>
+</post>

@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>f2f2a399-17f3-4866-8b86-6859183a6586</id>
+  <title>QFE Fixes VS 2010 SP1 Bug on Test Agents</title>
+  <slug>qfe-fixes-vs-2010-sp1-bug-on-test-agents</slug>
+  <shortUrl>http://bit.ly/1iTotlo</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2011-06-24 08:15:00</pubDate>
+  <lastModified>2020-04-04 10:49:40</lastModified>
+  <content>&lt;p&gt;Last week I was helping a customer get up and running with Lab Management. In an effort to make sure they’re up to date, I installed TFS and VS 2010 SP1 on their TFS machine as well as in all the Lab machines.&lt;/p&gt; &lt;p&gt;Everything was going smoothly until we started running automated tests. The tests would return as “not executed” and the error was:&lt;/p&gt; &lt;p&gt;&lt;font face="Courier New"&gt;"Attempted to access an unloaded AppDomain. (Exception from HRESULT: 0x80131014)"&lt;/font&gt;&lt;/p&gt; &lt;p&gt;The strange thing was that if we turned off &lt;strong&gt;all&lt;/strong&gt; the diagnostic adaptors, the tests ran successfully&lt;/p&gt; &lt;p&gt;After some investigation, we found out that this was a known bug in SP1. Yesterday, however, a &lt;a href="http://blogs.msdn.com/b/lab_management/archive/2011/06/23/new-qfe-for-visual-studio-2010-testing-tools.aspx" target="_blank"&gt;QFE was released that fixes this issue&lt;/a&gt;. If you’ve installed TFS and VS 2010 SP1 on your TFS and in your lab machines, make sure you apply this QFE if you want to run automated tests with diagnostic data adaptors!&lt;/p&gt; &lt;p&gt;Happy testing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Lab Management</category>
+  </categories>
+  <comments></comments>
+  <viewCount>1507</viewCount>
+</post>

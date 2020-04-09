@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<post>
+  <id>31d67685-9c54-4430-8ba0-b8f8e167510f</id>
+  <title>Test Case Manager: Customize Failure and Resolution Type</title>
+  <slug>test-case-manager-customize-failure-and-resolution-type</slug>
+  <shortUrl>http://bit.ly/1kouN1C</shortUrl>
+  <author>Colin Dembovsky</author>
+  <pubDate>2013-03-19 20:54:00</pubDate>
+  <lastModified>2020-04-03 04:01:50</lastModified>
+  <content>&lt;p&gt;In Test Case Manager, you can open a test run that has failed and set the Failure and Resolution types for the failure.&lt;/p&gt; &lt;p&gt;&lt;a href="http://lh3.ggpht.com/-t4a_kS-0_WQ/UUi0PYbJc0I/AAAAAAAAApM/oRpIK3_2rUc/s1600-h/image%25255B3%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-GCU-UWuNV7g/UUi0QjIpIGI/AAAAAAAAApU/sxN5-ZNBTo4/image_thumb%25255B1%25255D.png?imgmax=800" width="364" height="199"&gt;&lt;/a&gt;&lt;/p&gt; &lt;p&gt;I’ve had a lot of customers ask me if it’s possible to customize the lists. Up until now, the answer has been no. However, in the middle of a bunch of improvements released in the CTPs of QU2 (Quarterly Update 2), &lt;a href="http://blogs.msdn.com/b/bharry/archive/2013/01/30/announcing-visual-studio-2012-update-2-vs2012-2.aspx" target="_blank"&gt;Brian Harry mentioned&lt;/a&gt; that it is now possible to customize the lists. The CTP he was referring to is NOT A GO LIVE CTP, so rather &lt;a href="http://go.microsoft.com/fwlink/?LinkId=273878" target="_blank"&gt;download CTP4&lt;/a&gt; of the update (which IS GO LIVE) if you want to try this on a production server.&lt;/p&gt; &lt;p&gt;The customization is only possible via the command line. And even that is hard to figure out. So here are the 4 commands that you need.&lt;/p&gt; &lt;p&gt;Export the Current Lists&lt;/p&gt; &lt;p&gt;Open a developer command prompt, and type the following commands (substituting your collection URL and team project accordingly):&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;tcm fieldmapping /export /collection:&lt;strong&gt;collectionURL&lt;/strong&gt; /teamproject:&lt;strong&gt;Project&lt;/strong&gt; /type:FailureType /mappingFile:FailureTypes.xml&lt;/font&gt;&lt;/p&gt; &lt;p&gt;&lt;font size="2" face="Courier New"&gt;tcm fieldmapping /export /collection:&lt;strong&gt;collectionURL&lt;/strong&gt; /teamproject:&lt;strong&gt;Project&lt;/strong&gt; /type:ResolutionType /mappingFile:ResolutionTypes.xml&lt;/font&gt;&lt;/p&gt; &lt;p&gt;This will export the two lists for you. They are pretty straight-forward and self-explanatory:&lt;/p&gt;&lt;pre class="brush: xml; ruler: true;"&gt;&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;br /&gt;&lt;TestFailureTypes&gt;&lt;br /&gt;  &lt;TestFailureType name="Regression" /&gt;&lt;br /&gt;  &lt;TestFailureType name="New Issue" /&gt;&lt;br /&gt;  &lt;TestFailureType name="Known Issue" /&gt;&lt;br /&gt;  &lt;TestFailureType name="Unknown" /&gt;&lt;br /&gt;&lt;/TestFailureTypes&gt;&lt;br /&gt;&lt;/pre&gt;&lt;pre class="brush: xml; ruler: true;"&gt;&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;br /&gt;&lt;TestResolutionStates&gt;&lt;br /&gt;  &lt;TestResolutionState name="Configuration issue" /&gt;&lt;br /&gt;  &lt;TestResolutionState name="Needs investigation" /&gt;&lt;br /&gt;  &lt;TestResolutionState name="Product issue" /&gt;&lt;br /&gt;  &lt;TestResolutionState name="Test issue" /&gt;&lt;br /&gt;&lt;/TestResolutionStates&gt;&lt;br /&gt;&lt;/pre&gt;&lt;br /&gt;&lt;p&gt;Now edit the lists, and then use the import commands:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;font size="2" face="Courier New"&gt;tcm fieldmapping /import /collection:&lt;strong&gt;collectionURL&lt;/strong&gt; /teamproject:&lt;strong&gt;Project&lt;/strong&gt; /type:FailureType /mappingFile:FailureTypes.xml&lt;/font&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;font size="2" face="Courier New"&gt;tcm fieldmapping /import /collection:&lt;strong&gt;collectionURL&lt;/strong&gt; /teamproject:&lt;strong&gt;Project&lt;/strong&gt; /type:ResolutionType /mappingFile:ResolutionTypes.xml&lt;/font&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;That’s it – restart (not just refresh) Test Case Manager and you’re good to go.&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh3.ggpht.com/-4Q1g78FyB44/UUi0Rg70FdI/AAAAAAAAApc/l2FlHrIvBjM/s1600-h/image%25255B7%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh5.ggpht.com/-hy4l-RVHqcE/UUi0TiAe36I/AAAAAAAAApk/gvBaS1v1EjY/image_thumb%25255B3%25255D.png?imgmax=800" width="313" height="339"&gt;&lt;/a&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Of course they new values appear in the Plan Results page, and though I haven’t tested it, I presume they’ll be in the warehouse too:&lt;/p&gt;&lt;br /&gt;&lt;p&gt;&lt;a href="http://lh4.ggpht.com/-PQkxMGznEbQ/UUi0U-wkp9I/AAAAAAAAAps/pijAP-bwSN8/s1600-h/image%25255B11%25255D.png"&gt;&lt;img title="image" style="border-top: 0px; border-right: 0px; background-image: none; border-bottom: 0px; float: none; padding-top: 0px; padding-left: 0px; margin-left: auto; border-left: 0px; display: block; padding-right: 0px; margin-right: auto" border="0" alt="image" src="http://lh4.ggpht.com/-DYoCHNhi4Us/UUi0WOenaNI/AAAAAAAAAp0/14-5SeK8km4/image_thumb%25255B5%25255D.png?imgmax=800" width="244" height="312"&gt;&lt;/a&gt;&lt;/p&gt;&lt;br /&gt;&lt;p&gt;Happy testing!&lt;/p&gt;  </content>
+  <ispublished>true</ispublished>
+  <categories>
+    <category>Testing</category>
+  </categories>
+  <comments>
+    <comment isAdmin="false" isApproved="true" id="c4e6266a-dbea-4be1-8ccc-ad9ce3e0538f">
+      <author>Stephanie Greene</author>
+      <email>stephaniegreene@beckgroup.com</email>
+      <website></website>
+      <ip>198.17.222.114</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-01-20 16:59:44</date>
+      <content>I used this blog a few months ago to set up custom Failure Type and Resolution fields for our projects. Somehow, our custom Failure Type fields were removed and replaced with their default values. When I tried adding them again through the command line, I got an error saying &amp;quot;Command fieldmapping was not found&amp;quot;. We are using VS 2012 Update 4 and TFS 2012, and have not made any known updates to our VS or TFS. Have you experienced this issue before? If so, do you have a workaround or solution?</content>
+    </comment>
+    <comment isAdmin="false" isApproved="true" id="220a4a54-fb87-478d-960f-696ad27f00b8">
+      <author>Stephanie Greene</author>
+      <email>stephaniegreene@beckgroup.com</email>
+      <website></website>
+      <ip>198.17.222.114</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko</userAgent>
+      <date>2015-01-20 17:23:10</date>
+      <content>You can disregard my last comment. I figured out that my new computer was missing Update 4. The problem appears to be solved.</content>
+    </comment>
+    <comment isAdmin="true" isApproved="true" id="cf078f07-a782-4f1e-a346-0b84965465e7">
+      <author>Colin Dembovsky</author>
+      <email>colindembovsky@gmail.com</email>
+      <website>http://colinsalmcorner.com/</website>
+      <ip>105.226.32.63</ip>
+      <userAgent>Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; Touch; rv:11.0) like Gecko</userAgent>
+      <date>2015-03-16 20:58:57</date>
+      <content>Hi @Stephanie&lt;br /&gt;&lt;br /&gt;I was going to suggest that you double-check the update on the client machine - seems you beat me to the chase! Glad you got it working.</content>
+    </comment>
+  </comments>
+  <viewCount>45338</viewCount>
+</post>
