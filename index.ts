@@ -31,7 +31,7 @@ const ALLTAGS = [
     { id: 3, name: "Source Control", slug: "sourcecontrol", description: "Posts about Source Control" },
     { id: 4, name: "Docker", slug: "docker", description: "Posts about Docker" },
     { id: 5, name: "DevOps", slug: "devops", description: "Posts about DevOps" },
-    { id: 6, name: "Release Manaagement", slug: "releasemanaagement", description: "Posts about Release Manaagement" },
+    { id: 6, name: "Release Management", slug: "releasemanagement", description: "Posts about Release Manaagement" },
     { id: 7, name: "Development", slug: "development", description: "Posts about Development" },
     { id: 8, name: "TFS Config", slug: "tfsconfig", description: "Posts about TFS Config" },
     { id: 9, name: "Cloud", slug: "cloud", description: "Posts about Cloud" },
@@ -45,13 +45,17 @@ const ALLTAGS = [
 
 function getTags(post) {
     let cats = <any[]>[];
-    cats.push(...post.categories.category);
-
+    if (Array.isArray(post.categories.category)) {
+        cats.push(...post.categories.category);
+    } else {
+        cats.push(post.categories.category);
+    }
+    
     const tags = cats.map(c => {
         const lookupTagName = c.toLowerCase().replace(" ", "");
         if (lookupTagName === "teambuild") return 1;
-        const lookupTag = ALLTAGS.filter(t => t.name === lookupTagName);
-        if (lookupTag) return lookupTagName.id;
+        const lookupTag = ALLTAGS.filter(t => t.slug === lookupTagName);
+        if (lookupTag.length === 1) return lookupTag[0].id;
         return 15;
     });
     return tags.map(t => {
@@ -116,7 +120,7 @@ const gdpost = {
             data: {
                 posts,
                 posts_tags: postTags,
-                ALLTAGS,
+                tags: ALLTAGS,
             }
         }   
     ]
