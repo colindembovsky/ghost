@@ -4,6 +4,8 @@ import fs from 'fs';
 import { createParserPlugins } from '@tryghost/kg-parser-plugins';
 import { fontToHtmlCard, preCodeToCardCustom, imgToCardCustom } from './customPlugins';
 import { JSDOM } from 'jsdom';
+import axios from 'axios';
+import { threadId } from 'worker_threads';
 
 const defaultPlugins = createParserPlugins({
     createDocument(html) {
@@ -66,6 +68,34 @@ function getTags(post) {
     });
 }
 
+function getComments(post) {
+    let comments = post.comments.comment;
+    if (!comments) return [];
+    if (!Array.isArray(comments)) {
+        comments = [comments];
+    }
+    
+    let issoComments = <any>[];
+    comments.forEach(c => {
+        let issoComment = {
+            slug: post.slug,
+            text: c.content,
+            created: Date.parse(c.date)
+        }
+        if (c.author !== "Anonymous") {
+            issoComment["author"] = c.author
+            if (c.email) {
+                issoComment["email"] = c.email;
+            }
+        }
+        if (c.website.length > 0) {
+            issoComment["website"] = c.website
+        }
+        issoComments.push(issoComment);
+    });
+    return issoComments;
+}
+
 function getPost(path: string) {
     const xml = fs.readFileSync(path, "utf8");
     const postString = parser.toJson(xml);
@@ -86,29 +116,24 @@ function getPost(path: string) {
             status: "published",
             published_by: 1
         },
-        postTags: getTags(post)
+        postTags: getTags(post),
+        comments: getComments(post)
     }
 }
 
 let posts = <any[]>[];
 let postTags = <any[]>[];
+let comments = <any[]>[];
 
 const folder = "exported";
-//const folder = "dev";
 var files = fs.readdirSync(folder);
 files.forEach(f => {
     const postData = getPost(folder + "/" + f);
     postTags.push(...postData.postTags);
     posts.push(postData.post);
-});
 
-// // TODO: loop through XML files in 'exported' folder
-// const postData = getPost("exported/build-fails-path-limit-exceeded.xml");
-// const postData2 = getPost("exported/azure-pipeline-parameters.xml");
-// postTags.push(postData.postTags);
-// posts.push(postData.post);
-// postTags.push(postData2.postTags);
-// posts.push(postData2.post);
+    comments.push(...postData.comments);
+});
 
 const gdpost = {
     db: [
@@ -130,3 +155,33 @@ const gdpost = {
 const pattern = /http(s?):\/\/colinsalmcorner.com\/posts\/files\//gi;
 let importContent = JSON.stringify(gdpost).replace(pattern, "https://colinsalmcorner.azureedge.net/ghostcontent/images/files/");
 fs.writeFileSync("import.json", importContent);
+
+// import comments to isso
+const caller = axios.create({
+    baseURL: `http://localhost:3002`,
+    headers: { "Content-Type": "application/json" }
+});
+
+const waitFor = (ms: number) => new Promise(r => setTimeout(r, ms));
+async function asyncForEach(array, callback) {
+    for (let index = 0; index < array.length; index++) {
+        await callback(array[index], index, array);
+    }
+}
+
+const importComments = async () => {
+    await asyncForEach(comments, async (c) => {
+        try {
+            await caller.post(`/new?uri=%2F${c.slug.replace("(", "-").replace(")", "-")}%2F`, JSON.stringify(c));
+            console.log(".");
+        } catch (e) {
+            console.log(`Failed uploading comment for ${c.slug} by ${c.author ? c.author: 'anonymous'}`);
+            console.log(`  --> [${e.response.status}] ${e.response.statusText}`);
+            console.log(c.website);
+            //console.log(e.response);
+        }
+        await waitFor(20);
+    });
+}
+console.log("Uploading comments!");
+importComments();

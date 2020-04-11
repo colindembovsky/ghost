@@ -1,5 +1,11 @@
 [
     {
+                 
+        "from": "^\/post\/([^(]*)\\(([^)]*)\\)(.*)",
+        "to": "/$1-$2-$3",
+        "permanent": true
+    },
+    {
         "from": "^\/post\/(.+)",
         "to": "/$1",
         "permanent": true
