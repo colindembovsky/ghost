@@ -5,7 +5,7 @@
         // {{#if description}}<p class='search-description'>{{description}}</p>{{/if}}
         $("#search-field").ghostHunter({
             results: "#results",
-            includebodysearch: true,
+            includebodysearch: false,
             info_template: "<p class='search-results-number'>Matching posts: {{amount}}</p>",
             result_template: "<a id='gh-{{ref}}' class='gh-search-item' href='{{link}}'><h3>{{title}}</h3></a><h4>{{pubDate}}</h4>",
             indexing_start: function() { 
