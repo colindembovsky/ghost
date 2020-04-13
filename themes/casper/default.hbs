@@ -15,7 +15,6 @@
     <link rel="stylesheet" type="text/css" href="{{asset "built/screen.css"}}" />
     <link rel="stylesheet" type="text/css" href="{{asset "custom/custom.css"}}" />
     <link rel="stylesheet" type="text/css" href="{{asset "custom/isso-dark.css"}}" >
-    <link rel="stylesheet" type="text/css" href="{{asset "custom/search.css"}}" >
 
     {{!-- Syntax highlighting --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.20.0/themes/prism-tomorrow.min.css" />
@@ -134,26 +133,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.20.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.20.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
-
-    {{!-- Search with GhostHunter --}}
-    <script src="{{asset "js/lib/ghosthunter.js"}}"></script>
-    <script src="{{asset "js/search.js"}}"></script>
-
     {{!-- Ghost outputs important scripts and data with this tag - it should always be the very last thing before the closing body tag --}}
     {{ghost_foot}}
-
-    {{!-- Search overlay and spinner --}}
-    <div id="search-overlay" class="search-overlay block">
-        <div class="centered">
-            <div id='search-box' class="search-box">
-                <div id="search-spinner"></div>
-                <a href="#" id="close-btn" class="close-btn">{{> "icons/close"}}</a>
-                <form id="search-form" class="search-form" onsubmit="return false;">
-                    <input id="search-field" class="search-field" name="q" placeholder="Search" type="text"/>
-                </form>
-            </div>
-            <section class="search-results" id="results"></section>
-        </div>
-    </div>
 </body>
 </html>
