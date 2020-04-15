@@ -1,0 +1,8 @@
+version: '3.3'
+
+services:
+  ghost:
+    image: cacregistry.azurecr.io/ghost:dev
+    ports: 
+    - "2368:80"
+    restart: always
