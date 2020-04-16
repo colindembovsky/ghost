@@ -31,12 +31,11 @@ key=$(az storage account keys list -g $rg -n $saName --query [0].value -o tsv)
 #az storage file upload --account-name $saName --account-key $key \ 
 #   -s $issoDbShareName --source ../docker/isso/config/empty/comments.db
 az storage file upload --account-name $saName --account-key $key \ 
-    -s $issoConfigShareName --source ../docker/isso/config/isso.conf
+    -s $issoConfigShareName --source ../isso/config/azure/isso.conf
 
 echo "Creating app service plan $plan with sku $sku"
 az appservice plan create -g $rg -n $planName --sku $sku --is-linux
 
-# create an initial web app with just ghost - we'll add isso after the volume mount is created
 echo "Creating webapp $webAppName"
 az webapp create -g $rg -n $webAppName -p $planName -i "$acrName.azurecr.io/ghost:dev"
 
