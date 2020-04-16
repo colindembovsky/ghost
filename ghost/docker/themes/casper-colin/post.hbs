@@ -114,11 +114,12 @@ into the {body} of the default.hbs template --}}
                 {{> subscribe-form}}
             {{/if}}
 
+            {{#if }}
             <script 
                 data-isso-css="false"
                 data-isso-require-author="true"
-                data-isso="https://cacisso.azurewebsites.net/" 
-                src="https://cacisso.azurewebsites.net/js/embed.min.js"></script>
+                data-isso="ISSOURL" 
+                src="ISSOURL/js/embed.min.js"></script>
             <section id="isso-thread"></section>
             {{!--
             <section class="post-full-comments">
