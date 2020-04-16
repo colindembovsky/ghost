@@ -3,11 +3,16 @@ Repo for converting posts from MiniBlog to Ghost
 
 ## Creating Docker Image
 ```
+# issoUrl
+# do this before you build the image - remember not to check in the post.hbs :-/
+$issoUrl="..." 
+sed -i "s|ISSOURL|$issoUrl|g" themes/casper-colin/post.hbs
+
 # dev
-docker build . --build-arg issoUrl=http://192.168.1.13:3002 -t cacregistry.azurecr.io/ghost:dev
+docker build . -t cacregistry.azurecr.io/ghost:dev
 
 # prod image
-docker build . --build-arg issoUrl=http://cacisso.azurewebsites.net --build-arg mode=production -t cacregistry.azurecr.io/ghost:prod
+docker build . --build-arg mode=production -t cacregistry.azurecr.io/ghost:prod
 
 # running in dev
 az storage account keys list -g $rg -n $saName --query [0].value -o tsv
