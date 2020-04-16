@@ -197,7 +197,7 @@
     display: inline-block;
     position: relative;
     max-width: 25%;
-    margin: 0;
+    margin: 5px !important;
 }
 .isso-postbox > .form-wrapper > .auth-section .input-wrapper input {
     padding: .3em 10px;
@@ -212,7 +212,7 @@
 .isso-postbox > .form-wrapper > .auth-section .post-action {
     display: inline-block;
     float: right;
-    margin: 0 0 0 5px;
+    margin: 5px 0 0 5px;
 }
 .isso-postbox > .form-wrapper > .auth-section .post-action > input {
     padding-left: 10px;

@@ -3,9 +3,10 @@ Repo for converting posts from MiniBlog to Ghost
 
 ## Creating Docker Image
 ```
-$key="<az storage key>"
+az storage account keys list -g $rg -n $saName --query [0].value -o tsv
+$azkey="<az storage key>"
 docker build . -t col/ghost
-docker run -d --name ghost -e url=http://localhost:3001 -e AZURE_STORAGE_CONNECTION_STRING=$key -p 3001:2368 col/ghost:latest
+docker run -d --name ghost -e url=http://192.168.1.13:3001 -e AZURE_STORAGE_CONNECTION_STRING=$azkey -p 3001:2368 col/ghost:latest
 ```
 
 ## Upload image files
