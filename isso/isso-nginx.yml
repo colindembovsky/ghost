@@ -2,22 +2,15 @@ version: '3.3'
 
 services:
   isso:
-    image: wonderfall/isso
+    image: cacregistry.azurecr.io/isso:dev
     ports: 
     - "8080:8080"
     restart: always
-    volumes:
-    - isso-conf:/config
-    - isso-db:/db
-    
+        
   nginx:
     depends_on:
     - isso
-    image: cacregistry.azurecr.io/nginx-isso:dev  # image with custom nginx config built in
+    image: cacregistry.azurecr.io/nginx-isso:dev
     ports:
     - "80:80"
     restart: always
-       
-volumes:
-  isso-db:
-  isso-conf:
