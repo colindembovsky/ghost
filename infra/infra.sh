@@ -125,8 +125,12 @@ az webapp config container set -g $rg -n $issoAppName \
     --multicontainer-config-file "../isso/isso-nginx.yml"
 
 echo "Enabling docker container logging"
-az webapp log config -g $rg -n $issoAppName --docker-container-logging filesystem
-
+az webapp log config -g $rg -n $issoAppName \
+    --application-logging true \
+    --detailed-error-messages true \
+    --web-server-logging filesystem \
+    --docker-container-logging filesystem \
+    --level information
 
 # container images for dev
 # az acr login -n cacregistry
