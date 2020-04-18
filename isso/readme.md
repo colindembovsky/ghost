@@ -16,7 +16,17 @@ enabled = false
 rateLimit = 2000
 ```
 
+## MySQL
+Spin up a MySQL container like so:
+```
+docker run --name mysql -e MYSQL_ROOT_PASSWORD=S0m3L0ngP@ssw0rd -e MYSQL_USER=isso -e MYSQL_PASSWORD=S0m3L0ngP@ssw0rd -e MYSQL_DATABASE=comments -d -p 3306:3306 mysql:latest
+```
+
+Update the config to specify mysql.
+
 ## Azure File Share and SQLite
+> **Note:** This does not work!
+
 To get sqlite to work on a File share, you must enable WAL mode. Create the db, then run this command:
 
 ```

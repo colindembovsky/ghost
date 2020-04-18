@@ -1,3 +1,6 @@
-FROM wonderfall/isso
+#FROM wonderfall/isso
+FROM col/isso-mysql
 
-COPY config/azure/isso.conf /config/isso.conf
+ARG target
+
+COPY config/${target:-mysql-local}/isso.conf /config/isso.cfg
