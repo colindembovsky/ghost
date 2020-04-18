@@ -1,5 +1,3 @@
 node_modules
-import.json
 key.txt
-themes/*.zip
-ghost/docker/themes/casper-colin.zip
+*.zip

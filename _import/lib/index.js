@@ -129,9 +129,9 @@ let posts = [];
 let postTags = [];
 let comments = [];
 const folder = "exported";
-var files = fs_1.default.readdirSync(folder);
-files.forEach(f => {
-    const postData = getPost(folder + "/" + f);
+var files = fs_1.default.readdirSync(folder, { withFileTypes: true });
+files.filter(f => f.isFile()).forEach(f => {
+    const postData = getPost(folder + "/" + f.name);
     postTags.push(...postData.postTags);
     posts.push(postData.post);
     comments.push(...postData.comments);
@@ -180,7 +180,7 @@ const importComments = () => __awaiter(void 0, void 0, void 0, function* () {
             console.log(c.website);
             //console.log(e.response);
         }
-        yield waitFor(20);
+        yield waitFor(200);
     }));
 });
 console.log("Uploading comments!");
