@@ -28,7 +28,7 @@ jobs:
       dockerfile: nginx/Dockerfile
       buildContext: nginx/
       arguments: |
-        --build-arg site=ghost --build-arg --cdn=$(GhostCDN)
+        --build-arg site=ghost --build-arg cdn=$(GhostCDN)
       repository: ghost-nginx
       tags: |
         $(Build.BuildNumber)
@@ -49,7 +49,7 @@ jobs:
       dockerfile: nginx/Dockerfile
       buildContext: nginx/
       arguments: |
-        --build-arg site=isso --build-arg port=8080 --cdn=$(IssoCDN)
+        --build-arg site=isso --build-arg port=8080 --build-arg cdn=$(IssoCDN)
       repository: isso-nginx
       tags: |
         $(Build.BuildNumber)
