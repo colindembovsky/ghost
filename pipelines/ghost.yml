@@ -28,7 +28,7 @@ jobs:
     inputs:
       command: build
       dockerfile: ghost/docker/Dockerfile
-      buildContext: ghost/docker
+      buildContext: ghost/docker/**
       arguments: |
         --build-arg mode=production
       repository: ghost
