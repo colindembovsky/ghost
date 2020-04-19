@@ -1,4 +1,4 @@
-FROM cacregistry.azurecr.io/issomysql:1.0.4
+FROM cacregistry.azurecr.io/issomysql:latest
 
 ARG target
 
