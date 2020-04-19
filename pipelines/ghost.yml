@@ -27,7 +27,7 @@ jobs:
     displayName: Build ghost image
     inputs:
       command: build
-      dockerfile: ghost/Dockerfile
+      dockerfile: ghost/docker/Dockerfile
       buildContext: ghost
       arguments: |
         --build-arg mode=production
