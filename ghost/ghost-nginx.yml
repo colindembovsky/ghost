@@ -1,16 +1,16 @@
 version: '3.3'
 
 services:
-  isso:
-    image: cacregistry.azurecr.io/isso:dev
+  ghost:
+    image: cacregistry.azurecr.io/ghost:latest
     ports: 
-    - "8080:8080"
+    - "80:80"
     restart: always
         
   nginx:
     depends_on:
-    - isso
-    image: cacregistry.azurecr.io/nginx-isso:dev
+    - ghost
+    image: cacregistry.azurecr.io/nginx-ghost:latest
     ports:
     - "80:80"
     restart: always
