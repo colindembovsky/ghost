@@ -1,0 +1,41 @@
+name: 1.0$($rev:.r)
+
+trigger: none
+
+variables:
+  - template: common-variables.yml
+  # create the following secrets in the pipeline UI:
+  # ISSO_ADMIN_PASS
+  # MYSQL_PASS
+
+jobs:
+- job: buildIsso
+  displayName: Build Isso image
+  pool:
+    vmImageName: ubuntu-latest
+  steps:
+  - task: colinsalmcorner.colinsalmcorner-buildtasks.replace-tokens-task.ReplaceTokens@1
+    displayName: Replace tokens in config
+    inputs:
+      sourcePath: isso/config/release
+      filePattern: isso.conf
+  - task: Docker@2
+    displayName: Build ghost image
+    inputs:
+      command: build
+      dockerfile: isso/Dockerfile
+      buildContext: isso
+      arguments: |
+        --build-arg target=release
+      containerRegistry: cacregistry
+      repository: isso
+      tags: |
+        $(Build.BuildNumber)
+  - task: Docker@2
+    displayName: Push isso image
+    inputs:
+      command: push
+      containerRegistry: cacregistry
+      repository: isso
+      tags: |
+        $(Build.BuildNumber)

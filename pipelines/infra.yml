@@ -1,0 +1,8 @@
+name: 1.0$($rev:.r)
+
+trigger: none
+
+variables:
+  - template: common-variables.yml
+  # create the following secrets in the pipeline UI:
+  # mySQLPass

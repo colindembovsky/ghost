@@ -18,5 +18,5 @@ RUN cp /var/lib/ghost/config.production.json /var/lib/ghost/config.production-or
 
 COPY config/redirects.json /var/lib/ghost/content/data/redirects.json
 COPY config/config.${devMode}.json /var/lib/ghost/config.production.json
-# remember to replace ISSOURL in post.hbs before running docker build
+# remember to replace __ISSO_CDN__ in post.hbs before running docker build
 COPY themes/casper-colin/ /var/lib/ghost/content/themes/casper-colin/

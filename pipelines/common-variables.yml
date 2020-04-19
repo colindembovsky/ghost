@@ -1,0 +1,19 @@
+variables:
+  RG: cac-ghost
+  SKU: B2
+  REGION: westus2
+  PLAN_NAME: cacghostplan
+  GHOST_WEBAPP_NAME: cacghost
+  ISSO_WEBAPP_NAME: cacisso
+  GHOST_SLOT_NAME: test
+  SA_NAME: cacghoststore
+  ACR_NAME: cacregistry
+  GHOST_CDN: "https://$GHOST_WEBAPP_NAME.azurewebsites.net"
+  ISSO_CDN: "https://$ISSO_WEBAPP_NAME.azurewebsites.net"
+  MYSQL_SERVER_NAME: cacmysql
+  MYSQL_ADMIN: cacadmin
+  MYSQL_SKU: B_Gen5_1
+  
+  # Set in pipelines UI
+  # MYSQL_PASS: SomeL0ngP@ssw0rd
+  # ISSO_ADMIN_PASS: SomeLongPass

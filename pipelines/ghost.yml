@@ -1,0 +1,40 @@
+name: 1.0$($rev:.r)
+
+trigger: none
+
+variables:
+  - template: common-variables.yml
+  # create the following secrets in the pipeline UI:
+  # MYSQL_PASS
+
+jobs:
+- job: guildGhost
+  displayName: Build Ghost image
+  pool:
+    vmImageName: ubuntu-latest
+  steps:
+  - task: colinsalmcorner.colinsalmcorner-buildtasks.replace-tokens-task.ReplaceTokens@1
+    displayName: Replace tokens in config
+    inputs:
+      sourcePath: ghost/docker/themes/casper-colin
+      filePattern: post.hbs
+  - task: Docker@2
+    displayName: Build ghost image
+    inputs:
+      command: build
+      dockerfile: ghost/Dockerfile
+      buildContext: ghost
+      arguments: |
+        --build-arg mode=production
+      containerRegistry: cacregistry
+      repository: ghost
+      tags: |
+        $(Build.BuildNumber)
+  - task: Docker@2
+    displayName: Push ghost image
+    inputs:
+      command: push
+      containerRegistry: cacregistry
+      repository: ghost
+      tags: |
+        $(Build.BuildNumber)

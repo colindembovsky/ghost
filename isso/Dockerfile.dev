@@ -1,4 +1,4 @@
-FROM cacregistry/issomysql:latest
+FROM col/isso-mysql
 
 ARG target
 
