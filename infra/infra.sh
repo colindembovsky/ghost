@@ -16,7 +16,7 @@ acrName="cacregistry"
 ghostUrl="https://$webAppName.azurewebsites.net"
 mySQLServerName="cacmysql"
 mySQLAdmin="admin_cac"
-mySQLPass="SomeL0ngP@ssw0rd"
+mySQLPass=$1
 mySQLSku="B_Gen5_1"
 
 # for fish
@@ -59,8 +59,11 @@ az mysql server firewall-rule create --resource-group $rg --server $mySQLServerN
         --name AllowAzureIP \
         --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
 
-echo "Creating Ghost Database"
+echo "Creating ghost Database"
 az mysql db create -g $rg -s $mySQLServerName -n ghost
+
+echo "Creating comments Database"
+az mysql db create -g $rg -s $mySQLServerName -n comments
 
 echo "Creating app service plan $planName with sku $sku"
 az appservice plan create -g $rg -n $planName --sku $sku --is-linux
