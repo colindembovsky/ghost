@@ -4,5 +4,22 @@ trigger: none
 
 variables:
   - template: common-variables.yml
+  - name: AzureSub
+    value: VSEnterprise
   # create the following secrets in the pipeline UI:
-  # mySQLPass
+  # ISSO_ADMIN_PASS
+  # MYSQL_PASS
+
+jobs:
+- job: infra
+  displayName: Create infra
+  pool:
+    vmImageName: ubuntu-latest
+  steps:
+  - task: AzureCLI@2
+    displayName: Run infra script
+    inputs:
+      azureSubscription: $(AzureSub)
+      scriptType: bash
+      scriptPath: infra/infra.sh
+      workingDirectory: infra
