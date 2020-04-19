@@ -62,3 +62,14 @@ jobs:
       tags: |
         $(Build.BuildNumber)
         latest
+  
+  - task: Docker@2
+    displayName: Build certbot image
+    inputs:
+      command: buildAndPush
+      dockerfile: certbot/Dockerfile
+      buildContext: certbot/
+      repository: certbot
+      tags: |
+        $(Build.BuildNumber)
+        latest
