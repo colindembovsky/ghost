@@ -1,0 +1,64 @@
+name: 1.0$(Rev:.r)
+
+trigger: none
+
+variables:
+  - template: common-variables.yml
+  - name: GhostCDN
+    value: cacghost.azurewebsites.net
+  - name: IssoCDN
+    value: cacisso.azurewebsites.net 
+
+jobs:
+- job: buildNginx
+  displayName: Build nginx images
+  pool:
+    vmImageName: ubuntu-latest
+  steps:
+  - task: Docker@2
+    displayName: Login to ACR
+    inputs:
+      command: login
+      containerRegistry: CACRegistry
+  
+  - task: Docker@2
+    displayName: Build ghost nginx image
+    inputs:
+      command: build
+      dockerfile: nginx/Dockerfile
+      buildContext: nginx/
+      arguments: |
+        --build-arg site=ghost --build-arg --cdn $(GhostCDN)
+      repository: ghost-nginx
+      tags: |
+        $(Build.BuildNumber)
+        latest
+  - task: Docker@2
+    displayName: Push ghost nginx image
+    inputs:
+      command: push
+      repository: ghost-nginx
+      tags: |
+        $(Build.BuildNumber)
+        latest
+  
+  - task: Docker@2
+    displayName: Build isso nginx image
+    inputs:
+      command: build
+      dockerfile: nginx/Dockerfile
+      buildContext: nginx/
+      arguments: |
+        --build-arg site=isso --build-arg port=8080 --cdn $(IssoCDN)
+      repository: isso-nginx
+      tags: |
+        $(Build.BuildNumber)
+        latest
+  - task: Docker@2
+    displayName: Push isso nginx image
+    inputs:
+      command: push
+      repository: isso-nginx
+      tags: |
+        $(Build.BuildNumber)
+        latest
