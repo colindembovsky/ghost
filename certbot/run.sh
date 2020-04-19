@@ -5,7 +5,7 @@ data_path="./data/certbot"
 if [ -z $STAGING ] || [ $STAGING != "0" ]; then staging_arg="--staging"; fi
 
 if [ -z $EMAIL ] || [ -z $CDN ]; then
-  echo "Please set email and CDN!"
+  echo "Please set email and CDN environment variables!"
 else
     echo "Registering cert"
     echo "Staging arg: $STAGING"
