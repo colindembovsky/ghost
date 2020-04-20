@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   isso:
-    image: cacregistry.azurecr.io/isso:dev
+    image: cacregistry.azurecr.io/isso:1.0.3
     ports: 
     - "8080:8080"
     restart: always
@@ -10,7 +10,7 @@ services:
   nginx:
     depends_on:
     - isso
-    image: cacregistry.azurecr.io/nginx-isso:dev
+    image: cacregistry.azurecr.io/isso-nginx:dev
     ports:
     - "80:80"
     restart: always

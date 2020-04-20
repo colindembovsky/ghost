@@ -49,6 +49,7 @@ echo "Creating app service plan $PLAN_NAME with sku $SKU"
 az appservice plan create -g $RG -n $PLAN_NAME --sku $SKU --is-linux
 
 echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
+acrPassword=$(az acr credential show -g $RG -n $ACR_NAME --query "[passwords[?name=='password'].value]" --output tsv)
 az webapp create -g $RG -n $GHOST_WEBAPP_NAME -p $PLAN_NAME \
     --multicontainer-config-type "compose" \
     --multicontainer-config-file "../ghost/ghost-nginx.yml"
@@ -59,13 +60,13 @@ az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
     --detailed-error-messages true \
     --web-server-logging filesystem \
     --docker-container-logging filesystem \
-    --level information
+    --level verbose
 
 echo "Setting ghost and nginx env settings"
 az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     url=https://$GHOST_CDN \
     CDN=$GHOST_CDN \
-    EMAIL=$(Email) \
+    EMAIL=$EMAIL \
     STAGING=$STAGING \
     database__client=mysql \
     database__connection__database=ghost \
@@ -74,15 +75,22 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     database__connection__password=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
+echo "Reset images for ghost"
+az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
+    --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
+    --docker-registry-server-user $ACR_NAME \
+    --docker-registry-server-password $acrPassword \
+    --multicontainer-config-type "compose" \
+    --multicontainer-config-file "../ghost/ghost-nginx.yml"
+
 echo "Creating webapp $ISSO_WEBAPP_NAME"
-acrPassword=$(az acr credential show -g $RG -n $ACR_NAME --query "[passwords[?name=='password'].value]" --output tsv)
 az webapp create -g $RG -n $ISSO_WEBAPP_NAME -p $PLAN_NAME \
     --multicontainer-config-type "compose" \
     --multicontainer-config-file "../isso/isso-nginx.yml"
 
 echo "Setting registry for $ISSO_WEBAPP_NAME"
 az webapp config container set -g $RG -n $ISSO_WEBAPP_NAME \
-    --docker-registry-server-url "http://$ACR_NAME.azurecr.io" \
+    --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
     --docker-registry-server-user $ACR_NAME \
     --docker-registry-server-password $acrPassword \
     --multicontainer-config-type "compose" \
@@ -99,7 +107,7 @@ az webapp log config -g $RG -n $ISSO_WEBAPP_NAME \
 echo "Setting isso and nginx env settings"
 az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     CDN=$ISSO_CDN \
-    EMAIL=$(Email) \
+    EMAIL=$EMAIL \
     STAGING=$STAGING \
     MYSQL_HOST=$MYSQL_SERVER_NAME.mysql.database.azure.com \
     MYSQL_DB=comments \
