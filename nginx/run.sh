@@ -3,11 +3,13 @@
 if [ -z $CDN ]; then
   echo "Please set CDN environment variable!"
 else
-    # copy dummy certs into the ssl volume
-    echo "Copying ssl dummy certs"
-    mkdir -p /etc/letsencrypt/live/$CDN/
-    cp -f /tmp/dummy_cert.pem /etc/letsencrypt/live/$CDN/fullchain.pem
-    cp -f /tmp/dummy_privkey.pem /etc/letsencrypt/live/$CDN/privkey.pem
+    if [ ! -f "/etc/letsencrypt/live/$CDN/fullchain.pem" ]; then
+      # copy dummy certs into the ssl volume
+      echo "Copying ssl dummy certs"
+      mkdir -p /etc/letsencrypt/live/$CDN/
+      cp -f /tmp/dummy_cert.pem /etc/letsencrypt/live/$CDN/fullchain.pem
+      cp -f /tmp/dummy_privkey.pem /etc/letsencrypt/live/$CDN/privkey.pem
+    fi
 
     # loop 10 times, reloading the config every 30 seconds to allow
     # certbot to create a valid cert

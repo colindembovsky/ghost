@@ -1,17 +1,11 @@
 #!/bin/sh
 
 rsa_key_size=4096
-data_path="./data/certbot"
 if [ -z $STAGING ] || [ $STAGING != "0" ]; then staging_arg="--staging"; fi
 
 if [ -z $EMAIL ] || [ -z $CDN ]; then
   echo "Please set email and CDN environment variables!"
 else
-    if [ -f "/tmp/firsttime" ]; then
-      echo "Container first time - delete self-signed cert"
-      rm -rf /etc/letsencrypt/live/CDN/*.pem
-    fi
-
     wwwArg=""
     if [ ! -z $WWWCDN ]; then
       echo "Adding $WWWCDN to registration"
