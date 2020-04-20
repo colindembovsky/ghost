@@ -10,7 +10,7 @@ services:
   nginx:
     depends_on:
     - isso
-    image: cacregistry.azurecr.io/isso-nginx:dev
+    image: cacregistry.azurecr.io/isso-nginx:latest
     ports:
     - "80:80"
     restart: always
@@ -19,6 +19,8 @@ services:
       - ${WEBAPP_STORAGE_HOME}/certbot/www:/var/www/certbot
   
   certbot:
+    depends_on:
+    - nginx
     image: cacregistry.azurecr.io/certbot:latest
     restart: unless-stopped
     volumes:

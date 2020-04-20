@@ -19,6 +19,8 @@ services:
       - ${WEBAPP_STORAGE_HOME}/certbot/www:/var/www/certbot
   
   certbot:
+    depends_on:
+    - nginx
     image: cacregistry.azurecr.io/certbot:latest
     restart: unless-stopped
     volumes:

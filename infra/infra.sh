@@ -120,3 +120,5 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     MYSQL_USERNAME=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \
     MYSQL_PASSWORD=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
+
+curl https://$ISSO_CDN/js/embed.min.js
