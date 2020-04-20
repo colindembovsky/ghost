@@ -17,4 +17,4 @@ COPY config/*.pem /tmp/
 COPY run.sh /usr/local/bin
 
 # override entrypoint to reload config every 6 hours (for auto-renew of certs)
-ENTRYPOINT ["/usr/local/bin/run.sh"]
+ENTRYPOINT ["run.sh"]
