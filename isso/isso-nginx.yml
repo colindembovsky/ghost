@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   isso:
-    image: cacregistry.azurecr.io/isso:1.0.3
+    image: cacregistry.azurecr.io/isso:1.0.4
     ports: 
     - "8080:8080"
     restart: always

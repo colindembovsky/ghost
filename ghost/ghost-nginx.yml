@@ -12,7 +12,7 @@ services:
     - ghost
     image: cacregistry.azurecr.io/ghost-nginx:latest
     ports:
-    - "80:80"
+    - "443:443"
     restart: always
     volumes:
       - ${WEBAPP_STORAGE_HOME}/certbot/conf:/etc/letsencrypt
