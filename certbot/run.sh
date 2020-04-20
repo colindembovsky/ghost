@@ -7,6 +7,11 @@ if [ -z $STAGING ] || [ $STAGING != "0" ]; then staging_arg="--staging"; fi
 if [ -z $EMAIL ] || [ -z $CDN ]; then
   echo "Please set email and CDN environment variables!"
 else
+    if [ -f "/tmp/firsttime" ]; then
+      echo "Container first time - delete self-signed cert"
+      rm -rf /etc/letsencrypt/live/CDN/*.pem
+    fi
+
     wwwArg=""
     if [ ! -z $WWWCDN ]; then
       echo "Adding $WWWCDN to registration"
@@ -21,8 +26,7 @@ else
         $wwwArg \
         --rsa-key-size $rsa_key_size \
         --agree-tos \
-        --force-renewal \
-        --expand
+        --force-renewal
 
     # other containers may take a while to boot, but we need them to
     # be running to respond to challenges, so loop every 30s for 10

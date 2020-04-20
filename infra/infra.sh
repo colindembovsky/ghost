@@ -10,7 +10,9 @@
 # set -x SA_NAME "cacghoststore"
 # set -x ACR_NAME "cacregistry"
 # set -x GHOST_CDN "$GHOST_WEBAPP_NAME.azurewebsites.net"
+# set -x GHOST_WWW_CDN ""
 # set -x ISSO_CDN "$ISSO_WEBAPP_NAME.azurewebsites.net"
+# set -x ISSO_WWW_CDN ""
 # set -x MYSQL_SERVER_NAME "cacmysql"
 # set -x MYSQL_ADMIN "admin_cac"
 # set -x MYSQL_PASS "SomeL0ngP@ssw0rd"
@@ -66,6 +68,7 @@ echo "Setting ghost and nginx env settings"
 az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     url=https://$GHOST_CDN \
     CDN=$GHOST_CDN \
+    WWWCDN=$GHOST_WWW_CDN \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
     database__client=mysql \
@@ -74,6 +77,8 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     database__connection__user=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \
     database__connection__password=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
+
+curl https://$GHOST_CDN
 
 echo "Reset images for ghost"
 az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
@@ -107,6 +112,7 @@ az webapp log config -g $RG -n $ISSO_WEBAPP_NAME \
 echo "Setting isso and nginx env settings"
 az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     CDN=$ISSO_CDN \
+    WWWCDN=$ISSO_WWW_CDN \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
     MYSQL_HOST=$MYSQL_SERVER_NAME.mysql.database.azure.com \
