@@ -21,7 +21,8 @@ else
         $wwwArg \
         --rsa-key-size $rsa_key_size \
         --agree-tos \
-        --force-renewal
+        --force-renewal \
+        --expand
 
     # loop infinitely and check for cert renewal every 12 hours
     trap exit TERM; while :; do certbot renew; sleep 10s & wait $!; done;
