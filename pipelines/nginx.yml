@@ -1,6 +1,11 @@
 name: 1.0$(Rev:.r)
 
-trigger: none
+trigger:
+  paths:
+    include:
+    - pipelines/nginx.yml
+    - nginx/*
+    - certbot/*
 
 variables:
   - template: common-variables.yml
