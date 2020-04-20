@@ -24,6 +24,12 @@ else
         --force-renewal \
         --expand
 
+    # other containers may take a while to boot, but we need them to
+    # be running to respond to challenges, so loop every 30s for 10
+    # mins
+    x=20
+    trap exit TERM; while [ $x -gt 0 ]; do certbot renew; sleep 30s & wait $!; done;
+
     # loop infinitely and check for cert renewal every 12 hours
-    trap exit TERM; while :; do certbot renew; sleep 10s & wait $!; done;
+    trap exit TERM; while :; do certbot renew; sleep 12h & wait $!; done;
 fi
