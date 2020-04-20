@@ -11,7 +11,7 @@ else
     echo "Staging arg: $STAGING"
     certbot certonly --webroot -w /var/www/certbot \
         $staging_arg \
-        $EMAIL \
+        --email $EMAIL \
         -d $CDN -d www.$CDN \
         --rsa-key-size $rsa_key_size \
         --agree-tos \
