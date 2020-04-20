@@ -33,7 +33,7 @@ jobs:
       dockerfile: nginx/Dockerfile
       buildContext: nginx/
       arguments: |
-        --build-arg site=ghost --build-arg cdn=$(GhostCDN)
+        --build-arg site=ghost --build-arg port=2368 --build-arg cdn=$(GhostCDN)
       repository: ghost-nginx
       tags: |
         $(Build.BuildNumber)
