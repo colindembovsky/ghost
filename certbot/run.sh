@@ -7,27 +7,38 @@ if [ -z $EMAIL ] || [ -z $CDN ]; then
   echo "Please set email and CDN environment variables!"
 else
     wwwArg=""
-    if [ ! -z $WWWCDN ]; then
-      echo "Adding $WWWCDN to registration"
-      wwwArg="-d $WWWCDN" 
+    if [ -z $WWW ] || [ $WWW != "0" ]; then
+      echo "Adding www.$CDN to registration"
+      wwwArg="-d www.$CDN" 
     fi
-    echo "Registering cert"
-    echo "Staging arg: $STAGING"
-    certbot certonly --webroot -w /var/www/certbot \
-        $staging_arg \
-        --email $EMAIL \
-        -d $CDN \
-        $wwwArg \
-        --rsa-key-size $rsa_key_size \
-        --agree-tos \
-        --force-renewal
 
-    # other containers may take a while to boot, but we need them to
-    # be running to respond to challenges, so loop every 30s for 10
-    # mins
-    x=20
-    trap exit TERM; while [ $x -gt 0 ]; do certbot renew; sleep 30s & wait $!; done;
+    if [ ! -f "$WORKING_PATH/live/$CDN/fullchain.pem" ]; then
+      echo "Creating cert"
+      echo "Staging arg: $STAGING"
+
+      certbot certonly --standalone \
+        --preferred-challenges=http \
+        --email $EMAIL \
+        --agree-tos \
+        --no-eff-email \
+        --manual-public-ip-logging-ok \
+        --domain $CDN $wwwArg
+      
+      # append the renew_hook to the config file
+      echo "renew_hook = deploy-cert-az-webapp.sh" >> "$WORKING_PATH/renawal/$CDN.conf"
+
+      # run the script to register the cert with web apps
+      deploy-cert-az-webapp.sh
+    fi
+
+    timeout="12h"
+    if [ ! -z $DEBUG ] && [ $DEBUG == "TRUE" ]; then
+      timeout="30s"
+    fi
 
     # loop infinitely and check for cert renewal every 12 hours
-    trap exit TERM; while :; do certbot renew; sleep 12h & wait $!; done;
+    # if the cert does not need renewing, certbot does nothing
+    # after renewal, the deploy-cert-az-webapp.sh should fire to
+    # register the renewed cert
+    trap exit TERM; while :; do certbot renew; sleep $timeout & wait $!; done;
 fi

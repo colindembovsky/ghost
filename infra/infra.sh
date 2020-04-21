@@ -56,6 +56,14 @@ az webapp create -g $RG -n $GHOST_WEBAPP_NAME -p $PLAN_NAME \
     --multicontainer-config-type "compose" \
     --multicontainer-config-file "../ghost/ghost-nginx.yml"
 
+echo "Setting registry for $GHOST_WEBAPP_NAME"
+az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
+    --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
+    --docker-registry-server-user $ACR_NAME \
+    --docker-registry-server-password $acrPassword \
+    --multicontainer-config-type "compose" \
+    --multicontainer-config-file "../ghost/ghost-nginx.yml"
+
 echo "Enabling docker container logging"
 az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
     --application-logging true \
@@ -78,15 +86,8 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     database__connection__password=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
+echo "Hit $GHOST_CDN to start site"
 curl https://$GHOST_CDN
-
-echo "Reset images for ghost"
-az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
-    --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
-    --docker-registry-server-user $ACR_NAME \
-    --docker-registry-server-password $acrPassword \
-    --multicontainer-config-type "compose" \
-    --multicontainer-config-file "../ghost/ghost-nginx.yml"
 
 echo "Creating webapp $ISSO_WEBAPP_NAME"
 az webapp create -g $RG -n $ISSO_WEBAPP_NAME -p $PLAN_NAME \
@@ -121,4 +122,5 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     MYSQL_PASSWORD=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
+echo "Hit $ISSO_CDN to start site"
 curl https://$ISSO_CDN/js/embed.min.js

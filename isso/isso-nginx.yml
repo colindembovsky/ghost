@@ -8,21 +8,13 @@ services:
     restart: always
         
   nginx:
-    depends_on:
-    - isso
     image: cacregistry.azurecr.io/isso-nginx:latest
     ports:
     - "80:80"
     restart: always
-    volumes:
-      - ${WEBAPP_STORAGE_HOME}/certbot/conf:/etc/letsencrypt
-      - ${WEBAPP_STORAGE_HOME}/certbot/www:/var/www/certbot
   
   certbot:
-    depends_on:
-    - nginx
     image: cacregistry.azurecr.io/certbot:latest
+    ports:
+    - "8081:80"
     restart: unless-stopped
-    volumes:
-      - ${WEBAPP_STORAGE_HOME}/certbot/conf:/etc/letsencrypt
-      - ${WEBAPP_STORAGE_HOME}/certbot/www:/var/www/certbot
