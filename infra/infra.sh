@@ -9,9 +9,9 @@
 # set -x ISSO_WEBAPP_NAME "cacisso"
 # set -x ACR_NAME "cacregistry"
 # set -x GHOST_CDN "blog.colinsalmcorner.com"
-# set -x GHOST_WWW_CDN ""
+# set -x GHOST_WWW "0"
 # set -x ISSO_CDN "comments.colinsalmcorner.com"
-# set -x ISSO_WWW_CDN ""
+# set -x ISSO_WWW "0"
 # set -x MYSQL_SERVER_NAME "cacmysql"
 # set -x MYSQL_ADMIN "admin_cac"
 # set -x MYSQL_SKU "B_Gen5_1"
@@ -75,7 +75,7 @@ echo "Setting ghost and nginx env settings"
 az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     url=https://$GHOST_CDN \
     CDN=$GHOST_CDN \
-    WWWCDN=$GHOST_WWW_CDN \
+    WWW=$GHOST_WWW \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
     AZ_CLIENT_ID=$AZ_CLIENT_ID \
@@ -118,7 +118,7 @@ az webapp log config -g $RG -n $ISSO_WEBAPP_NAME \
 echo "Setting isso and nginx env settings"
 az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     CDN=$ISSO_CDN \
-    WWWCDN=$ISSO_WWW_CDN \
+    WWW=$ISSO_WWW \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
     AZ_CLIENT_ID=$AZ_CLIENT_ID \

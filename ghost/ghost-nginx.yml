@@ -14,5 +14,9 @@ services:
     restart: always
 
   certbot:
+    depends_on:
+    - nginx
     image: cacregistry.azurecr.io/certbot:latest
+    ports:
+    - "80"
     restart: always
