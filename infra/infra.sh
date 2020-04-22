@@ -7,27 +7,23 @@
 # set -x PLAN_NAME "cacghostplan"
 # set -x GHOST_WEBAPP_NAME "cacghost"
 # set -x ISSO_WEBAPP_NAME "cacisso"
-# set -x SA_NAME "cacghoststore"
 # set -x ACR_NAME "cacregistry"
-# set -x GHOST_CDN "$GHOST_WEBAPP_NAME.azurewebsites.net"
+# set -x GHOST_CDN "blog.colinsalmcorner.com"
 # set -x GHOST_WWW_CDN ""
-# set -x ISSO_CDN "$ISSO_WEBAPP_NAME.azurewebsites.net"
+# set -x ISSO_CDN "comments.colinsalmcorner.com"
 # set -x ISSO_WWW_CDN ""
 # set -x MYSQL_SERVER_NAME "cacmysql"
 # set -x MYSQL_ADMIN "admin_cac"
-# set -x MYSQL_PASS "SomeL0ngP@ssw0rd"
 # set -x MYSQL_SKU "B_Gen5_1"
 # set -x EMAIL "colin@home.com"
 # set -x STAGING "1"
+# set -x MYSQL_PASS "SomeL0ngP@ssw0rd"
 
 echo "Creating resource group $RG in REGION $REGION"
 az group create -n $RG -l $REGION
 
 echo "Create container registry"
 az acr create -g $RG -n $ACR_NAME --sku Basic --admin-enabled true
-
-echo "Create storage account $SA_NAME"
-az storage account create -n $SA_NAME -g $RG -l $REGION --kind StorageV2 --sku Standard_LRS
 
 echo "Creating MYSQL server $MYSQL_SERVER_NAME"
 az mysql server create -g $RG -n $MYSQL_SERVER_NAME \
@@ -72,6 +68,9 @@ az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
     --docker-container-logging filesystem \
     --level verbose
 
+echo "Set custom DNS $GHOST_CDN for $GHOST_WEBAPP_NAME"
+az webapp config hostname add --webapp-name $GHOST_WEBAPP_NAME -g $RG --hostname $GHOST_CDN
+
 echo "Setting ghost and nginx env settings"
 az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     url=https://$GHOST_CDN \
@@ -79,6 +78,12 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     WWWCDN=$GHOST_WWW_CDN \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
+    AZ_CLIENT_ID=$AZ_CLIENT_ID \
+    AZ_CLIENT_KEY=$AZ_CLIENT_KEY \
+    AZ_TENANT_ID=$AZ_TENANT_ID \
+    PFX_PASSWORD=$PFX_PASSWORD \
+    WEB_APP_NAME=$GHOST_WEBAPP_NAME \
+    RESOURCE_GROUP=$RG \
     database__client=mysql \
     database__connection__database=ghost \
     database__connection__host=$MYSQL_SERVER_NAME.mysql.database.azure.com \
@@ -116,6 +121,12 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     WWWCDN=$ISSO_WWW_CDN \
     EMAIL=$EMAIL \
     STAGING=$STAGING \
+    AZ_CLIENT_ID=$AZ_CLIENT_ID \
+    AZ_CLIENT_KEY=$AZ_CLIENT_KEY \
+    AZ_TENANT_ID=$AZ_TENANT_ID \
+    PFX_PASSWORD=$PFX_PASSWORD \
+    WEB_APP_NAME=$ISSO_WEBAPP_NAME \
+    RESOURCE_GROUP=$RG \
     MYSQL_HOST=$MYSQL_SERVER_NAME.mysql.database.azure.com \
     MYSQL_DB=comments \
     MYSQL_USERNAME=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \

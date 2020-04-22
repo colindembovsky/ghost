@@ -5,11 +5,9 @@ variables:
   PLAN_NAME: cacghostplan
   GHOST_WEBAPP_NAME: cacghost
   ISSO_WEBAPP_NAME: cacisso
-  GHOST_SLOT_NAME: test
-  SA_NAME: cacghoststore
   ACR_NAME: cacregistry
-  GHOST_CDN: "https://$GHOST_WEBAPP_NAME.azurewebsites.net"
-  ISSO_CDN: "https://$ISSO_WEBAPP_NAME.azurewebsites.net"
+  GHOST_CDN: "blog.colinsalmcorner.com"
+  ISSO_CDN: "comments.colinsalmcorner.com"
   MYSQL_SERVER_NAME: cacmysql
   MYSQL_ADMIN: cacadmin
   MYSQL_SKU: B_Gen5_1

@@ -4,16 +4,16 @@ services:
   ghost:
     image: cacregistry.azurecr.io/ghost:1.0.4
     ports: 
-    - "2368:2368"
+    - "2368"
     restart: always
         
   nginx:
     image: cacregistry.azurecr.io/ghost-nginx:latest
     ports:
-    - "80:80"
+    - "80"
     restart: always
 
   certbot:
     image: cacregistry.azurecr.io/certbot:latest
-    ports: "8081:80"
+    ports: "8081"
     restart: unless-stopped

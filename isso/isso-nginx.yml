@@ -4,17 +4,17 @@ services:
   isso:
     image: cacregistry.azurecr.io/isso:1.0.4
     ports: 
-    - "8080:8080"
+    - "8080"
     restart: always
         
   nginx:
     image: cacregistry.azurecr.io/isso-nginx:latest
     ports:
-    - "80:80"
+    - "80"
     restart: always
   
   certbot:
     image: cacregistry.azurecr.io/certbot:latest
     ports:
-    - "8081:80"
+    - "8081"
     restart: unless-stopped
