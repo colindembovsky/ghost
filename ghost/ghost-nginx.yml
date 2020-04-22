@@ -12,6 +12,8 @@ services:
     ports:
     - "0:80"
     restart: always
+    volumes:
+    - ${WEBAPP_STORAGE_HOME}/nginx/log:/var/log
 
   # certbot:
   #   depends_on:
