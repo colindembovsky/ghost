@@ -19,6 +19,7 @@ else
       certbot certonly --standalone \
         --preferred-challenges=http \
         --email $EMAIL \
+        $staging_arg \
         --agree-tos \
         --no-eff-email \
         --manual-public-ip-logging-ok \
