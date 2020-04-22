@@ -10,7 +10,7 @@ fi
 # convert pem to pfx for azure web app
 echo "Converting pem to pfx"
 openssl pkcs12 \
-    -pass pass:$PFX_PASSWORD \
+    -password pass:$PFX_PASSWORD \
     -inkey $certPath/privkey.pem \
     -in $certPath/cert.pem \
     -export -out $certPath/cert.pfx
