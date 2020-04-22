@@ -25,6 +25,7 @@ else
         --domain $CDN $wwwArg
       
       # append the renew_hook to the config file
+      mkdir -p "$WORKING_PATH/renawal/"
       echo "renew_hook = deploy-cert-az-webapp.sh" >> "$WORKING_PATH/renawal/$CDN.conf"
 
       # run the script to register the cert with web apps
