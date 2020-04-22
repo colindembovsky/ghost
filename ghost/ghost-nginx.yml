@@ -18,5 +18,5 @@ services:
     - nginx
     image: cacregistry.azurecr.io/certbot:latest
     ports:
-    - "80"
+    - "80:80"
     restart: always
