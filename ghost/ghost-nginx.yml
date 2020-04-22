@@ -1,7 +1,15 @@
 version: '3.3'
 
 services:
+  ghost:
+    image: cacregistry.azurecr.io/ghost:1.0.4
+    ports: 
+    - "2368:2368"
+    restart: always
+
   nginx:
+    depends_on:
+    - ghost
     image: cacregistry.azurecr.io/ghost-nginx:latest
     ports:
     - "0:80"
@@ -17,10 +25,4 @@ services:
   #   volumes:
   #   - ${WEBAPP_STORAGE_HOME}/certbot/letsencrypt:/etc/letsencrypt
 
-  ghost:
-  #   depends_on:
-  #   - certbot
-    image: cacregistry.azurecr.io/ghost:1.0.4
-    ports: 
-    - "0:2368"
-    restart: always
+  
