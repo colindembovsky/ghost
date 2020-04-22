@@ -10,11 +10,9 @@ services:
   nginx:
     image: cacregistry.azurecr.io/ghost-nginx:latest
     ports:
-    - "80:80"
+    - "0:80"
     restart: always
 
   certbot:
     image: cacregistry.azurecr.io/certbot:latest
-    ports: 
-    - "8081:80"
     restart: always
