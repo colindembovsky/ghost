@@ -4,7 +4,7 @@ services:
   isso:
     image: cacregistry.azurecr.io/isso:1.0.4
     ports: 
-    - "8088:8080"
+    - "8088:8088"
     restart: always
 
   nginx:
@@ -12,7 +12,7 @@ services:
     - isso
     image: cacregistry.azurecr.io/isso-nginx:latest
     ports:
-    - "80"
+    - "0:80"
     restart: always
 
   certbot:
