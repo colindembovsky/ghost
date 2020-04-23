@@ -25,7 +25,7 @@ jobs:
       command: login
       containerRegistry: CACRegistry
   - task: Docker@2
-    displayName: Build ghost image
+    displayName: Build isso image
     inputs:
       command: build
       dockerfile: isso/Dockerfile
