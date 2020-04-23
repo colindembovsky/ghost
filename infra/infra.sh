@@ -91,8 +91,8 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     database__connection__password=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
-echo "Hit $GHOST_CDN to start site"
-curl https://$GHOST_CDN
+echo "Hit $GHOST_WEBAPP_NAME.azurewebsites.net to start site"
+curl https://$GHOST_WEBAPP_NAME.azurewebsites.net
 
 echo "Creating webapp $ISSO_WEBAPP_NAME"
 az webapp create -g $RG -n $ISSO_WEBAPP_NAME -p $PLAN_NAME \
@@ -115,6 +115,9 @@ az webapp log config -g $RG -n $ISSO_WEBAPP_NAME \
     --docker-container-logging filesystem \
     --level information
 
+echo "Set custom DNS $ISSO_CDN for $ISSO_WEBAPP_NAME"
+az webapp config hostname add --webapp-name $ISSO_WEBAPP_NAME -g $RG --hostname $ISSO_CDN
+
 echo "Setting isso and nginx env settings"
 az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     CDN=$ISSO_CDN \
@@ -133,5 +136,5 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     MYSQL_PASSWORD=$MYSQL_PASS \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
-echo "Hit $ISSO_CDN to start site"
-curl https://$ISSO_CDN/js/embed.min.js
+echo "Hit $ISSO_WEBAPP_NAME.azurewebsites.net to start site"
+curl http://$ISSO_WEBAPP_NAME.azurewebsites.net/js/embed.min.js
