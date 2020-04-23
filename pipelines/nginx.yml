@@ -33,7 +33,7 @@ jobs:
       dockerfile: nginx/Dockerfile
       buildContext: nginx/
       arguments: |
-        --build-arg site=ghost --build-arg port=2368 --build-arg
+        --build-arg site=ghost --build-arg port=2368
       repository: ghost-nginx
       tags: |
         $(Build.BuildNumber)
@@ -54,7 +54,7 @@ jobs:
       dockerfile: nginx/Dockerfile
       buildContext: nginx/
       arguments: |
-        --build-arg site=isso --build-arg port=8088 --build-arg
+        --build-arg site=isso --build-arg port=8088
       repository: isso-nginx
       tags: |
         $(Build.BuildNumber)
