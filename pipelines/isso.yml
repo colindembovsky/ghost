@@ -4,8 +4,6 @@ trigger: none
 
 variables:
   - template: common-variables.yml
-  - name: GHOST_CDN # temp override till full domain is registered
-    value: cacghost.azurewebsites.net
   # create the following secrets in the pipeline UI:
   # ISSO_ADMIN_PASS
   # MYSQL_PASS
