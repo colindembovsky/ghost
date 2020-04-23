@@ -95,6 +95,7 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     database__connection__host=$MYSQL_SERVER_NAME.mysql.database.azure.com \
     database__connection__user=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \
     database__connection__password=$MYSQL_PASS \
+    AZURE_STORAGE_CONNECTION_STRING=$storageConStr \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
 echo "Hit $GHOST_WEBAPP_NAME.azurewebsites.net to start site"
@@ -140,7 +141,6 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     MYSQL_DB=comments \
     MYSQL_USERNAME=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \
     MYSQL_PASSWORD=$MYSQL_PASS \
-    AZURE_STORAGE_CONNECTION_STRING=$storageConStr \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
 echo "Hit $ISSO_WEBAPP_NAME.azurewebsites.net to start site"
