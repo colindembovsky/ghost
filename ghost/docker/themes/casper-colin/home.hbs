@@ -25,8 +25,14 @@ into the {body} of the default.hbs template --}}
     <div class="inner posts">
 
         <div class="post-feed">
+            <h2>Featured!</h2>
+            {{#get "posts" include="tags,author" filter="featured:true" limit="3" as |featured|}}
+                {{#foreach featured}}
+                    {{> "post-card"}}
+                {{/foreach}}
+            {{/get}}
+            <h2>Other</h2>
             {{#foreach posts}}
-                {{!-- The tag below includes the markup for each post - partials/post-card.hbs --}}
                 {{#unless featured}}
                     {{> "post-card"}}
                 {{/unless}}
