@@ -6,8 +6,10 @@ services:
     ports: 
     - "2368:2368"
     restart: always
-        
+
   nginx:
+    depends_on:
+    - ghost
     image: cacregistry.azurecr.io/ghost-nginx:latest
     ports:
     - "0:80"
@@ -18,5 +20,7 @@ services:
     - nginx
     image: cacregistry.azurecr.io/certbot:latest
     ports:
-    - "80"
+    - "80:80"
     restart: always
+    volumes:
+    - ${WEBAPP_STORAGE_HOME}/certbot/letsencrypt:/etc/letsencrypt
