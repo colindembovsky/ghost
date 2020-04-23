@@ -77,6 +77,15 @@ az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
 echo "Set custom DNS $GHOST_CDN for $GHOST_WEBAPP_NAME"
 az webapp config hostname add --webapp-name $GHOST_WEBAPP_NAME -g $RG --hostname $GHOST_CDN
 
+echo "Check CORS for https://$ISSO_CDN to $GHOST_WEBAPP_NAME"
+corsExists=$(az webapp cors show -g $RG -n $GHOST_WEBAPP_NAME | grep "$ISSO_CDN")
+if [ "" == "$corsExists" ]; then
+  echo "Add CORS for https://$ISSO_CDN to $GHOST_WEBAPP_NAME"
+  az webapp cors add -g $RG -n $GHOST_WEBAPP_NAME --allowed-origins https://$ISSO_CDN
+else
+  echo "CORS rule for https://$ISSO_CDN exists!"
+fi
+
 echo "Setting ghost and nginx env settings"
 az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     url=https://$GHOST_CDN \
