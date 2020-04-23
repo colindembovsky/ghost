@@ -18,6 +18,7 @@
 # set -x EMAIL "colin@home.com"
 # set -x STAGING "1"
 # set -x MYSQL_PASS "SomeL0ngP@ssw0rd"
+# set -x SA_NAME "cacghoststore"
 
 echo "Creating resource group $RG in REGION $REGION"
 az group create -n $RG -l $REGION
@@ -46,8 +47,13 @@ az mysql db create -g $RG -s $MYSQL_SERVER_NAME -n comments
 echo "Creating app service plan $PLAN_NAME with sku $SKU"
 az appservice plan create -g $RG -n $PLAN_NAME --sku $SKU --is-linux
 
-echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
+echo "Looking up ACR credentials"
 acrPassword=$(az acr credential show -g $RG -n $ACR_NAME --query "[passwords[?name=='password'].value]" --output tsv)
+
+echo "Looking up ACR credentials"
+storageConStr=$(az storage account show-connection-string -g $RG -n $SA_NAME --query "connectionString" -o tsv)
+
+echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
 az webapp create -g $RG -n $GHOST_WEBAPP_NAME -p $PLAN_NAME \
     --multicontainer-config-type "compose" \
     --multicontainer-config-file "../ghost/ghost-nginx.yml"
@@ -134,6 +140,7 @@ az webapp config appsettings set -g $RG -n $ISSO_WEBAPP_NAME --settings \
     MYSQL_DB=comments \
     MYSQL_USERNAME=$MYSQL_ADMIN@$MYSQL_SERVER_NAME \
     MYSQL_PASSWORD=$MYSQL_PASS \
+    AZURE_STORAGE_CONNECTION_STRING=$storageConStr \
     WEBSITES_ENABLE_APP_SERVICE_STORAGE=true
 
 echo "Hit $ISSO_WEBAPP_NAME.azurewebsites.net to start site"

@@ -28,6 +28,7 @@
     "ghost-storage-azure": {
       "container": "ghostcontent",
       "useHttps" : "true",
+      "cdnUrl": "cdn.colinsalmcorner.com",
       "cacheControl" : "2592000",
       "useDatedFolder" : true
     }
