@@ -25,10 +25,6 @@ else
         --manual-public-ip-logging-ok \
         --domain $CDN $wwwArg
       
-      # append the renew_hook to the config file
-      mkdir -p "$WORKING_PATH/renawal/"
-      echo "renew_hook = deploy-cert-az-webapp.sh" >> "$WORKING_PATH/renawal/$CDN.conf"
-
       # run the script to register the cert with web apps
       deploy-cert-az-webapp.sh
     fi
@@ -42,5 +38,5 @@ else
     # if the cert does not need renewing, certbot does nothing
     # after renewal, the deploy-cert-az-webapp.sh should fire to
     # register the renewed cert
-    trap exit TERM; while :; do certbot renew; sleep $timeout & wait $!; done;
+    trap exit TERM; while :; do certbot renew --post-hook "$WORKING_PATH/renawal/$CDN.conf"; sleep $timeout & wait $!; done;
 fi
