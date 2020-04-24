@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   ghost:
-    image: cacregistry.azurecr.io/ghost:1.0.7
+    image: cacregistry.azurecr.io/ghost:1.0.8
     ports: 
     - "2368:2368"
     restart: always

@@ -9,10 +9,6 @@ trigger:
 
 variables:
   - template: common-variables.yml
-  - name: GhostCDN
-    value: cacghost.azurewebsites.net
-  - name: IssoCDN
-    value: cacisso.azurewebsites.net 
 
 jobs:
 - job: buildNginx

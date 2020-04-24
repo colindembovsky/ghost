@@ -44,6 +44,9 @@ az mysql db create -g $RG -s $MYSQL_SERVER_NAME -n ghost
 echo "Creating comments Database"
 az mysql db create -g $RG -s $MYSQL_SERVER_NAME -n comments
 
+echo "Creating app insights"
+$appInsightsKey=$(az monitor app-insights component create -g $RG --app cacghost --location westus2 --kind web --application-type web --query "instrumentationKey" -o tsv)
+
 echo "Creating app service plan $PLAN_NAME with sku $SKU"
 az appservice plan create -g $RG -n $PLAN_NAME --sku $SKU --is-linux
 
@@ -99,6 +102,7 @@ az webapp config appsettings set -g $RG -n $GHOST_WEBAPP_NAME --settings \
     PFX_PASSWORD=$PFX_PASSWORD \
     WEB_APP_NAME=$GHOST_WEBAPP_NAME \
     RESOURCE_GROUP=$RG \
+    APP_INSIGHTS_KEY=$appInsightsKey \
     database__client=mysql \
     database__connection__database=ghost \
     database__connection__host=$MYSQL_SERVER_NAME.mysql.database.azure.com \
