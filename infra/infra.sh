@@ -8,15 +8,15 @@
 # set -x GHOST_WEBAPP_NAME "cacghost"
 # set -x ISSO_WEBAPP_NAME "cacisso"
 # set -x ACR_NAME "cacregistry"
-# set -x GHOST_CDN "blog.colinsalmcorner.com"
-# set -x GHOST_WWW "0"
+# set -x GHOST_CDN "colinsalmcorner.com"
+# set -x GHOST_WWW "1"
 # set -x ISSO_CDN "comments.colinsalmcorner.com"
 # set -x ISSO_WWW "0"
 # set -x MYSQL_SERVER_NAME "cacmysql"
 # set -x MYSQL_ADMIN "admin_cac"
 # set -x MYSQL_SKU "B_Gen5_1"
 # set -x EMAIL "colin@home.com"
-# set -x STAGING "1"
+# set -x STAGING "0"
 # set -x MYSQL_PASS "SomeL0ngP@ssw0rd"
 # set -x SA_NAME "cacghoststore"
 
@@ -79,6 +79,11 @@ az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
 
 echo "Set custom DNS $GHOST_CDN for $GHOST_WEBAPP_NAME"
 az webapp config hostname add --webapp-name $GHOST_WEBAPP_NAME -g $RG --hostname $GHOST_CDN
+
+if [ "$GHOST_WWW" == "1" ]; then
+    echo "Set custom DNS $GHOST_CDN for $GHOST_WEBAPP_NAME"
+    az webapp config hostname add --webapp-name $GHOST_WEBAPP_NAME -g $RG --hostname www.$GHOST_CDN
+fi
 
 echo "Check CORS for https://$ISSO_CDN to $GHOST_WEBAPP_NAME"
 corsExists=$(az webapp cors show -g $RG -n $GHOST_WEBAPP_NAME | grep "$ISSO_CDN")

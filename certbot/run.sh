@@ -38,5 +38,5 @@ else
     # if the cert does not need renewing, certbot does nothing
     # after renewal, the deploy-cert-az-webapp.sh should fire to
     # register the renewed cert
-    trap exit TERM; while :; do certbot renew --post-hook "$WORKING_PATH/renawal/$CDN.conf"; sleep $timeout & wait $!; done;
+    trap exit TERM; while :; do certbot renew --post-hook "deploy-cert-az-webapp.sh"; sleep $timeout & wait $!; done;
 fi
