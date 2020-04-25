@@ -53,7 +53,7 @@ az appservice plan create -g $RG -n $PLAN_NAME --sku $SKU --is-linux
 echo "Looking up ACR credentials"
 acrPassword=$(az acr credential show -g $RG -n $ACR_NAME --query "[passwords[?name=='password'].value]" --output tsv)
 
-echo "Looking up ACR credentials"
+echo "Looking up Storage Account connection string"
 storageConStr=$(az storage account show-connection-string -g $RG -n $SA_NAME --query "connectionString" -o tsv)
 
 echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
