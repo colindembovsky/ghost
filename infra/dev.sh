@@ -4,7 +4,7 @@
 RG="cac-ghost"
 MYSQL_SERVER_NAME="cacmysql"
 MYSQL_ADMIN="admin_cac"
-MYSQL_PASSWORD=$1
+MYSQL_PASS=$1
 
 echo "Getting IP and adding firewall rule for MYSQL Server"
 myIP=$(dig +short myip.opendns.com @resolver1.opendns.com)
@@ -14,8 +14,11 @@ az mysql server firewall-rule create --resource-group $RG --server $MYSQL_SERVER
 
 echo "Running backup job"
 p=$(pwd)
-docker run -rm \
+rm -f $p/backup/ghost.sql
+touch $p/backup/ghost.sql
+docker run \
     --entrypoint "" \
+    --rm \
     -v $p/backup:/backup \
     schnitzler/mysqldump \
     mysqldump \
@@ -24,17 +27,22 @@ docker run -rm \
         "--result-file=/backup/ghost.sql" ghost
 
 echo "Start up MYSQL container"
-mysqlLocalPass="S0meL0ngP@ssw0rd"
+# 5.7.29
+mysqlLocalPass="foo"
+mysqlUser="xghost"
 docker run -d --name mysql \
     -p 3306:3306 \
-    -e MYSQL_ROOT_PASSWORD=$mysqlLocalPass \
-    -e MYSQL_USER=ghost \
+    -e MYSQL_ROOT_PASSWORD="foo" \
+    -e MYSQL_USER=$mysqlUser \
     -e MYSQL_PASSWORD=$mysqlLocalPass \
-    -e MYSQL_DATABASE=ghost \
-    mysql:latest
+    -e MYSQL_DATABASE="ghost" \
+    mysql:latest \
+    --default-authentication-plugin=mysql_native_password
+    
+sleep 30s
 
 echo "Restore db"
-docker exec -i mysql sh -c "exec mysql -ughost -p$mysqlLocalPass ghost" < ./backup/ghost.sql
+docker exec -i mysql sh -c "exec mysql -u$mysqlUser -p$mysqlLocalPass ghost" < ./backup/ghost.sql
 rm -rf ./backup/ghost.sql
 
 echo "Start up ghost"
@@ -45,7 +53,7 @@ docker run -d --name ghost \
     -e database__client="mysql" \
     -e database__connection__database="ghost" \
     -e database__connection__host="192.168.1.13" \
-    -e database__connection__password=$mysqlLocalPass \
-    -e database__connection__user="ghost" \
-    -e APP_INSIGHTS_KEY=$key
+    -e database__connection__password="$mysqlLocalPass" \
+    -e database__connection__user="$mysqlUser" \
+    -e APP_INSIGHTS_KEY="$key" \
     cacregistry.azurecr.io/ghost:1.0.9
