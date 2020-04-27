@@ -1,0 +1,730 @@
+{
+    "posts": [
+        {
+            "title": "LetsEncrypt Auto-Renewal For Azure Web Apps for Linux",
+            "slug": "letsencrypt-auto-renewal-for-azure-web-apps-for-linux"
+        },
+        {
+            "title": "ChatOps with GitHub Actions and Azure Web Apps",
+            "slug": "chatops-with-github-actions-and-azure-web-apps"
+        },
+        {
+            "title": "Azure Pipeline Parameters",
+            "slug": "azure-pipeline-parameters"
+        },
+        {
+            "title": "Executing JMeter Tests in an Azure Pipeline",
+            "slug": "executing-jmeter-tests-in-an-azure-pipeline"
+        },
+        {
+            "title": "Azure Pipeline Variables",
+            "slug": "azure-pipeline-variables"
+        },
+        {
+            "title": "Azure DevOps Build and Test Reports using OData and REST in PowerBI",
+            "slug": "azure-devops-build-and-test-reports-using-odata-and-rest-in-powerbi"
+        },
+        {
+            "title": "Enterprise GitHub",
+            "slug": "enterprise-github"
+        },
+        {
+            "title": "Container DevOps: Beyond Build (Part 4) - Telemetry with Prometheus",
+            "slug": "container-devops-beyond-build-part-4---telemetry-with-prometheus"
+        },
+        {
+            "title": "Container DevOps: Beyond Build (Part 3) - Canary Testing",
+            "slug": "container-devops-beyond-build-part-3---canary-testing"
+        },
+        {
+            "title": "Container DevOps Beyond Build: Part 2 - Traefik",
+            "slug": "container-devops-beyond-build-part-2---traefik"
+        },
+        {
+            "title": "Container DevOps: Beyond Build (Part 1)",
+            "slug": "container-devops-beyond-build-part-1"
+        },
+        {
+            "title": "Container DevOps: Beyond Build (Part 5) - Prometheus Operator",
+            "slug": "container-devops-beyond-build-part-5---prometheus-operator"
+        },
+        {
+            "title": "Lessons about DevOps from 3D Printing",
+            "slug": "lessons-about-devops-from-3d-printing"
+        },
+        {
+            "title": ".NET Core Multi-Stage Dockerfile with Test and Code Coverage in Azure Pipelines",
+            "slug": "net-core-multi-stage-dockerfile-with-test-and-code-coverage-in-azure-pipelines"
+        },
+        {
+            "title": "Modernizing Source Control - Migrating to Git",
+            "slug": "modernizing-source-control---migrating-to-git"
+        },
+        {
+            "title": "Implement an Azure DevOps Release Gate to ServiceNow",
+            "slug": "implement-an-azure-devops-release-gate-to-servicenow"
+        },
+        {
+            "title": "Pimp Your Consoles on Windows",
+            "slug": "pimp-your-consoles-on-windows"
+        },
+        {
+            "title": "Serverless Parallel Selenium Grid Testing with VSTS and Azure Container Instances",
+            "slug": "serverless-parallel-selenium-grid-testing-with-vsts-and-azure-container-instances"
+        },
+        {
+            "title": "Terraform all the Things with VSTS",
+            "slug": "terraform-all-the-things-with-vsts"
+        },
+        {
+            "title": "Managing Credentials and Secrets in VSTS Release Management",
+            "slug": "managing-credentials-and-secrets-in-vsts-release-management"
+        },
+        {
+            "title": "Auditing VSTS Client Access IPs",
+            "slug": "auditing-vsts-client-access-ips"
+        },
+        {
+            "title": "VSTS, One Team Project and Inverse Conway Maneuver",
+            "slug": "vsts-one-team-project-and-inverse-conway-maneuver"
+        },
+        {
+            "title": "Tip: Creating Task Groups with Azure Service Endpoint Parameters",
+            "slug": "tip-creating-task-groups-with-azure-service-endpoint-parameters"
+        },
+        {
+            "title": "Using Chrome to Solve Identity Hell",
+            "slug": "using-chrome-to-solve-identity-hell"
+        },
+        {
+            "title": "Using VSTS to Test Python Code (with Code Coverage)",
+            "slug": "using-vsts-to-test-python-code-with-code-coverage"
+        },
+        {
+            "title": "Using Linked ARM Templates with VSTS Release Management",
+            "slug": "using-linked-arm-templates-with-vsts-release-management"
+        },
+        {
+            "title": "Tips and Tricks for Complex IaaS Deployments Using VSTS Deployment Groups",
+            "slug": "tips-and-tricks-for-complex-iaas-deployments-using-vsts-deployment-groups"
+        },
+        {
+            "title": "A/B Testing with Azure Linux Web Apps for Containers",
+            "slug": "ab-testing-with-azure-linux-web-apps-for-containers"
+        },
+        {
+            "title": "Configuring AAD Authentication to Azure SQL Databases",
+            "slug": "configuring-aad-authentication-to-azure-sql-databases"
+        },
+        {
+            "title": "Protecting a VSTS Web Hook with Basic Authentication",
+            "slug": "protecting-a-vsts-web-hook-with-basic-authentication"
+        },
+        {
+            "title": "DevOps with Kubernetes and VSTS: Part 1",
+            "slug": "devops-with-kubernetes-and-vsts-part-1"
+        },
+        {
+            "title": "DevOps with Kubernetes and VSTS: Part 2",
+            "slug": "devops-with-kubernetes-and-vsts-part-2"
+        },
+        {
+            "title": "Aurelia, Azure and VSTS",
+            "slug": "aurelia-azure-and-vsts"
+        },
+        {
+            "title": "Testing in Production: Routing Traffic During a Release",
+            "slug": "testing-in-production-routing-traffic-during-a-release"
+        },
+        {
+            "title": "New Task: Tag Build or Release",
+            "slug": "new-task-tag-build-or-release"
+        },
+        {
+            "title": "Easy Config Management when Deploying Azure Web Apps from VSTS",
+            "slug": "easy-config-management-when-deploying-azure-web-apps-from-vsts"
+        },
+        {
+            "title": "Running Selenium Tests in Docker using VSTS Release Management",
+            "slug": "running-selenium-tests-in-docker-using-vsts-release-management"
+        },
+        {
+            "title": "DevOps Drives Better Architecture–Part 2 of 2",
+            "slug": "devops-drives-better-architecturepart-2-of-2"
+        },
+        {
+            "title": "DevOps Drives Better Architecture–Part 1 of 2",
+            "slug": "devops-drives-better-architecturepart-1-of-2"
+        },
+        {
+            "title": "You Suck: Or, How to Process Criticism",
+            "slug": "you-suck-or-how-to-process-criticism"
+        },
+        {
+            "title": "Managing Config for .NET Core Web App Deployments with Tokenizer and ReplaceTokens Tasks",
+            "slug": "managing-config-for-net-core-web-app-deployments-with-tokenizer-and-replacetokens-tasks"
+        },
+        {
+            "title": "End to End Walkthrough: Deploying Web Applications Using Team Build and Release Management",
+            "slug": "end-to-end-walkthrough-deploying-web-applications-using-team-build-and-release-management"
+        },
+        {
+            "title": "Using Release Management to Manage Ad-Hoc Deployments",
+            "slug": "using-release-management-to-manage-ad-hoc-deployments"
+        },
+        {
+            "title": "Load Balancing DotNet Core Docker Containers with nginx",
+            "slug": "load-balancing-dotnet-core-docker-containers-with-nginx"
+        },
+        {
+            "title": "DacPac Change Report Task for VSTS Builds",
+            "slug": "dacpac-change-report-task-for-vsts-builds"
+        },
+        {
+            "title": "Parallel Testing in a Selenium Grid with VSTS",
+            "slug": "parallel-testing-in-a-selenium-grid-with-vsts"
+        },
+        {
+            "title": "Running the New DotNet Core VSTS Agent in a Docker Container",
+            "slug": "running-the-new-dotnet-core-vsts-agent-in-a-docker-container"
+        },
+        {
+            "title": "DotNet Core, VS 2015, VSTS and Docker",
+            "slug": "dotnet-core-vs-2015-vsts-and-docker"
+        },
+        {
+            "title": "Updating XAML Release Builds after Upgrading Release Management Legacy from 2013 to 2015",
+            "slug": "upgrading-release-management-legacy-from-2013-to-2015"
+        },
+        {
+            "title": "Continuous Deployment of Service Fabric Apps using VSTS (or TFS)",
+            "slug": "continuous-deployment-of-service-fabric-apps-using-vsts-or-tfs"
+        },
+        {
+            "title": "AppInsights Analytics in the Real World",
+            "slug": "appinsights-analytics-in-the-real-world"
+        },
+        {
+            "title": "DevOps is a Culture, Not a Team",
+            "slug": "devops-is-a-culture-not-a-team"
+        },
+        {
+            "title": "Staging Servers Must Die – Or Must They?",
+            "slug": "staging-servers-must-die--or-must-they"
+        },
+        {
+            "title": "Building VS 2015 Setup Projects in Team Build",
+            "slug": "building-vs-2015-setup-projects-in-team-build"
+        },
+        {
+            "title": "Config Per Environment vs Tokenization in Release Management",
+            "slug": "config-per-environment-vs-tokenization-in-release-management"
+        },
+        {
+            "title": "WebDeploy, Configs and Web Release Management",
+            "slug": "webdeploy-configs-and-web-release-management"
+        },
+        {
+            "title": "Docker DevOps",
+            "slug": "docker-devops"
+        },
+        {
+            "title": "Continuous Deployment with Docker and Build vNext",
+            "slug": "continuous-deployment-with-docker-and-build-vnext"
+        },
+        {
+            "title": "Developing a Custom Build vNext Task: Part 1",
+            "slug": "developing-a-custom-build-vnext-task-part-1"
+        },
+        {
+            "title": "Developing a Custom Build vNext Task: Part 2",
+            "slug": "developing-a-custom-build-vnext-task-part-2"
+        },
+        {
+            "title": "Build vNext and SonarQube Runner: Dynamic Version Script",
+            "slug": "build-vnext-and-sonarqube-runner-dynamic-version-script"
+        },
+        {
+            "title": "Azure Web Apps, Kudu Console and TcpPing",
+            "slug": "azure-web-apps-kudu-console-and-tcpping"
+        },
+        {
+            "title": "Release Management 2015 with Build vNext: Component to Artifact Name Matching and Other Fun Gotchas",
+            "slug": "release-management-2015-with-build-vnext-component-to-artifact-name-matching-and-other-fun-gotchas"
+        },
+        {
+            "title": "Enable SAFe Features in Existing Team Projects After Upgrading to TFS 2015",
+            "slug": "enable-safe-features-in-existing-team-projects-after-upgrading-to-tfs-2015"
+        },
+        {
+            "title": "PaaS and Time Compression in the Cloud",
+            "slug": "paas-and-time-compression-in-the-cloud"
+        },
+        {
+            "title": "My First VSO Extension: Retry Build",
+            "slug": "my-first-vso-extension-retry-build"
+        },
+        {
+            "title": "Why You Should Switch to Build VNext",
+            "slug": "why-you-should-switch-to-build-vnext"
+        },
+        {
+            "title": "Aurelia, Karma and More VS Debugging Goodness",
+            "slug": "aurelia-karma-and-more-vs-debugging-goodness"
+        },
+        {
+            "title": "Aurelia – Debugging from within Visual Studio",
+            "slug": "aurelia--debugging-from-within-visual-studio"
+        },
+        {
+            "title": "Aurelia: Object Binding Without Dirty Checking",
+            "slug": "aurelia-object-binding-without-dirty-checking"
+        },
+        {
+            "title": "JSPM, NPM, Gulp and WebDeploy in a TeamBuild",
+            "slug": "jspm-npm-gulp-and-webdeploy-in-a-teambuild"
+        },
+        {
+            "title": "Reflections on DSC for Release Management",
+            "slug": "reflections-on-dsc-for-release-management"
+        },
+        {
+            "title": "Gulp – Workaround for Handling VS Solution Configuration",
+            "slug": "gulp--workaround-for-handling-vs-solution-configuration"
+        },
+        {
+            "title": "Don’t Just Fix It, Red-Green Refactor It!",
+            "slug": "dont-just-fix-it-red-green-refactor-it"
+        },
+        {
+            "title": "Azure Outage – I was a victim too, dear Reader",
+            "slug": "azure-outage--i-was-a-victim-too-dear-reader"
+        },
+        {
+            "title": "Real Config Handling for DSC in RM",
+            "slug": "real-config-handling-for-dsc-in-rm"
+        },
+        {
+            "title": "Using WebDeploy in vNext Releases",
+            "slug": "using-webdeploy-in-vnext-releases"
+        },
+        {
+            "title": "Moving to Northwest Cadence",
+            "slug": "moving-to-northwest-cadence"
+        },
+        {
+            "title": "Matching Binary Version to Build Number Version in TFS 2013 Builds",
+            "slug": "matching-binary-version-to-build-number-version-in-tfs-2013-builds"
+        },
+        {
+            "title": "New vNext Config Variable Options in RM Update 4 RC",
+            "slug": "new-vnext-config-variable-options-in-rm-update-4-rc"
+        },
+        {
+            "title": "Source Control Operations During Deployments in Release Management",
+            "slug": "source-control-operations-during-deployments-in-release-management"
+        },
+        {
+            "title": "Test Result Traceability Matrix Tool",
+            "slug": "test-result-traceability-matrix-tool"
+        },
+        {
+            "title": "A Day of DevOps, Release Management, Software Quality and Agile Project Requirements Management",
+            "slug": "a-day-of-devops-release-management-software-quality-and-agile-project-requirements-management"
+        },
+        {
+            "title": "Branch Is Not Equal to Environment: CODE-PROD Branching Strategy",
+            "slug": "branch-is-not-equal-to-environment"
+        },
+        {
+            "title": "Bulk Migrate Work Item Comments, Links and Attachments",
+            "slug": "bulk-migrate-work-item-comments-links-and-attachments"
+        },
+        {
+            "title": "Install and Configure SQL Server using PowerShell DSC",
+            "slug": "install-and-configure-sql-server-using-powershell-dsc"
+        },
+        {
+            "title": "More DSC Release Management Goodness: Readying a Webserver for Deployment",
+            "slug": "more-dsc-release-management-goodness-readying-a-webserver-for-deployment"
+        },
+        {
+            "title": "Using PowerShell DSC in Release Management: The Hidden Manual",
+            "slug": "using-powershell-dsc-in-release-management-the-hidden-manual"
+        },
+        {
+            "title": "PowerShell DSC: Remotely Configuring a Node to “RebootNodeIfNeeded”",
+            "slug": "powershell-dsc-remotely-configuring-a-node-to-rebootnodeifneeded"
+        },
+        {
+            "title": "Imaginet Timesheet: Time Tracking for TFS and Visual Studio Online",
+            "slug": "imaginet-timesheet-time-tracking-for-tfs-and-visual-studio-online"
+        },
+        {
+            "title": "Enabling JavaScript Code Coverage Link in Builds",
+            "slug": "enabling-javascript-code-coverage-link-in-builds"
+        },
+        {
+            "title": "Colin’s ALM Corner – New Theme and Live Tiles",
+            "slug": "colins-alm-corner--new-theme-and-live-tiles"
+        },
+        {
+            "title": "Colin’s ALM Corner – Updated Blog Engine",
+            "slug": "colins-alm-corner--updated-blog-engine"
+        },
+        {
+            "title": "WebDeploy Gets Even More Awesome – Profile Specific Transforms",
+            "slug": "webdeploy-gets-even-more-awesome--profile-specific-transforms"
+        },
+        {
+            "title": "Application Insights Telemetry for WAWS or Customer-Hosted Sites Without MMA",
+            "slug": "application-insights-telemetry-for-waws-or-customer-hosted-sites-without-mma"
+        },
+        {
+            "title": "Project Plans, Agile, Pizza and Startups",
+            "slug": "project-plans-agile-pizza-and-startups"
+        },
+        {
+            "title": "Integrating TFS and Project Server – Two Way Manual Sync",
+            "slug": "integrating-tfs-and-project-server--two-way-manual-sync"
+        },
+        {
+            "title": "Fix: Release Management WebDeploy Deployment Fails: Access Denied",
+            "slug": "fix-release-management-webdeploy-deployment-fails-access-denied"
+        },
+        {
+            "title": "Fix: Release Management “Service Unavailable 503”",
+            "slug": "fix-release-management-service-unavailable-503"
+        },
+        {
+            "title": "CrossBrowser Testing: ChromeDriver Window Hangs after Test",
+            "slug": "crossbrowser-testing-chromedriver-window-hangs-after-test"
+        },
+        {
+            "title": "Error Handling Poor Man’s RunScript in 2012 Builds",
+            "slug": "error-handling-poor-mans-runscript-in-2012-builds"
+        },
+        {
+            "title": "Build Script Hooks for TFS 2012 Builds",
+            "slug": "build-script-hooks-for-tfs-2012-builds"
+        },
+        {
+            "title": "WebDeploy and Release Management – The Proper Way",
+            "slug": "webdeploy-and-release-management--the-proper-way"
+        },
+        {
+            "title": "TFS 2013 Default Build – The GetEnvironmentVariable<T> Activity",
+            "slug": "tfs-2013-default-build--the-getenvironmentvariablet-activity"
+        },
+        {
+            "title": "Monitoring Web Applications – Continuous IntelliTrace",
+            "slug": "monitoring-web-applications--continuous-intellitrace"
+        },
+        {
+            "title": "Fix: You Open TfcvTemplate.12.xaml and Don’t See Any Parameters",
+            "slug": "fix-you-open-tfcvtemplate12xaml-and-dont-see-any-parameters"
+        },
+        {
+            "title": "Contributions to TFS Build Extensions",
+            "slug": "contributions-to-tfs-build-extensions"
+        },
+        {
+            "title": "New Feature: Lightweight Query Charts in Web Access",
+            "slug": "new-feature-lightweight-query-charts-in-web-access"
+        },
+        {
+            "title": "Branch Info Team Explorer Extension (BITE) Now Available for VS 2013",
+            "slug": "branch-info-team-explorer-extension--bite--now-available-for-vs-2013"
+        },
+        {
+            "title": "Getting Results from Backlog Overview Report in TFS 2013 Preview",
+            "slug": "getting-results-from-backlog-overview-report-in-tfs-2013-preview"
+        },
+        {
+            "title": "Fix: InRelease Demo “Hangs” on Keller’s 2013 Preview VM",
+            "slug": "fix-inrelease-demo-hangs-on-kellers-2013-preview-vm"
+        },
+        {
+            "title": "Frequent Status Updates–What They Really Mean",
+            "slug": "frequent-status-updateswhat-they-really-mean"
+        },
+        {
+            "title": "Why You Absolutely Need to Unit Test",
+            "slug": "why-you-absolutely-need-to-unit-test"
+        },
+        {
+            "title": "Adding Custom Team Field to MS Project Mappings",
+            "slug": "adding-custom-team-field-to-ms-project-mappings"
+        },
+        {
+            "title": "BITE–Branch Info Team Explorer Extension",
+            "slug": "bitebranch-info-team-explorer-extension"
+        },
+        {
+            "title": "IntelliTrace Tips and Tricks: IntelliTrace Everywhere",
+            "slug": "intellitrace-tips-and-tricks-intellitrace-everywhere"
+        },
+        {
+            "title": "IntelliTrace Tips and Tricks: The Basics",
+            "slug": "intellitrace-tips-and-tricks-the-basics"
+        },
+        {
+            "title": "Automated Builds–Why They’re Absolutely Essential (Part 2)",
+            "slug": "automated-buildswhy-theyre-absolutely-essential--part-2-"
+        },
+        {
+            "title": "Automated Builds–Why They’re Absolutely Essential (Part 1)",
+            "slug": "automated-buildswhy-theyre-absolutely-essential--part-1-"
+        },
+        {
+            "title": "Testing Windows 8 Applications",
+            "slug": "testing-windows-8-applications"
+        },
+        {
+            "title": "Improvements to Code Review Checkin Policy",
+            "slug": "improvements-to-code-review-checkin-policy"
+        },
+        {
+            "title": "Build Fails: Path Limit Exceeded",
+            "slug": "build-fails-path-limit-exceeded"
+        },
+        {
+            "title": "Enable Custom IntelliTrace Web Events with a Right-Click",
+            "slug": "enable-custom-intellitrace-web-events-with-a-right-click"
+        },
+        {
+            "title": "Excel Sheet Showing Parent Items Whose Child Items Are All Closed",
+            "slug": "excel-sheet-showing-parent-items-whose-child-items-are-all-closed"
+        },
+        {
+            "title": "Test Case Manager: Customize Failure and Resolution Type",
+            "slug": "test-case-manager-customize-failure-and-resolution-type"
+        },
+        {
+            "title": "Failing Builds based on Code Coverage",
+            "slug": "failing-builds-based-on-code-coverage"
+        },
+        {
+            "title": "Custom Build Task: Include Merged Changesets (and Work Items) in Build Report",
+            "slug": "custom-build-task-include-merged-changesets--and-work-items--in-build-report"
+        },
+        {
+            "title": "TFS 2012 Upgrade Bugs–again?",
+            "slug": "tfs-2012-upgrade-bugsagain"
+        },
+        {
+            "title": "Subtle MSF Agile Enhancement: Adding Bugs to the Backlogs",
+            "slug": "subtle-msf-agile-enhancement-adding-bugs-to-the-backlogs"
+        },
+        {
+            "title": "Custom Code Review Checkin Policy",
+            "slug": "custom-code-review-checkin-policy"
+        },
+        {
+            "title": "Extending Hybrid Lab Workflow Virtual Hosts",
+            "slug": "extending-hybrid-lab-workflow-virtual-hosts"
+        },
+        {
+            "title": "Developing the Hybrid Lab Workflow",
+            "slug": "developing-the-hybrid-lab-workflow"
+        },
+        {
+            "title": "Hybrid Lab Workflow: Standard Lab Environment with Snapshots",
+            "slug": "hybrid-lab-workflow-standard-lab-environment-with-snapshots"
+        },
+        {
+            "title": "MVP Status Renewed",
+            "slug": "mvp-status-renewed"
+        },
+        {
+            "title": "TechDays and Jhb Training Class",
+            "slug": "techdays-and-jhb-training-class"
+        },
+        {
+            "title": "Lab Management: Configuring Workgroup Lab Machines to a TFS on a Domain",
+            "slug": "lab-management-configuring-workgroup-lab-machines-to-a-tfs-on-a-domain"
+        },
+        {
+            "title": "Upgrading MSF Agile 5.0 to MSF Agile 6.0: Why does my velocity chart not work?",
+            "slug": "upgrading-msf-agile-50-to-msf-agile-60-why-does-my-velocity-chart-not-work"
+        },
+        {
+            "title": "Unit Testing Javascript in VS 2012",
+            "slug": "unit-testing-javascript-in-vs-2012"
+        },
+        {
+            "title": "Code Coverage doesn’t work with Fakes on Hosted Build",
+            "slug": "code-coverage-doesnt-work-with-fakes-on-hosted-build"
+        },
+        {
+            "title": "2012 Lab Management Standard Environment: Configuring UI Tests Agent Identity Problem",
+            "slug": "2012-lab-management-standard-environment-configuring-ui-tests-agent-identity-problem"
+        },
+        {
+            "title": "Build with a Hosted Build Controller: A First Attempt",
+            "slug": "build-with-a-hosted-build-controller-a-first-attempt"
+        },
+        {
+            "title": "Microsoft Fakes – Customizing the System Whitelist (or, enabling Fakes for classes you’ve always wanted to fake, like WebClient)",
+            "slug": "microsoft-fakes--customizing-the-system-whitelist--or-enabling-fakes-for-classes-youve-always-wanted-to-fake-like-webclient-"
+        },
+        {
+            "title": "VS 2012 RC – Fakes Bugs Fixed",
+            "slug": "vs-2012-rc--fakes-bugs-fixed"
+        },
+        {
+            "title": "More on Fakes – the beta has issues",
+            "slug": "more-on-fakes--the-beta-has-issues"
+        },
+        {
+            "title": "Using the Fakes Framework to Test TFS API Code (Part 2 of 2)",
+            "slug": "using-the-fakes-framework-to-test-tfs-api-code--part-2-of-2-"
+        },
+        {
+            "title": "Using the Fakes Framework to Test TFS API Code (Part 1 of 2)",
+            "slug": "using-the-fakes-framework-to-test-tfs-api-code--part-1-of-2-"
+        },
+        {
+            "title": "Code Monkey?",
+            "slug": "code-monkey"
+        },
+        {
+            "title": "Using TFS ALM for Sharepoint Development (The Easy Way – with Lab Management)",
+            "slug": "using-tfs-alm-for-sharepoint-development--the-easy-way--with-lab-management-"
+        },
+        {
+            "title": "Workspaces: Updating the owner",
+            "slug": "workspaces-updating-the-owner"
+        },
+        {
+            "title": "ISubscriber: Getting the TFS Url for Client Operations",
+            "slug": "isubscriber-getting-the-tfs-url-for-client-operations"
+        },
+        {
+            "title": "WpfCell – The Key to Coded UI Automation of DataGrids",
+            "slug": "wpfcell--the-key-to-coded-ui-automation-of-datagrids"
+        },
+        {
+            "title": "GenericAutomationPeer – Helping the Coded UI Framework Find Your Custom Controls",
+            "slug": "genericautomationpeer--helping-the-coded-ui-framework-find-your-custom-controls"
+        },
+        {
+            "title": "Using the TFS API to display results of a Hierarchical Work Item Query",
+            "slug": "using-the-tfs-api-to-display-results-of-a-hierarchical-work-item-query"
+        },
+        {
+            "title": "I’ve been made an MVP",
+            "slug": "ive-been-made-an-mvp"
+        },
+        {
+            "title": "Presenting at TechEd Africa 2011",
+            "slug": "presenting-at-teched-africa-2011"
+        },
+        {
+            "title": "TF50299: The value named ‘xxx’ was not found when evaluating a condition",
+            "slug": "tf50299-the-value-named-xxx-was-not-found-when-evaluating-a-condition"
+        },
+        {
+            "title": "Load Balancing Application Tiers on VMWare",
+            "slug": "load-balancing-application-tiers-on-vmware"
+        },
+        {
+            "title": "TFS and Project Server Integration: Tips from the Trenches (Part 4)",
+            "slug": "tfs-and-project-server-integration-tips-from-the-trenches--part-4-"
+        },
+        {
+            "title": "TFS and Project Server Integration: Tips from the Trenches (Part 3)",
+            "slug": "tfs-and-project-server-integration-tips-from-the-trenches--part-3-"
+        },
+        {
+            "title": "TFS and Project Server Integration: Tips from the Trenches (Part 2)",
+            "slug": "tfs-and-project-server-integration-tips-from-the-trenches--part-2-"
+        },
+        {
+            "title": "TFS and Project Server Integration: Tips from the Trenches (Part 1)",
+            "slug": "tfs-and-project-server-integration-tips-from-the-trenches--part-1-"
+        },
+        {
+            "title": "QFE Fixes VS 2010 SP1 Bug on Test Agents",
+            "slug": "qfe-fixes-vs-2010-sp1-bug-on-test-agents"
+        },
+        {
+            "title": "Imaginet (Notion Solutions) wins Microsoft Partner of the Year in the Application Lifecycle Management Category",
+            "slug": "imaginet--notion-solutions--wins-microsoft-partner-of-the-year-in-the-application-lifecycle-management-category"
+        },
+        {
+            "title": "Lab Management: Use Database Backups During Deployment for Repeatable Automated Tests",
+            "slug": "lab-management-use-database-backups-during-deployment-for-repeatable-automated-tests"
+        },
+        {
+            "title": "Using Powershell to Replace Config Settings in Lab Management",
+            "slug": "using-powershell-to-replace-config-settings-in-lab-management"
+        },
+        {
+            "title": "Running Lab Management with XP SP3 Machines",
+            "slug": "running-lab-management-with-xp-sp3-machines"
+        },
+        {
+            "title": "Running Load Tests in Lab Management: Perfmon Issues",
+            "slug": "running-load-tests-in-lab-management-perfmon-issues"
+        },
+        {
+            "title": "Presenting @ DevDays SA 2011: Cape Town and Johannesburg",
+            "slug": "presenting--devdays-sa-2011-cape-town-and-johannesburg"
+        },
+        {
+            "title": "Automating Office Tasks in a TeamBuild",
+            "slug": "automating-office-tasks-in-a-teambuild"
+        },
+        {
+            "title": "Lab management: The Dreaded “Unknown Error: 0x8033811e”",
+            "slug": "lab-management-the-dreaded-unknown-error-0x8033811e"
+        },
+        {
+            "title": "Monitoring Check-in Policy Overrides",
+            "slug": "monitoring-check-in-policy-overrides"
+        },
+        {
+            "title": "TFS 2010 is Complete ALM",
+            "slug": "tfs-2010-is-complete-alm"
+        },
+        {
+            "title": "Default Team Build to Invoke Instead of Build",
+            "slug": "default-team-build-to-invoke-instead-of-build"
+        },
+        {
+            "title": "Build-Deploy-Test Workflow for Physical Environments",
+            "slug": "build-deploy-test-workflow-for-physical-environments"
+        },
+        {
+            "title": "Using Data Generation Plans to create repeatable data for code unit tests",
+            "slug": "using-data-generation-plans-to-create-repeatable-data-for-code-unit-tests"
+        },
+        {
+            "title": "Using Indexed Published Symbols from TeamBuilds",
+            "slug": "using-indexed-published-symbols-from-teambuilds"
+        },
+        {
+            "title": "ClickOnce Versioning and Deployment in a TeamBuild",
+            "slug": "clickonce-versioning-and-deployment-in-a-teambuild"
+        },
+        {
+            "title": "Running Data-Driven Unit Tests with SpreadSheets on Sharepoint",
+            "slug": "running-data-driven-unit-tests-with-spreadsheets-on-sharepoint"
+        },
+        {
+            "title": "Running DB Data Generation and Unit Tests in TeamBuild 2010",
+            "slug": "running-db-data-generation-and-unit-tests-in-teambuild-2010"
+        }
+    ],
+    "meta": {
+        "pagination": {
+            "page": 1,
+            "limit": "all",
+            "pages": 1,
+            "total": 179,
+            "next": null,
+            "prev": null
+        }
+    }
+}

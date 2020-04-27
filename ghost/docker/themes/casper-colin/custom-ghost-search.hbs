@@ -1,0 +1,81 @@
+{{!< default}}
+
+<header class="site-header">
+  <div class="outer site-nav-main">
+    <div class="inner">
+      {{> "site-nav"}}
+    </div>
+  </div>
+</header>
+
+{{#post}}
+
+<main id="site-main" class="site-main outer" role="main">
+  <div class="inner">
+    <header class="post-full-header">
+      <h1 class="post-full-title">{{title}}</h1>
+    </header>
+
+    <form>
+        <input id="search-input" />
+        <input type="submit" id="search-button" />
+    </form>
+
+    <div id="search-spinner" class="la-line-spin-clockwise-fade la-2x" style="display: none;">
+    </div>
+
+    <ul id="search-results">
+    </ul>
+
+    {{!-- Ghost search --}}
+    <script type="text/javascript" src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script>
+    <script type="text/javascript" src="{{asset "js/ghost-search/content-api-1.4.1.min.js"}}"></script>
+    <script type="text/javascript" src="{{asset "js/ghost-search/ghost-search.js"}}"></script>
+
+    <script type="text/javascript">
+        let ghostSearch = new GhostSearch({
+            key: 'b944bc1545c0a1db9530c01a82',
+            url: 'http://192.168.1.13:3001',
+            input: '#search-input',
+            results: '#search-results',
+            button: '#search-button',
+            options: {
+              keys: ['title', 'plaintext'],
+              threshold: -10000, // limit to good results
+            },
+            api: {
+              resource: 'posts',
+              parameters: { 
+                  fields: ['title', 'slug', 'published_at', 'plaintext'],
+                  formats: 'plaintext',
+                  order: ['published_at DESC']
+              },
+            },
+            on: {
+              beforeFetch: function() {
+                $('#search-spinner').show();
+              },
+              afterFetch: function(results) {
+                $('#search-spinner').hide();
+              },
+              afterDisplay: function(results) {
+                if (results.total == 0 && document.getElementById('search-input').value != '') {
+                    let resultsElement = document.getElementById('search-results');
+                    let e = document.createElement('li');
+                    e.innerHTML = 'No results';
+                    resultsElement.appendChild(e.firstChild);
+                };
+              },
+            },
+            template: function(result, score) {
+              console.log("%O", {score, result});
+              let url = [location.protocol, '//', location.host].join('');
+              return '<li><a href="' + url + '/' + result.slug + '">' + result.title + '</a> (' + result.published_at + ')</li>';  
+            }
+        });
+    </script>
+
+  </div>
+</main>
+
+{{/post}}
