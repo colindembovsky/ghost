@@ -16,63 +16,39 @@
       <h1 class="post-full-title">{{title}}</h1>
     </header>
 
-    <form>
-        <input id="search-input" />
-        <input type="submit" id="search-button" />
+    <form class="search-form">
+        <input id="search-input" placeholder="Search..." class="search-input" />
+        <input type="submit" id="search-button" class="btn btn-primary" />
     </form>
 
-    <div id="search-spinner" class="la-line-spin-clockwise-fade la-2x" style="display: none;">
+    <div id="search-results" class="search-results">
+      <div id="search-results-exact-section">
+        <h3>Exact Matches</h3>
+        <ul id="search-results-exact" class="search-results"></ul>
+      </div>
+
+      <div id="search-results-fuzzy-section">
+        <h3>Fuzzy Matches</h3>
+        <ul id="search-results-fuzzy" class="search-results"></ul>
+      </div>
+
+      <div id="search-results-none">
+        <p>No results found.</p>
+      </div>
     </div>
 
-    <ul id="search-results">
-    </ul>
-
-    {{!-- Ghost search --}}
+    {{!-- Ghost search - except adapted to use fuse.js --}}
     {{!-- <script type="text/javascript" src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script> --}}
-    <script type="text/javascript" src="{{asset "js/ghost-search/content-api-1.4.1.min.js"}}"></script>
-    <script type="text/javascript" src="{{asset "js/ghost-search/ghost-search.min.js"}}"></script>
 
-    <script type="text/javascript">
-        let ghostSearch = new GhostSearch({
-            key: 'b944bc1545c0a1db9530c01a82',
-            url: 'http://192.168.1.13:3001',
-            input: '#search-input',
-            results: '#search-results',
-            button: '#search-button',
-            options: {
-              keys: ['title', 'plaintext'],
-              threshold: -2000, // limit to good results: -1000 and below are "far-fetched" matches
-            },
-            api: {
-              resource: 'posts',
-              limit: 'all',
-              parameters: { 
-                  fields: ['title', 'slug', 'published_at', 'plaintext'],
-                  formats: 'plaintext'
-              },
-            },
-            on: {
-              beforeFetch: function() {
-                $('#search-spinner').show();
-              },
-              afterFetch: function(results) {
-                $('#search-spinner').hide();
-              },
-              afterDisplay: function(results) {
-                if (results.total == 0 && document.getElementById('search-input').value != '') {
-                    let resultsElement = document.getElementById('search-results');
-                    let e = document.createElement('li');
-                    e.innerHTML = 'No results';
-                    resultsElement.appendChild(e.firstChild);
-                };
-              },
-            },
-            template: function(result) {
-              let url = [location.protocol, '//', location.host].join('');
-              return '<li><a href="' + url + '/' + result.slug + '">' + result.title + '</a> (' + result.published_at + ')</li>';  
-            }
-        });
-    </script>
+    {{!-- libs --}}
+    <script type="text/javascript" src="{{asset "js/fuse-search/content-api-1.4.1.min.js"}}"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/5.2.3/fuse.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+    <script type="text/javascript" src="{{asset "js/fuse-search/fuse-search.js"}}"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
+
+    {{!-- custom search logic --}}
+    <script type="text/javascript" src="{{asset "js/fuse-search/search.js"}}"></script>
 
   </div>
 </main>
