@@ -28,9 +28,9 @@
     </ul>
 
     {{!-- Ghost search --}}
-    <script type="text/javascript" src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script>
+    {{!-- <script type="text/javascript" src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script> --}}
     <script type="text/javascript" src="{{asset "js/ghost-search/content-api-1.4.1.min.js"}}"></script>
-    <script type="text/javascript" src="{{asset "js/ghost-search/ghost-search.js"}}"></script>
+    <script type="text/javascript" src="{{asset "js/ghost-search/ghost-search.min.js"}}"></script>
 
     <script type="text/javascript">
         let ghostSearch = new GhostSearch({
@@ -41,14 +41,14 @@
             button: '#search-button',
             options: {
               keys: ['title', 'plaintext'],
-              threshold: -10000, // limit to good results
+              threshold: -2000, // limit to good results: -1000 and below are "far-fetched" matches
             },
             api: {
               resource: 'posts',
+              limit: 'all',
               parameters: { 
                   fields: ['title', 'slug', 'published_at', 'plaintext'],
-                  formats: 'plaintext',
-                  order: ['published_at DESC']
+                  formats: 'plaintext'
               },
             },
             on: {
@@ -67,8 +67,7 @@
                 };
               },
             },
-            template: function(result, score) {
-              console.log("%O", {score, result});
+            template: function(result) {
               let url = [location.protocol, '//', location.host].join('');
               return '<li><a href="' + url + '/' + result.slug + '">' + result.title + '</a> (' + result.published_at + ')</li>';  
             }
