@@ -44,8 +44,11 @@ let model = new Model();
 ko.applyBindings(model);
 
 let fuseSearch = new FuseSearch({
-    key: 'b944bc1545c0a1db9530c01a82',
-    url: 'http://192.168.1.13:3001',
+    // local dev
+    // key: 'b944bc1545c0a1db9530c01a82',
+    // url: 'http://192.168.1.13:3001',
+    key: '__FUSE_API_KEY__',
+    url: 'https://colinsalmcorner',
     input: '#search-input',
     results: '#search-results',
     button: '#search-button',

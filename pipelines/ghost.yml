@@ -6,6 +6,7 @@ variables:
   - template: common-variables.yml
   # create the following secrets in the pipeline UI:
   # MYSQL_PASS
+  # FUSE_API_KEY
 
 jobs:
 - job: guildGhost
@@ -14,10 +15,15 @@ jobs:
     vmImageName: ubuntu-latest
   steps:
   - task: colinsalmcorner.colinsalmcorner-buildtasks.replace-tokens-task.ReplaceTokens@1
-    displayName: Replace tokens in config
+    displayName: Replace tokens in post.hbs
     inputs:
       sourcePath: ghost/docker/themes/casper-colin
       filePattern: post.hbs
+  - task: colinsalmcorner.colinsalmcorner-buildtasks.replace-tokens-task.ReplaceTokens@1
+    displayName: Replace tokens in search.js
+    inputs:
+      sourcePath: ghost/docker/themes/casper-colin/assets/js/fuse-search/
+      filePattern: search.js
   - task: Docker@2
     displayName: Login to ACR
     inputs:
