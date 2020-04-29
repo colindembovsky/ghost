@@ -27,7 +27,7 @@
           <h3><span data-bind="text: 'Exact Matches: (' + exactResults().length + ')'"></span></h3>
           <ul id="search-results-exact" class="search-results" data-bind="foreach: exactResults">
             <li>
-              <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
+              <a data-bind="attr: { href: item.full_slug }"><span data-bind="text: item.title"></span></a>
               <span data-bind="pubDate: item.published_at"></span>
             </li>
           </ul>

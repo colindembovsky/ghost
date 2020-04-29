@@ -6,7 +6,10 @@ var Model = function() {
 
   this.updateList = function(list, entries) {
     list([]); // clear the list
-    entries.forEach(e => list.push(e)); // add each item in
+    entries.forEach(e => {
+      e.item.full_slug = `${location.protocol}//${location.host}/${e.item.slug}`;
+      list.push(e);
+    }); // add each item in
   }
 
   this.updateResults = function(results) {
@@ -19,10 +22,6 @@ var Model = function() {
     return this.exactResults().length + this.exactResults().length === 0 && !this.isNew();
   }, this);
 };
-
-const baseUrl = `${location.protocol}//${location.host}`;
-
-//return `<a href="${baseUrl}/${val.slug}">${val.title}</a>`;
 
 ko.bindingHandlers.pubDate = {
   update: function (element, valueAccessor, allBindingsAccessor, viewModel) {
