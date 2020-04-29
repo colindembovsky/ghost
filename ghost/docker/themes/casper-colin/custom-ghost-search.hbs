@@ -19,12 +19,12 @@
     <div id="search">
       <form class="search-form">
           <input id="search-input" placeholder="Search..." class="search-input" data-bind="enabled: isBusy"/>
-          <input type="submit" id="search-button" class="btn btn-primary" data-bind="enabled: isBusy"/>
+          <input type="submit" id="search-button" class="btn btn-primary" data-bind="enabled: isBusy" value="Search"/>
       </form>
 
       <div id="search-results" class="search-results">
         <div id="search-results-exact-section" data-bind="visible: exactResults().length > 0">
-          <h3>Exact Matches</h3>
+          <h3><span data-bind="text: 'Exact Matches: (' + exactResults().length + ')'"></span></h3>
           <ul id="search-results-exact" class="search-results" data-bind="foreach: exactResults">
             <li>
               <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
@@ -34,7 +34,7 @@
         </div>
 
         <div id="search-results-fuzzy-section" data-bind="visible: fuzzyResults().length > 0">
-          <h3>Fuzzy Matches</h3>
+          <h3><span data-bind="text: 'Fuzzy Matches: (' + fuzzyResults().length + ')'"></span></h3>
           <ul id="search-results-exact" class="search-results" data-bind="foreach: fuzzyResults">
             <li>
               <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
