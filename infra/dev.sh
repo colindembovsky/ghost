@@ -56,4 +56,5 @@ docker run -d --name ghost \
     -e database__connection__password="$mysqlLocalPass" \
     -e database__connection__user="$mysqlUser" \
     -e APP_INSIGHTS_KEY="$key" \
+    -v $(pwd)/casper-colin:/casper-colin:/var/lib/ghost/content/themes/casper-colin \
     cacregistry.azurecr.io/ghost:1.0.9

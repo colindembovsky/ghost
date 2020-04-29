@@ -1,0 +1,28 @@
+div.search-results,
+.search-form {
+    padding-left: 1.5em;
+    padding-right: 1.5em;
+}
+
+.search-input{
+    width:250px;
+    border-radius: 5px;
+    background: #fff;
+    color: #444;
+    border: 1px solid #ccc;
+    outline:none;
+    padding: 6px;
+}
+  
+.search-input:focus{
+    border:1px solid #56b4ef;
+    box-shadow: 0px 0px 3px 1px #c8def0;
+}
+
+ul.search-results {
+    list-style-type: none !important;
+}
+
+.btn {
+    margin-bottom: 5px !important;
+}

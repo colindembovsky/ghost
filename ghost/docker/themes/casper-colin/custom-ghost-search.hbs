@@ -1,0 +1,69 @@
+{{!< default}}
+
+<header class="site-header">
+  <div class="outer site-nav-main">
+    <div class="inner">
+      {{> "site-nav"}}
+    </div>
+  </div>
+</header>
+
+{{#post}}
+
+<main id="site-main" class="site-main outer" role="main">
+  <div class="inner">
+    <header class="post-full-header">
+      <h1 class="post-full-title">{{title}}</h1>
+    </header>
+
+    <div id="search">
+      <form class="search-form">
+          <input id="search-input" placeholder="Search..." class="search-input" data-bind="enabled: isBusy"/>
+          <input type="submit" id="search-button" class="btn btn-primary" data-bind="enabled: isBusy" value="Search"/>
+      </form>
+
+      <div id="search-results" class="search-results">
+        <div id="search-results-exact-section" data-bind="visible: exactResults().length > 0">
+          <h3><span data-bind="text: 'Exact Matches: (' + exactResults().length + ')'"></span></h3>
+          <ul id="search-results-exact" class="search-results" data-bind="foreach: exactResults">
+            <li>
+              <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
+              <span data-bind="pubDate: item.published_at"></span>
+            </li>
+          </ul>
+        </div>
+
+        <div id="search-results-fuzzy-section" data-bind="visible: fuzzyResults().length > 0">
+          <h3><span data-bind="text: 'Fuzzy Matches: (' + fuzzyResults().length + ')'"></span></h3>
+          <ul id="search-results-exact" class="search-results" data-bind="foreach: fuzzyResults">
+            <li>
+              <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
+              <span data-bind="pubDate: item.published_at"></span>
+            </li>
+          </ul>
+        </div>
+
+        <div id="search-results-none" data-bind="visible: hasNoResults">
+          <p>No results found.</p>
+        </div>
+      </div>
+    </div>
+
+    {{!-- Ghost search - except adapted to use fuse.js --}}
+    {{!-- <script type="text/javascript" src="https://rawgit.com/farzher/fuzzysort/master/fuzzysort.js"></script> --}}
+
+    {{!-- libs --}}
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/5.2.3/fuse.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.1/knockout-latest.min.js"></script>
+    <script type="text/javascript" src="{{asset "js/fuse-search/content-api-1.4.1.min.js"}}"></script>
+    <script type="text/javascript" src="{{asset "js/fuse-search/fuse-search.js"}}"></script>
+
+    {{!-- custom search logic --}}
+    <script type="text/javascript" src="{{asset "js/fuse-search/search.js"}}"></script>
+
+  </div>
+</main>
+
+{{/post}}
