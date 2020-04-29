@@ -60,6 +60,13 @@ class FuseSearch {
                             );
                         };
                     }
+                },
+                clearResults: function() {
+                    if (document.querySelectorAll(this.results)[0].firstChild !== null && document.querySelectorAll(this.results)[0].firstChild !== '') {
+                        while (document.querySelectorAll(this.results)[0].firstChild) {
+                            document.querySelectorAll(this.results)[0].removeChild(document.querySelectorAll(this.results)[0].firstChild);
+                        }
+                    };
                 }
             }
         }
@@ -120,11 +127,7 @@ class FuseSearch {
 
     displayResults(data){
 
-        if (document.querySelectorAll(this.results)[0].firstChild !== null && document.querySelectorAll(this.results)[0].firstChild !== '') {
-            while (document.querySelectorAll(this.results)[0].firstChild) {
-                document.querySelectorAll(this.results)[0].removeChild(document.querySelectorAll(this.results)[0].firstChild);
-            }
-        };
+        this.on.clearResults();
 
         let inputValue = document.querySelectorAll(this.input)[0].value;
         if(this.defaultValue != ''){

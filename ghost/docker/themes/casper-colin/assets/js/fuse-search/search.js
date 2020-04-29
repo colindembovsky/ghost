@@ -1,23 +1,47 @@
-function createElementFromHTML(htmlString) {
-    var div = document.createElement('div');
-    div.innerHTML = htmlString.trim();
-    return div.firstChild; 
-}
+var Model = function() {
+  this.exactResults = ko.observableArray([]);
+  this.fuzzyResults = ko.observableArray([]);
+  this.isBusy = ko.observable(false);
+  this.isNew = ko.observable(true);
 
-function template(result) {
-  const url = `${location.protocol}//${location.host}`;
-  return `<li><a href="${url}/${result.slug}">${result.title}</a> (${moment(result.published_at).format('D MMM YYYY')})</li>`;
-}
-
-function renderList(section, ul, results) {
-  console.log("%O", ul);
-  if (results.length > 0) {
-    results.forEach(r => ul.appendChild(createElementFromHTML(template(r.item))));
-    section.show();
-  } else {
-    section.hide();
+  this.updateList = function(list, entries) {
+    list([]); // clear the list
+    entries.forEach(e => list.push(e)); // add each item in
   }
-}
+
+  this.updateResults = function(results) {
+    this.isNew(false);
+    this.updateList(this.exactResults, results.filter(r => r.score == 1))
+    this.updateList(this.fuzzyResults, results.filter(r => r.score < 1))
+  }.bind(this);
+
+  this.hasNoResults = ko.pureComputed(function() {
+    return this.exactResults().length + this.exactResults().length === 0 && !this.isNew();
+  }, this);
+};
+
+const baseUrl = `${location.protocol}//${location.host}`;
+
+//return `<a href="${baseUrl}/${val.slug}">${val.title}</a>`;
+
+ko.bindingHandlers.pubDate = {
+  update: function (element, valueAccessor, allBindingsAccessor, viewModel) {
+    var value = valueAccessor(),
+        allBindings = allBindingsAccessor();
+    var valueUnwrapped = ko.utils.unwrapObservable(value);        
+    var pattern = allBindings.datePattern || 'D MMM YYYY';
+    if (valueUnwrapped == undefined || valueUnwrapped == null) {
+        $(element).text("");
+    }
+    else {
+        var date = moment(valueUnwrapped);
+        $(element).text(`(${moment(date).format(pattern)})`);
+    }
+  }
+};
+
+let model = new Model();
+ko.applyBindings(model);
 
 let fuseSearch = new FuseSearch({
     key: 'b944bc1545c0a1db9530c01a82',
@@ -68,27 +92,16 @@ let fuseSearch = new FuseSearch({
         return `'${term} | ${term}`;
       },
       beforeFetch: function() {
+        model.isBusy(true);
         NProgress.start();
-        $('#search-form :input').prop('disabled', true);
       },
       afterFetch: function(results) {
-        $('#search-form :input').prop('disabled', false);
+        model.isBusy(false);
         NProgress.done();
       },
       drawResults: function(results) {
-        console.log("%O", results);
-        console.log(`Found ${results.length} matches`);
-
-        if (results.length == 0) {
-          $('#search-results-none').show();
-          return;
-        }
-
-        const exactMatches = results.filter(r => r.score == 1);
-        const fuzzyMatches = results.filter(r => r.score < 1);
-
-        renderList($('#search-results-exact-section'), $('#search-results-exact'), exactMatches);
-        renderList($('#search-results-fuzzy-section'), $('#search-results-fuzzy'), fuzzyMatches);
-      }
+        model.updateResults(results);
+      },
+      clearResults: function() {}
     }
 });
