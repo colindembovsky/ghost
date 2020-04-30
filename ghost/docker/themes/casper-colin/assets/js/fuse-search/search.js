@@ -14,7 +14,10 @@ var Model = function() {
 
   this.updateResults = function(results) {
     this.isNew(false);
-    this.updateList(this.exactResults, results.filter(r => r.score == 1))
+    // sort exact results by published date
+    let exactResults = results.filter(r => r.score == 1);
+    exactResults.sort((a, b) => a.item.published_at < b.item.published_at ? 1 : -1);
+    this.updateList(this.exactResults, exactResults);
     this.updateList(this.fuzzyResults, results.filter(r => r.score < 1))
   }.bind(this);
 
