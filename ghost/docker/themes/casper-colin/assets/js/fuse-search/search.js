@@ -22,7 +22,7 @@ var Model = function() {
   }.bind(this);
 
   this.hasNoResults = ko.pureComputed(function() {
-    return this.exactResults().length + this.exactResults().length === 0 && !this.isNew();
+    return this.exactResults().length + this.fuzzyResults().length === 0 && !this.isNew();
   }, this);
 };
 

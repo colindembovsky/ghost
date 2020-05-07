@@ -25,22 +25,14 @@
       <div id="search-results" class="search-results">
         <div id="search-results-exact-section" data-bind="visible: exactResults().length > 0">
           <h3><span data-bind="text: 'Exact Matches: (' + exactResults().length + ')'"></span></h3>
-          <ul id="search-results-exact" class="search-results" data-bind="foreach: exactResults">
-            <li>
-              <a data-bind="attr: { href: item.full_slug }"><span data-bind="text: item.title"></span></a>
-              <span data-bind="pubDate: item.published_at"></span>
-            </li>
-          </ul>
+          <ul id="search-results-exact" class="search-results" 
+              data-bind="template: { name: 'result-template', foreach: exactResults }"></ul>
         </div>
 
         <div id="search-results-fuzzy-section" data-bind="visible: fuzzyResults().length > 0">
           <h3><span data-bind="text: 'Fuzzy Matches: (' + fuzzyResults().length + ')'"></span></h3>
-          <ul id="search-results-exact" class="search-results" data-bind="foreach: fuzzyResults">
-            <li>
-              <a data-bind="attr: { href: item.slug }"><span data-bind="text: item.title"></span></a>
-              <span data-bind="pubDate: item.published_at"></span>
-            </li>
-          </ul>
+          <ul id="search-results-exact" class="search-results" 
+              data-bind="template: { name: 'result-template', foreach: fuzzyResults }"></ul>
         </div>
 
         <div id="search-results-none" data-bind="visible: hasNoResults">
@@ -62,6 +54,13 @@
 
     {{!-- custom search logic --}}
     <script type="text/javascript" src="{{asset "js/fuse-search/search.js"}}"></script>
+
+    <script type="text/html" id="result-template">
+      <li>
+        <a data-bind="attr: { href: item.full_slug }"><span data-bind="text: item.title"></span></a>
+        <span data-bind="pubDate: item.published_at"></span>
+      </li>
+    </script>
 
   </div>
 </main>
