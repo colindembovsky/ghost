@@ -152,7 +152,7 @@ const gdpost = {
 }
 
 // hack the urls for images
-const pattern = /http(s?):\/\/colinsalmcorner.com\/posts\/files\//gi;
+const pattern = /http(s?):\/\/(www\.)?colinsalmcorner.com\/posts\/files\//gi;
 let importContent = JSON.stringify(gdpost).replace(pattern, "https://colinsalmcorner.azureedge.net/ghostcontent/images/files/");
 fs.writeFileSync("import.json", importContent);
 
