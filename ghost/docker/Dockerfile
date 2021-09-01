@@ -5,7 +5,7 @@ ARG mode
 ENV devMode ${mode:-production}
 ENV url ""
 
-RUN apk add --update --no-cache gcc g++ make libc6-compat python python3 && \
+RUN apk add --update --no-cache gcc g++ make libc6-compat python3 && \
     apk add vips-dev fftw-dev build-base --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/community --repository https://alpine.global.ssl.fastly.net/alpine/edge/main && \
     rm -rf /var/cache/apk/*
 
