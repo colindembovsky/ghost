@@ -1,4 +1,4 @@
-FROM ghost:3.12.1-alpine
+FROM ghost:4.12.1
 
 ARG mode
 
