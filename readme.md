@@ -44,3 +44,6 @@ This creates `import.json`. Navigate to ghost/labs page and import this file.
     - update images folder to public (read) access
 1. Create CDN (MSFT standard) for storage account
 1. Update CDN URL in the `index.ts` file (near bottom) to account for URL updates for images
+
+# Local Dev and Testing
+To test locally, see the `/infra/dev.sh` script.
