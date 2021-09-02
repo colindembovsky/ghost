@@ -3,3 +3,38 @@
 .post-full-content {
     font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif !important;
 }
+
+.site-header-content,
+.gh-head {
+    background: black!important;
+}
+
+h2.site-description {
+    color: white!important;
+    z-index: 200;
+}
+
+.article-image {
+    width: 75%!important;
+    margin: 6vmin auto 0!important;
+}
+
+.gh-canvas {
+    grid-template-columns:
+        [full-start]
+        minmax(2vmin, auto)
+            [wide-start]
+            minmax(auto, 120px)
+                [main-start]
+                    min(720px, calc(100% - 4vw))
+                [main-end]
+            minmax(auto, 120px)
+            [wide-end]
+        minmax(2vmin, auto)
+        [full-end]
+    ;
+}
+
+.gh-content {
+    text-align: justify;
+}
