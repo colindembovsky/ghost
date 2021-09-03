@@ -22,15 +22,15 @@ h2.site-description {
 .gh-canvas {
     grid-template-columns:
         [full-start]
-        minmax(2vmin, auto)
-            [wide-start]
-            minmax(auto, 120px)
-                [main-start]
-                    min(720px, calc(100% - 4vw))
-                [main-end]
-            minmax(auto, 120px)
-            [wide-end]
-        minmax(2vmin, auto)
+            minmax(4vmin, auto)
+                [wide-start]
+                minmax(auto, 240px)
+                    [main-start]
+                        min(960px, calc(100% - 4vw))
+                    [main-end]
+                minmax(auto, 240px)
+                [wide-end]
+            minmax(4vmin, auto)
         [full-end]
     ;
 }
