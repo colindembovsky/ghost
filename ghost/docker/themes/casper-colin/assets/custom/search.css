@@ -26,3 +26,7 @@ ul.search-results {
 .btn {
     margin-bottom: 5px !important;
 }
+
+.search-link {
+    color: var(--ghost-accent-color);
+}
