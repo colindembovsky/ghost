@@ -56,18 +56,29 @@ acrPassword=$(az acr credential show -g $RG -n $ACR_NAME --query "[passwords[?na
 echo "Looking up Storage Account connection string"
 storageConStr=$(az storage account show-connection-string -g $RG -n $SA_NAME --query "connectionString" -o tsv)
 
+# echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
+# az webapp create -g $RG -n $GHOST_WEBAPP_NAME -p $PLAN_NAME \
+#     --multicontainer-config-type "compose" \
+#     --multicontainer-config-file "../ghost/ghost-nginx.yml"
+
+# echo "Setting registry for $GHOST_WEBAPP_NAME"
+# az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
+#     --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
+#     --docker-registry-server-user $ACR_NAME \
+#     --docker-registry-server-password $acrPassword \
+#     --multicontainer-config-type "compose" \
+#     --multicontainer-config-file "../ghost/ghost-nginx.yml"
+
 echo "Creating webapp $GHOST_WEBAPP_NAME with nginx image"
 az webapp create -g $RG -n $GHOST_WEBAPP_NAME -p $PLAN_NAME \
-    --multicontainer-config-type "compose" \
-    --multicontainer-config-file "../ghost/ghost-nginx.yml"
+    -i acregistry.azurecr.io/ghost:1.0.36
 
 echo "Setting registry for $GHOST_WEBAPP_NAME"
 az webapp config container set -g $RG -n $GHOST_WEBAPP_NAME \
     --docker-registry-server-url "https://$ACR_NAME.azurecr.io" \
     --docker-registry-server-user $ACR_NAME \
     --docker-registry-server-password $acrPassword \
-    --multicontainer-config-type "compose" \
-    --multicontainer-config-file "../ghost/ghost-nginx.yml"
+    -i acregistry.azurecr.io/ghost:1.0.36
 
 echo "Enabling docker container logging"
 az webapp log config -g $RG -n $GHOST_WEBAPP_NAME \
