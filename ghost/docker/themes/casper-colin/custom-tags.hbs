@@ -9,7 +9,7 @@
     </header>
     {{#get 'tags' limit='all' include='count.posts' order='count.posts desc'}}
     {{#foreach tags}}
-        <a href='{{ url }}'>
+        <a href='{{ url }}' class="tag-link">
         <h2>{{ name }} <small>({{ count.posts }})</small></h2>
         </a>
     {{/foreach}}

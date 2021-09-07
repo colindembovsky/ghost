@@ -60,3 +60,7 @@ h2.site-description {
 html.dark-mode .article-excerpt {
     color: white;
 }
+
+.tag-link {
+    color: white;
+}
