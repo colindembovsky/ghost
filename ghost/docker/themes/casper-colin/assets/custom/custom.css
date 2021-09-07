@@ -62,5 +62,5 @@ html.dark-mode .article-excerpt {
 }
 
 .tag-link {
-    color: white;
+    color: var(--ghost-accent-color)
 }
