@@ -62,7 +62,8 @@
                 </div>
 
                 {{#unless @member}}
-                    <a class="gh-head-button" href="#/portal/signup">Subscribe</a>
+                    {{!-- <a class="gh-head-button" href="#/portal/signup">Subscribe</a> --}}
+                    <a class="rss-button" href="https://feedly.com/i/subscription/feed/{{@site.url}}/rss/" title="RSS" target="_blank" rel="noopener">{{> "icons/rss"}}</a>
                 {{else}}
                     <a class="gh-head-button" href="#/portal/account">Account</a>
                 {{/unless}}
