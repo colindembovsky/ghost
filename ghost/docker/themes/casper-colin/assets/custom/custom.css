@@ -38,3 +38,25 @@ h2.site-description {
 .gh-content {
     text-align: justify;
 }
+
+:root {
+
+    /* Colours */
+    --color-darkmode: #0d0e0e;
+
+    /*
+    An accent color is also set by Ghost itself in
+    Ghost Admin > Settings > Brand
+
+    --ghost-accent-color: {value};
+
+    You can use this variale throughout your styles
+     */
+
+    /* Fonts */
+    --font-serif: -apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue",sans-serif;
+}
+
+html.dark-mode .article-excerpt {
+    color: white;
+}
