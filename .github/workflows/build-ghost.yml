@@ -1,0 +1,39 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ghost/docker
+
+env:
+  REGISTRY: cacregistry.azurecr.io
+  USERNAME: cacregistry
+  REPO: ghost
+  TAG_MAJOR: 1.1
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.REGISTRY }}
+        username: ${{ env.USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build and push the Docker image
+      run: |
+        img="${{ env.REGISTRY }}/${{ env.REPO }}:${{ env.TAG_MAJOR }}.$GITHUB_RUN_NUMBER"
+        docker build . -t $img
+        docker push $img
