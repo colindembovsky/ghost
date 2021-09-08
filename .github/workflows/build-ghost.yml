@@ -37,3 +37,19 @@ jobs:
         img="${{ env.REGISTRY }}/${{ env.REPO }}:${{ env.TAG_MAJOR }}.$GITHUB_RUN_NUMBER"
         docker build . -t $img
         docker push $img
+
+  deploy:
+    
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: https://colinsalmcorner.com
+    
+    steps:
+    - uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy the image
+      run: |
+        az webapp config container set -g ${{ env.RG }} -n ${{ env.WEBAPP }} -i ${{ env.REGISTRY }}/${{ env.REPO }}:${{ env.TAG_MAJOR }}.$GITHUB_RUN_NUMBER"
